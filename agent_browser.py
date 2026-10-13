@@ -10,7 +10,7 @@ JOURNAL_WINDOW = 6       # Only the most recent journal entries are sent to the 
 MAX_THOUGHT_CHARS = 120  # Old reasoning is trimmed in the prompt; the full text stays in research_log.txt
 MAX_SEARCH_RESULTS = 8
 MAX_SNIPPET_CHARS = 200
-MAX_PAGE_CHARS = 4500
+PAGE_PART_CHARS = 2500   # Pages are shown in parts of about this size; READ_MORE shows the next part
 MAX_LINKS = 15
 MAX_JSON_RETRIES = 3
 
@@ -19,20 +19,21 @@ On every turn, evaluate the CURRENT ENVIRONMENT and your RESEARCH JOURNAL. You m
 
 {
   "thought_process": "Your active reasoning about what to discover next and why.",
-  "action": "SEARCH" | "NAVIGATE" | "DISCOVER" | "FINISH",
-  "parameter": "The search query string, the full target URL, the extracted summary data, or an empty string for FINISH"
+  "action": "SEARCH" | "NAVIGATE" | "READ_MORE" | "DISCOVER" | "FINISH",
+  "parameter": "The search query string, the full target URL, a page part number, the extracted summary data, or an empty string"
 }
 
 Action guide:
 - SEARCH: parameter is a plain-text query (not a URL). Results appear as a numbered list with URLs.
 - NAVIGATE: parameter is a full URL copied exactly from the search results or page links you were shown.
-- DISCOVER: parameter is the concrete text you found on the current page: commands, config blocks, file names, parameters. Copy them exactly. You may group several related details from the same page into one DISCOVER.
+- READ_MORE: long pages are shown in parts. Use an empty parameter to see the next part, or a part number to jump to that part.
+- DISCOVER: parameter is the information you found on the current page that serves the objective. Copy exact text where precision matters. You may group several related details from the same page into one DISCOVER.
 - FINISH: only when your discoveries satisfy the objective.
 
 Strictly follow these rules:
-1. If the current page contains any command, config, or file convention relevant to the objective that is not already in DISCOVERIES SO FAR, your action MUST be DISCOVER before you leave the page.
+1. If the current page contains information relevant to the objective that is not already in DISCOVERIES SO FAR, your action MUST be DISCOVER before you leave the page.
 2. Never repeat a query or URL listed under ALREADY TRIED; repeats are blocked automatically.
-3. Prefer official documentation sources over third-party blogs and mirrors.
+3. Prefer primary, authoritative sources over copies and summaries of them.
 4. Output ONLY raw JSON. No markdown wrappers, no backticks, no conversational filler."""
 
 RESPONSE_FORMAT = {
@@ -44,13 +45,63 @@ RESPONSE_FORMAT = {
             "type": "object",
             "properties": {
                 "thought_process": {"type": "string"},
-                "action": {"type": "string", "enum": ["SEARCH", "NAVIGATE", "DISCOVER", "FINISH"]},
+                "action": {"type": "string", "enum": ["SEARCH", "NAVIGATE", "READ_MORE", "DISCOVER", "FINISH"]},
                 "parameter": {"type": "string"}
             },
             "required": ["thought_process", "action", "parameter"]
         }
     }
 }
+
+BLOCK_START = "[[[BLOCK_START {}]]]"
+BLOCK_END = "[[[BLOCK_END]]]"
+BLOCK_PATTERN = re.compile(r'\[\[\[BLOCK_START (\w+)\]\]\](.*?)\[\[\[BLOCK_END\]\]\]', re.S)
+
+# Hides navigation menus, footers and cookie/consent banners, wraps code blocks and tables in markers
+# so they are never split, reads the visible text, then restores the page exactly as it was.
+PAGE_TEXT_JS = r"""([blockStart, blockEnd]) => {
+    const clutter = new Set();
+    document.querySelectorAll('nav, footer, [role=navigation], [role=contentinfo]').forEach(el => clutter.add(el));
+    document.querySelectorAll('#onetrust-banner-sdk, #onetrust-consent-sdk, #CybotCookiebotDialog, #usercentrics-root, .qc-cmp2-container, .fc-consent-root, #truste-consent-track').forEach(el => clutter.add(el));
+    const consentName = /cookie|consent|gdpr/i;
+    document.querySelectorAll('body *').forEach(el => {
+        const name = (el.id || '') + ' ' + (typeof el.className === 'string' ? el.className : '');
+        if (!consentName.test(name)) return;
+        const pos = getComputedStyle(el).position;
+        if (pos === 'fixed' || pos === 'sticky' || el.getAttribute('role') === 'dialog' || el.getAttribute('aria-modal') === 'true') clutter.add(el);
+    });
+
+    const fullText = document.body ? document.body.innerText : '';
+    const hidden = [];
+    const markers = [];
+    try {
+        clutter.forEach(el => {
+            hidden.push([el, el.style.getPropertyValue('display'), el.style.getPropertyPriority('display')]);
+            el.style.setProperty('display', 'none', 'important');
+        });
+        document.querySelectorAll('pre, table').forEach(el => {
+            if (el.parentElement && el.parentElement.closest('pre, table')) return;  // Only mark the outermost block
+            const start = document.createTextNode(blockStart.replace('{}', el.tagName.toLowerCase()));
+            const end = document.createTextNode(blockEnd);
+            el.parentNode.insertBefore(start, el);
+            el.parentNode.insertBefore(end, el.nextSibling);
+            markers.push(start, end);
+        });
+        let text = document.body ? document.body.innerText : '';
+        // Safety net: if hiding clutter removed most of the page, the "clutter" was the content
+        if (text.length < fullText.length * 0.2) {
+            hidden.forEach(([el, value, priority]) => el.style.setProperty('display', value, priority));
+            hidden.length = 0;
+            text = document.body.innerText;
+        }
+        return text;
+    } finally {
+        markers.forEach(node => node.remove());
+        hidden.forEach(([el, value, priority]) => {
+            if (value) el.style.setProperty('display', value, priority); else el.style.removeProperty('display');
+        });
+    }
+}"""
 
 def normalize_url(url):
     return url.split("#")[0].rstrip("/") if url else url
@@ -98,6 +149,12 @@ def decode_ddg_link(href):
             return target[0]
     return full
 
+async def count_search_results(page):
+    try:
+        return await page.locator(".result:not(.result--ad) a.result__a").count()
+    except Exception:
+        return 0
+
 async def extract_search_results(page, visited_urls):
     results = await page.evaluate("""() => Array.from(document.querySelectorAll('.result:not(.result--ad)')).map(r => {
         const a = r.querySelector('a.result__a');
@@ -113,15 +170,71 @@ async def extract_search_results(page, visited_urls):
         lines.append(f"[{i}] {r['title']}{visited}\n    URL: {url}\n    {snippet}")
     return "\n\n".join(lines)
 
-async def extract_page_content(page):
-    body_text = await page.evaluate("""() => {
-        const root = document.querySelector('main, article, [role=main]') || document.body;
-        return root ? root.innerText : '';
-    }""")
-    body_text = re.sub(r'\n\s*\n+', '\n\n', body_text or "").strip()
-    if len(body_text) > MAX_PAGE_CHARS:
-        body_text = body_text[:MAX_PAGE_CHARS] + "\n\n[... Text Truncated for Context Security ...]"
+def text_units(text):
+    """Split page text into units that must stay whole: code blocks, tables, and paragraphs."""
+    units = []
+    def paragraphs(chunk):
+        return [p.strip() for p in re.split(r'\n\s*\n', chunk) if p.strip()]
 
+    pos = 0
+    for m in BLOCK_PATTERN.finditer(text):
+        units += paragraphs(text[pos:m.start()])
+        body = m.group(2).strip("\n")
+        if body.strip():
+            units.append(f"```\n{body}\n```" if m.group(1) == "pre" else body)
+        pos = m.end()
+    units += paragraphs(text[pos:])
+    return units
+
+def split_oversized(unit, limit):
+    """Last resort for a single unit bigger than a whole part: split at line, then sentence, boundaries."""
+    if len(unit) <= limit:
+        return [unit]
+    fenced = unit.startswith("```\n") and unit.endswith("\n```")
+    body = unit[4:-4] if fenced else unit
+    budget = limit - 40 if fenced else limit
+
+    pieces, current = [], ""
+    lines = body.split("\n") if "\n" in body else re.split(r'(?<=[.!?])\s+', body)
+    joiner = "\n" if "\n" in body else " "
+    for line in lines:
+        while len(line) > budget:  # A single line longer than a part: hard cut is unavoidable
+            if current:
+                pieces.append(current)
+                current = ""
+            pieces.append(line[:budget])
+            line = line[budget:]
+        if current and len(current) + len(joiner) + len(line) > budget:
+            pieces.append(current)
+            current = line
+        else:
+            current = f"{current}{joiner}{line}" if current else line
+    if current:
+        pieces.append(current)
+
+    if fenced:
+        return [f"```\n{p}\n```" + ("\n(code block continues in next part)" if i < len(pieces) - 1 else "") for i, p in enumerate(pieces)]
+    return pieces
+
+def split_into_parts(text, limit=PAGE_PART_CHARS):
+    parts, current = [], ""
+    for unit in text_units(text):
+        for piece in split_oversized(unit, limit):
+            if current and len(current) + 2 + len(piece) > limit:
+                parts.append(current)
+                current = piece
+            else:
+                current = f"{current}\n\n{piece}" if current else piece
+    if current:
+        parts.append(current)
+    return parts
+
+async def extract_page_parts(page):
+    text = await page.evaluate(PAGE_TEXT_JS, [BLOCK_START, BLOCK_END])
+    return split_into_parts(text or "")
+
+async def extract_page_links(page):
+    # Links come from the whole page, menus included, since navigation menus are how sites are used
     # a.href resolves relative links (e.g. /docs/intro) to absolute URLs
     links = await page.evaluate("""() => Array.from(document.querySelectorAll('a[href]'))
         .map(a => ({text: a.innerText.trim().replace(/\\s+/g, ' '), href: a.href.split('#')[0]}))
@@ -135,10 +248,9 @@ async def extract_page_content(page):
         link_lines.append(f"- {l['text'][:60]} -> {l['href']}")
         if len(link_lines) >= MAX_LINKS:
             break
+    return "\n".join(link_lines)
 
-    return body_text, "\n".join(link_lines)
-
-async def build_environment(page, current_url, visited_urls=frozenset()):
+async def build_environment(page, current_url, page_state, visited_urls=frozenset()):
     if not current_url:
         return "[Empty or No Target Page Loaded Yet]"
     try:
@@ -146,11 +258,22 @@ async def build_environment(page, current_url, visited_urls=frozenset()):
             results = await extract_search_results(page, visited_urls)
             if results:
                 return f"Search Results:\n{results}"
-            body_text, _ = await extract_page_content(page)
-            return f"[No search results parsed - possibly no matches or a bot-check page]\n{body_text[:1500]}"
+            parts = await extract_page_parts(page)
+            return f"[No search results parsed - possibly no matches or a search engine error]\n{parts[0][:1500] if parts else ''}"
 
-        body_text, link_lines = await extract_page_content(page)
-        return f"Page Text:\n{body_text or '[No readable text]'}\n\nLinks On Page:\n{link_lines or '[None]'}"
+        # Parts are cached per URL so part numbers stay stable while the model reads through a page
+        if page_state["url"] != normalize_url(current_url):
+            page_state.update(url=normalize_url(current_url), parts=await extract_page_parts(page), index=0)
+        parts, index = page_state["parts"], page_state["index"]
+        link_lines = await extract_page_links(page)
+
+        if not parts:
+            return f"Page Text:\n[No readable text]\n\nLinks On Page:\n{link_lines or '[None]'}"
+        if index < len(parts) - 1:
+            footer = f"[Page continues: READ_MORE shows part {index + 2} of {len(parts)}]"
+        else:
+            footer = "[End of page]"
+        return f"Page Text (part {index + 1} of {len(parts)}):\n{parts[index]}\n{footer}\n\nLinks On Page:\n{link_lines or '[None]'}"
     except Exception as e:
         return f"[Error reading page content: {e}]"
 
@@ -180,9 +303,9 @@ def extract_message_content(response):
         return msg.get("content", "").strip() if isinstance(msg, dict) else msg.content.strip()
     return first_choice.get("message", {}).get("content", "").strip()
 
-async def run_agent_turn(client, page, objective, journal, current_url, tried, loop_warning=None):
+async def run_agent_turn(client, page, objective, journal, current_url, tried, page_state, loop_warning=None):
     print("🔍 Scraping and preparing current environment text layout...")
-    environment = await build_environment(page, current_url, {normalize_url(u) for u in tried["urls"]})
+    environment = await build_environment(page, current_url, page_state, {normalize_url(u) for u in tried["urls"]})
 
     warning_prompt = f"\n\n⚠️ LOOP DETECTION WARNING: {loop_warning}" if loop_warning else ""
     discoveries = [e["extracted_data"] for e in journal if e.get("action") == "DISCOVER"]
@@ -207,7 +330,7 @@ URLs: {json.dumps(tried["urls"]) if tried["urls"] else "[None]"}
 Active URL: {current_url if current_url else "None (Loop Initializing)"}
 {environment}{warning_prompt}
 
-If the CURRENT ENVIRONMENT contains commands, config, or file conventions relevant to the objective that are not in DISCOVERIES SO FAR, choose DISCOVER now.
+If the CURRENT ENVIRONMENT contains information relevant to the objective that is not in DISCOVERIES SO FAR, choose DISCOVER now.
 Determine your next tactical move. Output your decision in the mandatory JSON format:"""
 
     for attempt in range(1, MAX_JSON_RETRIES + 1):
@@ -235,6 +358,17 @@ Determine your next tactical move. Output your decision in the mandatory JSON fo
 
     raise ValueError(f"No valid JSON decision after {MAX_JSON_RETRIES} attempts.")
 
+async def load_page(page, url=None):
+    if url:
+        await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+    else:
+        await page.reload(wait_until="domcontentloaded", timeout=30000)
+    try:
+        await page.wait_for_load_state("networkidle", timeout=5000)
+    except Exception:
+        pass  # Busy pages rarely go fully idle; the DOM is already usable
+    await asyncio.sleep(1)
+
 async def main():
     client = AsyncOpenAI(
         base_url="http://localhost:1234/v1",
@@ -253,6 +387,7 @@ async def main():
     turn_counter = 1
     max_turns = 100
     tried = {"queries": [], "urls": []}
+    page_state = {"url": None, "parts": [], "index": 0}
     loop_msg = None
 
     async with async_playwright() as p:
@@ -269,7 +404,7 @@ async def main():
             print(f"\n🧠 [TURN {turn_counter}/{max_turns}] Active reasoning cycle executing...")
 
             try:
-                decision = await run_agent_turn(client, page, objective, journal, current_url, tried, loop_warning=loop_msg)
+                decision = await run_agent_turn(client, page, objective, journal, current_url, tried, page_state, loop_warning=loop_msg)
                 thought = decision.get("thought_process", "No reasoning recorded.")
                 action = str(decision.get("action", "FINISH")).upper()
                 parameter = str(decision.get("parameter", "")).strip()
@@ -309,34 +444,63 @@ async def main():
                     journal.append({"turn": turn_counter, "thought": thought, "action": f"BLOCKED_{action}", "requested": parameter, "reason": reason})
                     loop_msg = f"Your {action} '{parameter}' was blocked. {reason}"
                 else:
-                    if action == "SEARCH":
-                        tried["queries"].append(search_query(parameter))
                     print(f"🌐 Driving Playwright to cross-domain target: {target_url}")
                     try:
-                        await page.goto(target_url, wait_until="domcontentloaded", timeout=30000)
-                        try:
-                            await page.wait_for_load_state("networkidle", timeout=5000)
-                        except Exception:
-                            pass  # Busy pages rarely go fully idle; the DOM is already usable
-                        await asyncio.sleep(1)
+                        await load_page(page, target_url)
                         current_url = page.url
-                        if action == "NAVIGATE":
+
+                        if action == "SEARCH":
+                            # The search engine sometimes returns an error page; reload once before giving up
+                            if await count_search_results(page) == 0:
+                                print("⚠️ Search returned no results. Retrying once...")
+                                await asyncio.sleep(3)
+                                await load_page(page)
+                                current_url = page.url
+                            if await count_search_results(page) == 0:
+                                print("❌ Search still returned no results.")
+                                journal.append({"turn": turn_counter, "thought": thought, "action": "FAILED_SEARCH", "requested": parameter,
+                                                "error": "No results (search engine error or no matches). This query may be tried again."})
+                            else:
+                                tried["queries"].append(search_query(parameter))
+                                journal.append({"turn": turn_counter, "thought": thought, "action": action, "requested": parameter, "destination": current_url})
+                        else:
                             tried["urls"].append(target_url)
                             if normalize_url(current_url) != normalize_url(target_url):
                                 tried["urls"].append(current_url)  # Also remember where redirects landed
-                        journal.append({"turn": turn_counter, "thought": thought, "action": action, "requested": parameter, "destination": current_url})
+                            journal.append({"turn": turn_counter, "thought": thought, "action": action, "requested": parameter, "destination": current_url})
                     except Exception as b_err:
                         print(f"❌ Failed to reach target destination: {b_err}")
                         if action == "NAVIGATE":
                             tried["urls"].append(target_url)
                         journal.append({"turn": turn_counter, "thought": thought, "action": f"FAILED_{action}", "requested": parameter, "error": str(b_err)})
 
+            elif action == "READ_MORE":
+                total = len(page_state["parts"])
+                on_page = current_url and page_state["url"] == normalize_url(current_url)
+                target = int(parameter) - 1 if parameter.isdigit() else page_state["index"] + 1
+
+                if not on_page or total == 0:
+                    reason = "The current page has no parts to read. Use SEARCH or NAVIGATE first."
+                elif not 0 <= target < total:
+                    reason = f"There is no part {target + 1}; this page has {total} part(s) and you are on part {page_state['index'] + 1}."
+                else:
+                    reason = None
+
+                if reason:
+                    print(f"⚠️ READ_MORE refused: {reason}")
+                    journal.append({"turn": turn_counter, "thought": thought, "action": "BLOCKED_READ_MORE", "requested": parameter, "reason": reason})
+                    loop_msg = reason
+                else:
+                    page_state["index"] = target
+                    print(f"📖 Showing part {target + 1} of {total} of the current page.")
+                    journal.append({"turn": turn_counter, "thought": thought, "action": "READ_MORE", "part": f"{target + 1} of {total}"})
+
             elif action == "DISCOVER":
                 known = [e["extracted_data"].strip().lower() for e in journal if e.get("action") == "DISCOVER"]
                 if parameter.lower() in known:
                     print("⚠️ Duplicate discovery ignored.")
                     journal.append({"turn": turn_counter, "thought": thought, "action": "DUPLICATE_DISCOVER", "reason": "Already recorded in DISCOVERIES SO FAR."})
-                    loop_msg = "That discovery is already recorded. Find a new detail, move to a new page, or FINISH if the objective is met."
+                    loop_msg = "That discovery is already recorded. Find a new detail, read more of the page, move to a new page, or FINISH if the objective is met."
                 else:
                     print(f"📝 Logging critical discovery element: {parameter}")
                     journal.append({"turn": turn_counter, "thought": thought, "action": "DISCOVER", "source": current_url, "extracted_data": parameter})
