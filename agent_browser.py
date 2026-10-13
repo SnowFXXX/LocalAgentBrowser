@@ -238,24 +238,33 @@ async def extract_page_parts(page):
     text = await page.evaluate(PAGE_TEXT_JS, [BLOCK_START, BLOCK_END])
     return split_into_parts(text or "")
 
-async def extract_page_links(page):
+async def extract_page_links(page, shown_links=None):
     # Links come from the whole page, menus included, since navigation menus are how sites are used
     # a.href resolves relative links (e.g. /docs/intro) to absolute URLs
+    # shown_links holds links already listed earlier in the running conversation; they are skipped so a
+    # new page on the same site lists its own links instead of repeating the site menu
     links = await page.evaluate("""() => Array.from(document.querySelectorAll('a[href]'))
         .map(a => ({text: a.innerText.trim().replace(/\\s+/g, ' '), href: a.href.split('#')[0]}))
         .filter(l => l.href.startsWith('http') && l.text.length >= 4)""")
     seen = set()
     link_lines = []
+    omitted = 0
     for l in links:
         if l["href"] in seen or normalize_url(l["href"]) == normalize_url(page.url):
             continue
         seen.add(l["href"])
-        link_lines.append(f"- {l['text'][:60]} -> {l['href']}")
-        if len(link_lines) >= MAX_LINKS:
-            break
+        if shown_links is not None and l["href"] in shown_links:
+            omitted += 1
+            continue
+        if len(link_lines) < MAX_LINKS:
+            link_lines.append(f"- {l['text'][:60]} -> {l['href']}")
+            if shown_links is not None:
+                shown_links.add(l["href"])
+    if omitted:
+        link_lines.append(f"({omitted} links already listed earlier in this conversation are not repeated)")
     return "\n".join(link_lines)
 
-async def build_environment(page, current_url, page_state, visited_urls=frozenset()):
+async def build_environment(page, current_url, page_state, visited_urls=frozenset(), shown_links=None):
     if not current_url:
         return "[Empty or No Target Page Loaded Yet]"
     try:
@@ -269,7 +278,7 @@ async def build_environment(page, current_url, page_state, visited_urls=frozense
         # Parts are cached per URL so part numbers stay stable while the model reads through a page
         if page_state["url"] != normalize_url(current_url):
             page_state.update(url=normalize_url(current_url), parts=await extract_page_parts(page), index=0)
-        link_lines = await extract_page_links(page)
+        link_lines = await extract_page_links(page, shown_links)
         return f"{render_part(page_state)}\n\nLinks On Page:\n{link_lines or '[None]'}"
     except Exception as e:
         return f"[Error reading page content: {e}]"
@@ -286,19 +295,41 @@ def render_part(page_state):
 
 QUOTE_STYLES = str.maketrans({"‘": "'", "’": "'", "“": "'", "”": "'", '"': "'", "`": "'"})
 
+KNOWN_LINE_THRESHOLD = 0.9
+
 def discovery_lines(text):
     # Case, spacing and quote style (curly, straight, single, double) do not make a line new
     text = unicodedata.normalize("NFKC", str(text)).translate(QUOTE_STYLES)
     return {" ".join(line.lower().split()) for line in text.splitlines() if line.strip()}
 
+def word_pairs(text):
+    words = re.findall(r"\w+", text)
+    return {tuple(words[i:i + 2]) for i in range(len(words) - 1)} or ({tuple(words)} if words else set())
+
 def is_known_discovery(parameter, journal):
-    # A discovery is a repeat when every one of its lines was already recorded, in any order or grouping
-    new_lines = discovery_lines(parameter)
-    known_lines = set()
+    # Compared by consecutive word pairs, so line breaks, commas, punctuation and the order of lines do not
+    # make old information look new. A line is known when 90% of its word pairs were already recorded;
+    # the discovery is a repeat only when every line is known, so one genuinely new line keeps it.
+    # A long line (8+ words) made entirely of recorded words is also known: it catches a block rejoined
+    # after its recorded version had other lines (such as comments) between its parts. Short lines like
+    # commands are judged by word pairs only, so a new command built from familiar words stays new.
+    known_pairs, known_words = set(), set()
     for e in journal:
         if e.get("action") == "DISCOVER":
-            known_lines |= discovery_lines(e["extracted_data"])
-    return bool(new_lines) and new_lines <= known_lines
+            lines = discovery_lines(e["extracted_data"])
+            known_pairs |= word_pairs(" ".join(lines))  # Pairs across line breaks, for text later rejoined
+            for line in lines:
+                known_pairs |= word_pairs(line)
+                known_words |= set(re.findall(r"\w+", line))
+
+    def line_is_known(line):
+        pairs, words = word_pairs(line), set(re.findall(r"\w+", line))
+        if len(re.findall(r"\w+", line)) >= 8 and words <= known_words:
+            return True
+        return len(pairs & known_pairs) >= KNOWN_LINE_THRESHOLD * len(pairs)
+
+    new_lines = [line for line in discovery_lines(parameter) if re.search(r"\w", line)]
+    return bool(new_lines) and all(line_is_known(line) for line in new_lines)
 
 def read_more_target(parameter, page_state):
     # The model sometimes writes "2 of 2" or "part 3"; the first number is the part it means
@@ -388,7 +419,7 @@ def extract_message_content(response):
     return first_choice.get("message", {}).get("content", "").strip()
 
 def new_conversation():
-    return {"messages": None, "followups": 0, "tokens": 0, "note": None, "note_url": None}
+    return {"messages": None, "followups": 0, "tokens": 0, "note": None, "note_url": None, "shown_links": set()}
 
 def set_note(conversation, note, current_url):
     # A note is only used if the agent is still on the page it describes when the next turn starts
@@ -410,8 +441,8 @@ async def run_agent_turn(client, page, objective, journal, current_url, tried, p
         print(f"⚡ Continuing the conversation (follow-up {conversation['followups']}/{MAX_FOLLOWUPS}, ~{estimated_tokens} tokens)")
         messages = conversation["messages"] + [{"role": "user", "content": f"{note}{warning_prompt}\n\n{TURN_INSTRUCTIONS}"}]
     else:
-        messages = await build_full_prompt(page, objective, journal, current_url, tried, page_state, warning_prompt)
-        conversation["followups"] = 0
+        conversation.update(followups=0, shown_links=set())
+        messages = await build_full_prompt(page, objective, journal, current_url, tried, page_state, warning_prompt, conversation["shown_links"])
     conversation["note"] = None
 
     decision, refused, messages, tokens = await request_decision(client, messages, journal, tried, page_state, current_url)
@@ -421,9 +452,9 @@ async def run_agent_turn(client, page, objective, journal, current_url, tried, p
 TURN_INSTRUCTIONS = """If the CURRENT ENVIRONMENT contains information relevant to the objective that is not in DISCOVERIES SO FAR, choose DISCOVER now.
 Determine your next tactical move. Output your decision in the mandatory JSON format:"""
 
-async def build_full_prompt(page, objective, journal, current_url, tried, page_state, warning_prompt):
+async def build_full_prompt(page, objective, journal, current_url, tried, page_state, warning_prompt, shown_links=None):
     print("🔍 Scraping and preparing current environment text layout...")
-    environment = await build_environment(page, current_url, page_state, {normalize_url(u) for u in tried["urls"]})
+    environment = await build_environment(page, current_url, page_state, {normalize_url(u) for u in tried["urls"]}, shown_links)
 
     discoveries = [e["extracted_data"] for e in journal if e.get("action") == "DISCOVER"]
     recent_journal = compact_journal(journal)
@@ -626,7 +657,7 @@ async def main():
                 else:
                     added = search_query(parameter) if action == "SEARCH" else target_url
                     result = f"RESULT: {action} '{parameter}' done. ALREADY TRIED now also includes: {added}"
-                environment = await build_environment(page, current_url, page_state, {normalize_url(u) for u in tried["urls"]})
+                environment = await build_environment(page, current_url, page_state, {normalize_url(u) for u in tried["urls"]}, conversation["shown_links"])
                 set_note(conversation, f"{result}\n\n### CURRENT ENVIRONMENT (replaces the earlier one)\n"
                                        f"Active URL: {current_url}\n{environment}", current_url)
 
