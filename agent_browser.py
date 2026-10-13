@@ -15,6 +15,9 @@ PAGE_PART_CHARS = 2500   # Pages are shown in parts of about this size; READ_MOR
 MAX_LINKS = 15
 MAX_JSON_RETRIES = 3
 MAX_CHEAP_RETRIES = 2    # Refused replies re-asked within the same turn before the refusal costs a whole turn
+MAX_FOLLOWUPS = 4        # Same-page turns that continue one conversation before a fresh full prompt
+MAX_CONVERSATION_TOKENS = 5500  # Start fresh before the conversation nears LM Studio's 8192-token context
+TURN_PAUSE_SECONDS = 1
 
 SYSTEM_PROMPT = """You are an autonomous web discovery agent. Your job is to achieve the high-level OBJECTIVE by executing sequential actions.
 On every turn, evaluate the CURRENT ENVIRONMENT and your RESEARCH JOURNAL. You must output exactly ONE valid JSON block matching this structure:
@@ -266,18 +269,20 @@ async def build_environment(page, current_url, page_state, visited_urls=frozense
         # Parts are cached per URL so part numbers stay stable while the model reads through a page
         if page_state["url"] != normalize_url(current_url):
             page_state.update(url=normalize_url(current_url), parts=await extract_page_parts(page), index=0)
-        parts, index = page_state["parts"], page_state["index"]
         link_lines = await extract_page_links(page)
-
-        if not parts:
-            return f"Page Text:\n[No readable text]\n\nLinks On Page:\n{link_lines or '[None]'}"
-        if index < len(parts) - 1:
-            footer = f"[Page continues: READ_MORE shows part {index + 2} of {len(parts)}]"
-        else:
-            footer = "[End of page]"
-        return f"Page Text (part {index + 1} of {len(parts)}):\n{parts[index]}\n{footer}\n\nLinks On Page:\n{link_lines or '[None]'}"
+        return f"{render_part(page_state)}\n\nLinks On Page:\n{link_lines or '[None]'}"
     except Exception as e:
         return f"[Error reading page content: {e}]"
+
+def render_part(page_state):
+    parts, index = page_state["parts"], page_state["index"]
+    if not parts:
+        return "Page Text:\n[No readable text]"
+    if index < len(parts) - 1:
+        footer = f"[Page continues: READ_MORE shows part {index + 2} of {len(parts)}]"
+    else:
+        footer = "[End of page]"
+    return f"Page Text (part {index + 1} of {len(parts)}):\n{parts[index]}\n{footer}"
 
 QUOTE_STYLES = str.maketrans({"‘": "'", "’": "'", "“": "'", "”": "'", '"': "'", "`": "'"})
 
@@ -328,7 +333,7 @@ def check_decision(action, parameter, journal, tried, page_state, current_url):
         return f"UNKNOWN_{action}", f"'{action}' is not a valid action."
     return None
 
-def escalation_message(refusals, last_action, last_reason, page_state, current_url):
+def action_options(page_state, current_url):
     on_page = current_url and page_state["url"] == normalize_url(current_url) and page_state["parts"]
     if on_page and page_state["index"] < len(page_state["parts"]) - 1:
         read_more = f"READ_MORE to see part {page_state['index'] + 2} of {len(page_state['parts'])} of this page"
@@ -336,12 +341,20 @@ def escalation_message(refusals, last_action, last_reason, page_state, current_u
         read_more = "READ_MORE with a part number to revisit an earlier part (you are on the last part of this page)"
     else:
         read_more = "READ_MORE is not available here"
-    return (f"Your last {refusals} actions were all refused. Do NOT choose {last_action} again with the same or similar parameter. "
-            f"Last refusal reason: {last_reason} Choose a different action:\n"
-            f"- {read_more}\n"
+    return (f"- {read_more}\n"
             f"- NAVIGATE to a link not listed under ALREADY TRIED\n"
             f"- SEARCH with a new query\n"
             f"- FINISH if DISCOVERIES SO FAR already satisfies the objective")
+
+def refusal_correction(action, reason, page_state, current_url):
+    # Listing the alternatives on the first refusal stops the model resubmitting the same action
+    return (f"REFUSED: {reason} Do NOT choose {action} with the same or similar parameter again. Choose a different action:\n"
+            f"{action_options(page_state, current_url)}\nReply with only the JSON object.")
+
+def escalation_message(refusals, last_action, last_reason, page_state, current_url):
+    return (f"Your last {refusals} actions were all refused. Do NOT choose {last_action} again with the same or similar parameter. "
+            f"Last refusal reason: {last_reason} Choose a different action:\n"
+            f"{action_options(page_state, current_url)}")
 
 def compact_journal(journal):
     # Dropping old entries in batches (not one per turn) keeps the start of the journal unchanged
@@ -372,11 +385,38 @@ def extract_message_content(response):
         return msg.get("content", "").strip() if isinstance(msg, dict) else msg.content.strip()
     return first_choice.get("message", {}).get("content", "").strip()
 
-async def run_agent_turn(client, page, objective, journal, current_url, tried, page_state, loop_warning=None):
+def new_conversation():
+    return {"messages": None, "url": None, "followups": 0, "tokens": 0, "note": None}
+
+async def run_agent_turn(client, page, objective, journal, current_url, tried, page_state, conversation, loop_warning=None):
+    warning_prompt = f"\n\n⚠️ LOOP DETECTION WARNING: {loop_warning}" if loop_warning else ""
+
+    # Same-page turns continue the previous conversation: LM Studio has already processed all of it,
+    # so only the short note about what changed is new. A new page, too many follow-ups, or a long
+    # conversation starts over with a full prompt.
+    if (conversation["messages"] and conversation["note"] and current_url
+            and conversation["url"] == normalize_url(current_url)
+            and conversation["followups"] < MAX_FOLLOWUPS
+            and conversation["tokens"] < MAX_CONVERSATION_TOKENS):
+        conversation["followups"] += 1
+        print(f"⚡ Same page: continuing the conversation (follow-up {conversation['followups']}/{MAX_FOLLOWUPS})")
+        messages = conversation["messages"] + [{"role": "user", "content": f"{conversation['note']}{warning_prompt}\n\n{TURN_INSTRUCTIONS}"}]
+    else:
+        messages = await build_full_prompt(page, objective, journal, current_url, tried, page_state, warning_prompt)
+        conversation.update(url=normalize_url(current_url) if current_url else None, followups=0)
+    conversation["note"] = None
+
+    decision, refused, messages, tokens = await request_decision(client, messages, journal, tried, page_state, current_url)
+    conversation.update(messages=messages, tokens=tokens)
+    return decision, refused
+
+TURN_INSTRUCTIONS = """If the CURRENT ENVIRONMENT contains information relevant to the objective that is not in DISCOVERIES SO FAR, choose DISCOVER now.
+Determine your next tactical move. Output your decision in the mandatory JSON format:"""
+
+async def build_full_prompt(page, objective, journal, current_url, tried, page_state, warning_prompt):
     print("🔍 Scraping and preparing current environment text layout...")
     environment = await build_environment(page, current_url, page_state, {normalize_url(u) for u in tried["urls"]})
 
-    warning_prompt = f"\n\n⚠️ LOOP DETECTION WARNING: {loop_warning}" if loop_warning else ""
     discoveries = [e["extracted_data"] for e in journal if e.get("action") == "DISCOVER"]
     recent_journal = compact_journal(journal)
 
@@ -401,17 +441,18 @@ URLs: {json.dumps(tried["urls"]) if tried["urls"] else "[None]"}
 Active URL: {current_url if current_url else "None (Loop Initializing)"}
 {environment}{warning_prompt}
 
-If the CURRENT ENVIRONMENT contains information relevant to the objective that is not in DISCOVERIES SO FAR, choose DISCOVER now.
-Determine your next tactical move. Output your decision in the mandatory JSON format:"""
+{TURN_INSTRUCTIONS}"""
+    return [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": user_payload}
+    ]
 
+async def request_decision(client, messages, journal, tried, page_state, current_url):
     # Cheap retries: a reply that is invalid or would be refused is answered with a short correction
     # appended to the same conversation. Everything before the correction is identical to what LM Studio
     # just processed, so it only reads the correction instead of the whole prompt again. Resending the
     # prompt unchanged would not help: the same prompt returns the same answer.
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": user_payload}
-    ]
+    messages = list(messages)
     refused = []
     json_failures = 0
     while True:
@@ -444,11 +485,13 @@ Determine your next tactical move. Output your decision in the mandatory JSON fo
         parameter = str(action_decision.get("parameter", "")).strip()
         refusal = check_decision(action, parameter, journal, tried, page_state, current_url)
         if not refusal or len(refused) >= MAX_CHEAP_RETRIES:
-            return action_decision, refused
+            usage = getattr(response, "usage", None)
+            tokens = (getattr(usage, "prompt_tokens", 0) or 0) + (getattr(usage, "completion_tokens", 0) or 0)
+            return action_decision, refused, messages + [{"role": "assistant", "content": original_content}], tokens
 
         refused.append({"action": action, "parameter": parameter, "journal_action": refusal[0], "reason": refusal[1]})
         print(f"♻️ Cheap retry {len(refused)}/{MAX_CHEAP_RETRIES}: [{action}] refused. {refusal[1]}")
-        correction = f"REFUSED: {refusal[1]} Choose an action that will not be refused. Reply with only the JSON object."
+        correction = refusal_correction(action, refusal[1], page_state, current_url)
         if len(refused) >= 2:
             correction = escalation_message(len(refused), action, refusal[1], page_state, current_url) + "\nReply with only the JSON object."
         messages += [{"role": "assistant", "content": original_content}, {"role": "user", "content": correction}]
@@ -483,6 +526,7 @@ async def main():
     max_turns = 100
     tried = {"queries": [], "urls": []}
     page_state = {"url": None, "parts": [], "index": 0}
+    conversation = new_conversation()
     loop_msg = None
     consecutive_refusals = 0
 
@@ -500,7 +544,7 @@ async def main():
             print(f"\n🧠 [TURN {turn_counter}/{max_turns}] Active reasoning cycle executing...")
 
             try:
-                decision, refused = await run_agent_turn(client, page, objective, journal, current_url, tried, page_state, loop_warning=loop_msg)
+                decision, refused = await run_agent_turn(client, page, objective, journal, current_url, tried, page_state, conversation, loop_warning=loop_msg)
                 thought = decision.get("thought_process", "No reasoning recorded.")
                 action = str(decision.get("action", "FINISH")).upper()
                 parameter = str(decision.get("parameter", "")).strip()
@@ -528,6 +572,7 @@ async def main():
                 print(f"⚠️ Action refused: {refusal[1]}")
                 journal.append({"turn": turn_counter, "thought": thought, "action": refusal[0], "requested": parameter, "reason": refusal[1]})
                 loop_msg = f"Your {action} was refused. {refusal[1]}"
+                conversation["note"] = "RESULT: Nothing changed; the CURRENT ENVIRONMENT above is unchanged."
 
             elif action == "FINISH":
                 print("\n🎯 Agent has signaled mission complete. Writing final summary report...")
@@ -571,10 +616,14 @@ async def main():
                 page_state["index"] = target
                 print(f"📖 Showing part {target + 1} of {len(page_state['parts'])} of the current page.")
                 journal.append({"turn": turn_counter, "thought": thought, "action": "READ_MORE", "part": f"{target + 1} of {len(page_state['parts'])}"})
+                conversation["note"] = (f"RESULT: READ_MORE done. The CURRENT ENVIRONMENT now shows:\n{render_part(page_state)}\n"
+                                        f"The links listed earlier for this page still apply.")
 
             elif action == "DISCOVER":
                 print(f"📝 Logging critical discovery element: {parameter}")
                 journal.append({"turn": turn_counter, "thought": thought, "action": "DISCOVER", "source": current_url, "extracted_data": parameter})
+                conversation["note"] = ("RESULT: Your DISCOVER was recorded and is now part of DISCOVERIES SO FAR. "
+                                        "The CURRENT ENVIRONMENT above is unchanged. Do not record the same information again.")
 
             # A single refusal gets a short warning; repeated refusals get an explicit list of other options
             last_entry = journal[-1]["action"] if journal else ""
@@ -592,7 +641,7 @@ async def main():
 
             turn_counter += 1
             print("\n⏱️ Cycle pacing check complete. Refreshing navigation loop pipeline...")
-            await asyncio.sleep(3)
+            await asyncio.sleep(TURN_PAUSE_SECONDS)
 
         print("\n🔒 Shutting down browser instance. Research log finalized in research_log.txt.")
         await browser.close()
