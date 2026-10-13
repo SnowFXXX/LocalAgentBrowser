@@ -277,6 +277,33 @@ async def build_environment(page, current_url, page_state, visited_urls=frozense
     except Exception as e:
         return f"[Error reading page content: {e}]"
 
+def discovery_lines(text):
+    return {" ".join(line.lower().split()) for line in str(text).splitlines() if line.strip()}
+
+def is_known_discovery(parameter, journal):
+    # A discovery is a repeat when every one of its lines was already recorded, in any order or grouping
+    new_lines = discovery_lines(parameter)
+    known_lines = set()
+    for e in journal:
+        if e.get("action") == "DISCOVER":
+            known_lines |= discovery_lines(e["extracted_data"])
+    return bool(new_lines) and new_lines <= known_lines
+
+def escalation_message(refusals, last_action, last_reason, page_state, current_url):
+    on_page = current_url and page_state["url"] == normalize_url(current_url) and page_state["parts"]
+    if on_page and page_state["index"] < len(page_state["parts"]) - 1:
+        read_more = f"READ_MORE to see part {page_state['index'] + 2} of {len(page_state['parts'])} of this page"
+    elif on_page:
+        read_more = "READ_MORE with a part number to revisit an earlier part (you are on the last part of this page)"
+    else:
+        read_more = "READ_MORE is not available here"
+    return (f"Your last {refusals} actions were all refused. Do NOT choose {last_action} again with the same or similar parameter. "
+            f"Last refusal reason: {last_reason} Choose a different action:\n"
+            f"- {read_more}\n"
+            f"- NAVIGATE to a link not listed under ALREADY TRIED\n"
+            f"- SEARCH with a new query\n"
+            f"- FINISH if DISCOVERIES SO FAR already satisfies the objective")
+
 def compact_journal(journal):
     # Dropping old entries in batches (not one per turn) keeps the start of the journal unchanged
     # between turns, so LM Studio can reuse its cached processing of it
@@ -394,6 +421,7 @@ async def main():
     tried = {"queries": [], "urls": []}
     page_state = {"url": None, "parts": [], "index": 0}
     loop_msg = None
+    consecutive_refusals = 0
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False)
@@ -501,8 +529,11 @@ async def main():
                     journal.append({"turn": turn_counter, "thought": thought, "action": "READ_MORE", "part": f"{target + 1} of {total}"})
 
             elif action == "DISCOVER":
-                known = [e["extracted_data"].strip().lower() for e in journal if e.get("action") == "DISCOVER"]
-                if parameter.lower() in known:
+                if not discovery_lines(parameter):
+                    print("⚠️ Empty discovery refused.")
+                    journal.append({"turn": turn_counter, "thought": thought, "action": "BLOCKED_DISCOVER", "reason": "The DISCOVER parameter was empty."})
+                    loop_msg = "Your DISCOVER had an empty parameter. Put the actual information in the parameter, or choose a different action."
+                elif is_known_discovery(parameter, journal):
                     print("⚠️ Duplicate discovery ignored.")
                     journal.append({"turn": turn_counter, "thought": thought, "action": "DUPLICATE_DISCOVER", "reason": "Already recorded in DISCOVERIES SO FAR."})
                     loop_msg = "That discovery is already recorded. Find a new detail, read more of the page, move to a new page, or FINISH if the objective is met."
@@ -513,6 +544,16 @@ async def main():
             else:
                 print(f"⚠️ Unknown action '{action}' ignored.")
                 journal.append({"turn": turn_counter, "thought": thought, "action": f"UNKNOWN_{action}", "requested": parameter})
+
+            # A single refusal gets a short warning; repeated refusals get an explicit list of other options
+            last_entry = journal[-1]["action"] if journal else ""
+            if last_entry.startswith("BLOCKED_") or last_entry == "DUPLICATE_DISCOVER":
+                consecutive_refusals += 1
+                if consecutive_refusals >= 2:
+                    print(f"⚠️ {consecutive_refusals} refused actions in a row. Escalating loop warning.")
+                    loop_msg = escalation_message(consecutive_refusals, action, journal[-1].get("reason", ""), page_state, current_url)
+            else:
+                consecutive_refusals = 0
 
             with open("research_log.txt", "w", encoding="utf-8") as log:
                 log.write(f"OBJECTIVE: {objective}\n")
