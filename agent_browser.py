@@ -6,7 +6,7 @@ from openai import AsyncOpenAI
 from playwright.async_api import async_playwright
 
 SEARCH_URL = "https://html.duckduckgo.com/html/?q="
-JOURNAL_WINDOW = 6       # Only the most recent journal entries are sent to the model
+JOURNAL_BATCH = 6        # The prompt shows 6-11 recent journal entries; old ones are dropped 6 at a time
 MAX_THOUGHT_CHARS = 120  # Old reasoning is trimmed in the prompt; the full text stays in research_log.txt
 MAX_SEARCH_RESULTS = 8
 MAX_SNIPPET_CHARS = 200
@@ -278,8 +278,11 @@ async def build_environment(page, current_url, page_state, visited_urls=frozense
         return f"[Error reading page content: {e}]"
 
 def compact_journal(journal):
+    # Dropping old entries in batches (not one per turn) keeps the start of the journal unchanged
+    # between turns, so LM Studio can reuse its cached processing of it
+    start = max(0, (len(journal) // JOURNAL_BATCH - 1) * JOURNAL_BATCH)
     compact = []
-    for entry in journal[-JOURNAL_WINDOW:]:
+    for entry in journal[start:]:
         e = {k: v for k, v in entry.items() if k != "extracted_data"}
         if len(e.get("thought", "")) > MAX_THOUGHT_CHARS:
             e["thought"] = e["thought"][:MAX_THOUGHT_CHARS] + "..."
@@ -311,20 +314,22 @@ async def run_agent_turn(client, page, objective, journal, current_url, tried, p
     discoveries = [e["extracted_data"] for e in journal if e.get("action") == "DISCOVER"]
     recent_journal = compact_journal(journal)
 
-    # Stable sections come first so LM Studio can reuse its cached prompt prefix between turns;
-    # the page content goes last, where small models pay the most attention.
+    # LM Studio only reuses the part of the prompt that is identical to the previous turn's, up to the
+    # first change. Sections are ordered from least to most often changed, carry no counters, and the
+    # journal only grows at its end, so each turn mostly adds text instead of changing earlier text.
+    # The page content goes last, where small models pay the most attention.
     user_payload = f"""### HIGH-LEVEL OBJECTIVE
 {objective}
 
-### DISCOVERIES SO FAR ({len(discoveries)})
+### DISCOVERIES SO FAR
 {json.dumps(discoveries, indent=2) if discoveries else "[None yet]"}
+
+### RECENT RESEARCH JOURNAL
+{json.dumps(recent_journal, indent=2)}
 
 ### ALREADY TRIED (Do not repeat)
 Queries: {json.dumps(tried["queries"]) if tried["queries"] else "[None]"}
 URLs: {json.dumps(tried["urls"]) if tried["urls"] else "[None]"}
-
-### RECENT RESEARCH JOURNAL (Last {len(recent_journal)} of {len(journal)} entries)
-{json.dumps(recent_journal, indent=2)}
 
 ### CURRENT ENVIRONMENT
 Active URL: {current_url if current_url else "None (Loop Initializing)"}
