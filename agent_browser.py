@@ -27,7 +27,7 @@ Action guide:
 - SEARCH: parameter is a plain-text query (not a URL). Results appear as a numbered list with URLs.
 - NAVIGATE: parameter is a full URL copied exactly from the search results or page links you were shown.
 - READ_MORE: long pages are shown in parts. Use an empty parameter to see the next part, or a part number to jump to that part.
-- DISCOVER: parameter is the information you found on the current page that serves the objective. Copy exact text where precision matters. You may group several related details from the same page into one DISCOVER.
+- DISCOVER: parameter is the information you found on the current page that serves the objective. DISCOVER does not extract anything for you: you must write the information itself into the parameter. An empty DISCOVER is refused. Copy exact text where precision matters. You may group several related details from the same page into one DISCOVER.
 - FINISH: only when your discoveries satisfy the objective.
 
 Strictly follow these rules:
