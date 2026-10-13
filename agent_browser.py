@@ -2,6 +2,7 @@ import asyncio
 import json
 import urllib.parse
 import re
+import unicodedata
 from openai import AsyncOpenAI
 from playwright.async_api import async_playwright
 
@@ -13,6 +14,7 @@ MAX_SNIPPET_CHARS = 200
 PAGE_PART_CHARS = 2500   # Pages are shown in parts of about this size; READ_MORE shows the next part
 MAX_LINKS = 15
 MAX_JSON_RETRIES = 3
+MAX_CHEAP_RETRIES = 2    # Refused replies re-asked within the same turn before the refusal costs a whole turn
 
 SYSTEM_PROMPT = """You are an autonomous web discovery agent. Your job is to achieve the high-level OBJECTIVE by executing sequential actions.
 On every turn, evaluate the CURRENT ENVIRONMENT and your RESEARCH JOURNAL. You must output exactly ONE valid JSON block matching this structure:
@@ -277,8 +279,12 @@ async def build_environment(page, current_url, page_state, visited_urls=frozense
     except Exception as e:
         return f"[Error reading page content: {e}]"
 
+QUOTE_STYLES = str.maketrans({"‘": "'", "’": "'", "“": "'", "”": "'", '"': "'", "`": "'"})
+
 def discovery_lines(text):
-    return {" ".join(line.lower().split()) for line in str(text).splitlines() if line.strip()}
+    # Case, spacing and quote style (curly, straight, single, double) do not make a line new
+    text = unicodedata.normalize("NFKC", str(text)).translate(QUOTE_STYLES)
+    return {" ".join(line.lower().split()) for line in text.splitlines() if line.strip()}
 
 def is_known_discovery(parameter, journal):
     # A discovery is a repeat when every one of its lines was already recorded, in any order or grouping
@@ -288,6 +294,39 @@ def is_known_discovery(parameter, journal):
         if e.get("action") == "DISCOVER":
             known_lines |= discovery_lines(e["extracted_data"])
     return bool(new_lines) and new_lines <= known_lines
+
+def read_more_target(parameter, page_state):
+    return int(parameter) - 1 if parameter.isdigit() else page_state["index"] + 1
+
+def check_decision(action, parameter, journal, tried, page_state, current_url):
+    """Refusals that can be decided before acting. Returns (journal action, reason), or None if the decision may proceed."""
+    if action == "SEARCH":
+        query = search_query(parameter)
+        if not query.strip():
+            return "BLOCKED_SEARCH", "The SEARCH query was empty."
+        # Repeats are blocked outright; a warning alone does not stop small models from looping
+        if normalize_query(query) in [normalize_query(q) for q in tried["queries"]]:
+            return "BLOCKED_SEARCH", "This exact query was already searched. Use a new query, or DISCOVER from the current page."
+    elif action == "NAVIGATE":
+        if not parameter.strip():
+            return "BLOCKED_NAVIGATE", "NAVIGATE needs a full URL in the parameter."
+        if normalize_url(determine_url(action, parameter)) in {normalize_url(u) for u in tried["urls"]}:
+            return "BLOCKED_NAVIGATE", "This URL was already visited. Pick a URL not listed under ALREADY TRIED."
+    elif action == "READ_MORE":
+        total = len(page_state["parts"])
+        target = read_more_target(parameter, page_state)
+        if not (current_url and page_state["url"] == normalize_url(current_url)) or total == 0:
+            return "BLOCKED_READ_MORE", "The current page has no parts to read. Use SEARCH or NAVIGATE first."
+        if not 0 <= target < total:
+            return "BLOCKED_READ_MORE", f"There is no part {target + 1}; this page has {total} part(s) and you are on part {page_state['index'] + 1}."
+    elif action == "DISCOVER":
+        if not discovery_lines(parameter):
+            return "BLOCKED_DISCOVER", "The DISCOVER parameter was empty. Put the actual information in the parameter."
+        if is_known_discovery(parameter, journal):
+            return "DUPLICATE_DISCOVER", "Everything in that DISCOVER is already recorded in DISCOVERIES SO FAR."
+    elif action != "FINISH":
+        return f"UNKNOWN_{action}", f"'{action}' is not a valid action."
+    return None
 
 def escalation_message(refusals, last_action, last_reason, page_state, current_url):
     on_page = current_url and page_state["url"] == normalize_url(current_url) and page_state["parts"]
@@ -365,30 +404,54 @@ Active URL: {current_url if current_url else "None (Loop Initializing)"}
 If the CURRENT ENVIRONMENT contains information relevant to the objective that is not in DISCOVERIES SO FAR, choose DISCOVER now.
 Determine your next tactical move. Output your decision in the mandatory JSON format:"""
 
-    for attempt in range(1, MAX_JSON_RETRIES + 1):
+    # Cheap retries: a reply that is invalid or would be refused is answered with a short correction
+    # appended to the same conversation. Everything before the correction is identical to what LM Studio
+    # just processed, so it only reads the correction instead of the whole prompt again. Resending the
+    # prompt unchanged would not help: the same prompt returns the same answer.
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": user_payload}
+    ]
+    refused = []
+    json_failures = 0
+    while True:
         response = await client.chat.completions.create(
             model="qwen2.5-7b-instruct",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_payload}
-            ],
+            messages=messages,
             temperature=0.2,
             response_format=RESPONSE_FORMAT
         )
-        raw_content = extract_message_content(response)
+        original_content = extract_message_content(response)
+        raw_content = original_content
 
         if raw_content.startswith("```"):
             raw_content = re.sub(r'^```json\s*|^```\s*|```$', '', raw_content, flags=re.MULTILINE).strip()
 
         try:
             action_decision = json.loads(raw_content)
-            if isinstance(action_decision, dict):
-                return action_decision
-            print(f"⚠️ Model returned non-object JSON (attempt {attempt}/{MAX_JSON_RETRIES}).")
-        except json.JSONDecodeError:
-            print(f"⚠️ Model returned invalid JSON (attempt {attempt}/{MAX_JSON_RETRIES}): {raw_content[:200]}")
+            if not isinstance(action_decision, dict):
+                raise ValueError("the reply was JSON but not an object")
+        except (json.JSONDecodeError, ValueError) as parse_err:
+            json_failures += 1
+            print(f"⚠️ Model returned invalid JSON (attempt {json_failures}/{MAX_JSON_RETRIES}): {raw_content[:200]}")
+            if json_failures >= MAX_JSON_RETRIES:
+                raise ValueError(f"No valid JSON decision after {MAX_JSON_RETRIES} attempts.")
+            messages += [{"role": "assistant", "content": original_content},
+                         {"role": "user", "content": f"That reply was not a valid JSON object ({parse_err}). Reply with only the JSON object in the mandatory format."}]
+            continue
 
-    raise ValueError(f"No valid JSON decision after {MAX_JSON_RETRIES} attempts.")
+        action = str(action_decision.get("action", "FINISH")).upper()
+        parameter = str(action_decision.get("parameter", "")).strip()
+        refusal = check_decision(action, parameter, journal, tried, page_state, current_url)
+        if not refusal or len(refused) >= MAX_CHEAP_RETRIES:
+            return action_decision, refused
+
+        refused.append({"action": action, "parameter": parameter, "journal_action": refusal[0], "reason": refusal[1]})
+        print(f"♻️ Cheap retry {len(refused)}/{MAX_CHEAP_RETRIES}: [{action}] refused. {refusal[1]}")
+        correction = f"REFUSED: {refusal[1]} Choose an action that will not be refused. Reply with only the JSON object."
+        if len(refused) >= 2:
+            correction = escalation_message(len(refused), action, refusal[1], page_state, current_url) + "\nReply with only the JSON object."
+        messages += [{"role": "assistant", "content": original_content}, {"role": "user", "content": correction}]
 
 async def load_page(page, url=None):
     if url:
@@ -437,7 +500,7 @@ async def main():
             print(f"\n🧠 [TURN {turn_counter}/{max_turns}] Active reasoning cycle executing...")
 
             try:
-                decision = await run_agent_turn(client, page, objective, journal, current_url, tried, page_state, loop_warning=loop_msg)
+                decision, refused = await run_agent_turn(client, page, objective, journal, current_url, tried, page_state, loop_warning=loop_msg)
                 thought = decision.get("thought_process", "No reasoning recorded.")
                 action = str(decision.get("action", "FINISH")).upper()
                 parameter = str(decision.get("parameter", "")).strip()
@@ -452,102 +515,70 @@ async def main():
                 print("💡 Check that LM Studio is actively running and model 'qwen2.5-7b-instruct' is loaded.")
                 break
 
+            # Replies refused and retried within this turn stay in the journal so the model sees what failed
+            for r in refused:
+                journal.append({"turn": turn_counter, "action": "REFUSED_IN_TURN", "requested": f"{r['action']} {r['parameter'][:120]}", "reason": r["reason"]})
+
             print(f"💡 Agent Thoughts: {thought}")
             print(f"🎬 Chosen Action: [{action}] -> Parameter: {parameter}")
 
-            if action == "FINISH":
+            refusal = check_decision(action, parameter, journal, tried, page_state, current_url)
+            if refusal:
+                # Only reached once this turn's cheap retries are used up
+                print(f"⚠️ Action refused: {refusal[1]}")
+                journal.append({"turn": turn_counter, "thought": thought, "action": refusal[0], "requested": parameter, "reason": refusal[1]})
+                loop_msg = f"Your {action} was refused. {refusal[1]}"
+
+            elif action == "FINISH":
                 print("\n🎯 Agent has signaled mission complete. Writing final summary report...")
                 journal.append({"turn": turn_counter, "thought": thought, "action": "FINISH", "finding": parameter})
                 break
 
             elif action in ["SEARCH", "NAVIGATE"]:
                 target_url = determine_url(action, parameter)
-                visited = {normalize_url(u) for u in tried["urls"]}
+                print(f"🌐 Driving Playwright to cross-domain target: {target_url}")
+                try:
+                    await load_page(page, target_url)
+                    current_url = page.url
 
-                # Repeats are blocked outright; a warning alone does not stop small models from looping
-                if action == "SEARCH" and normalize_query(search_query(parameter)) in [normalize_query(q) for q in tried["queries"]]:
-                    reason = "This exact query was already searched. Use a new query, or DISCOVER from the current page."
-                elif action == "NAVIGATE" and normalize_url(target_url) in visited:
-                    reason = "This URL was already visited. Pick a URL not listed under ALREADY TRIED."
-                else:
-                    reason = None
-
-                if reason:
-                    print(f"⚠️ Anti-Loop Block: {action} '{parameter}' was already tried.")
-                    journal.append({"turn": turn_counter, "thought": thought, "action": f"BLOCKED_{action}", "requested": parameter, "reason": reason})
-                    loop_msg = f"Your {action} '{parameter}' was blocked. {reason}"
-                else:
-                    print(f"🌐 Driving Playwright to cross-domain target: {target_url}")
-                    try:
-                        await load_page(page, target_url)
-                        current_url = page.url
-
-                        if action == "SEARCH":
-                            # The search engine sometimes returns an error page; reload once before giving up
-                            if await count_search_results(page) == 0:
-                                print("⚠️ Search returned no results. Retrying once...")
-                                await asyncio.sleep(3)
-                                await load_page(page)
-                                current_url = page.url
-                            if await count_search_results(page) == 0:
-                                print("❌ Search still returned no results.")
-                                journal.append({"turn": turn_counter, "thought": thought, "action": "FAILED_SEARCH", "requested": parameter,
-                                                "error": "No results (search engine error or no matches). This query may be tried again."})
-                            else:
-                                tried["queries"].append(search_query(parameter))
-                                journal.append({"turn": turn_counter, "thought": thought, "action": action, "requested": parameter, "destination": current_url})
+                    if action == "SEARCH":
+                        # The search engine sometimes returns an error page; reload once before giving up
+                        if await count_search_results(page) == 0:
+                            print("⚠️ Search returned no results. Retrying once...")
+                            await asyncio.sleep(3)
+                            await load_page(page)
+                            current_url = page.url
+                        if await count_search_results(page) == 0:
+                            print("❌ Search still returned no results.")
+                            journal.append({"turn": turn_counter, "thought": thought, "action": "FAILED_SEARCH", "requested": parameter,
+                                            "error": "No results (search engine error or no matches). This query may be tried again."})
                         else:
-                            tried["urls"].append(target_url)
-                            if normalize_url(current_url) != normalize_url(target_url):
-                                tried["urls"].append(current_url)  # Also remember where redirects landed
+                            tried["queries"].append(search_query(parameter))
                             journal.append({"turn": turn_counter, "thought": thought, "action": action, "requested": parameter, "destination": current_url})
-                    except Exception as b_err:
-                        print(f"❌ Failed to reach target destination: {b_err}")
-                        if action == "NAVIGATE":
-                            tried["urls"].append(target_url)
-                        journal.append({"turn": turn_counter, "thought": thought, "action": f"FAILED_{action}", "requested": parameter, "error": str(b_err)})
+                    else:
+                        tried["urls"].append(target_url)
+                        if normalize_url(current_url) != normalize_url(target_url):
+                            tried["urls"].append(current_url)  # Also remember where redirects landed
+                        journal.append({"turn": turn_counter, "thought": thought, "action": action, "requested": parameter, "destination": current_url})
+                except Exception as b_err:
+                    print(f"❌ Failed to reach target destination: {b_err}")
+                    if action == "NAVIGATE":
+                        tried["urls"].append(target_url)
+                    journal.append({"turn": turn_counter, "thought": thought, "action": f"FAILED_{action}", "requested": parameter, "error": str(b_err)})
 
             elif action == "READ_MORE":
-                total = len(page_state["parts"])
-                on_page = current_url and page_state["url"] == normalize_url(current_url)
-                target = int(parameter) - 1 if parameter.isdigit() else page_state["index"] + 1
-
-                if not on_page or total == 0:
-                    reason = "The current page has no parts to read. Use SEARCH or NAVIGATE first."
-                elif not 0 <= target < total:
-                    reason = f"There is no part {target + 1}; this page has {total} part(s) and you are on part {page_state['index'] + 1}."
-                else:
-                    reason = None
-
-                if reason:
-                    print(f"⚠️ READ_MORE refused: {reason}")
-                    journal.append({"turn": turn_counter, "thought": thought, "action": "BLOCKED_READ_MORE", "requested": parameter, "reason": reason})
-                    loop_msg = reason
-                else:
-                    page_state["index"] = target
-                    print(f"📖 Showing part {target + 1} of {total} of the current page.")
-                    journal.append({"turn": turn_counter, "thought": thought, "action": "READ_MORE", "part": f"{target + 1} of {total}"})
+                target = read_more_target(parameter, page_state)
+                page_state["index"] = target
+                print(f"📖 Showing part {target + 1} of {len(page_state['parts'])} of the current page.")
+                journal.append({"turn": turn_counter, "thought": thought, "action": "READ_MORE", "part": f"{target + 1} of {len(page_state['parts'])}"})
 
             elif action == "DISCOVER":
-                if not discovery_lines(parameter):
-                    print("⚠️ Empty discovery refused.")
-                    journal.append({"turn": turn_counter, "thought": thought, "action": "BLOCKED_DISCOVER", "reason": "The DISCOVER parameter was empty."})
-                    loop_msg = "Your DISCOVER had an empty parameter. Put the actual information in the parameter, or choose a different action."
-                elif is_known_discovery(parameter, journal):
-                    print("⚠️ Duplicate discovery ignored.")
-                    journal.append({"turn": turn_counter, "thought": thought, "action": "DUPLICATE_DISCOVER", "reason": "Already recorded in DISCOVERIES SO FAR."})
-                    loop_msg = "That discovery is already recorded. Find a new detail, read more of the page, move to a new page, or FINISH if the objective is met."
-                else:
-                    print(f"📝 Logging critical discovery element: {parameter}")
-                    journal.append({"turn": turn_counter, "thought": thought, "action": "DISCOVER", "source": current_url, "extracted_data": parameter})
-
-            else:
-                print(f"⚠️ Unknown action '{action}' ignored.")
-                journal.append({"turn": turn_counter, "thought": thought, "action": f"UNKNOWN_{action}", "requested": parameter})
+                print(f"📝 Logging critical discovery element: {parameter}")
+                journal.append({"turn": turn_counter, "thought": thought, "action": "DISCOVER", "source": current_url, "extracted_data": parameter})
 
             # A single refusal gets a short warning; repeated refusals get an explicit list of other options
             last_entry = journal[-1]["action"] if journal else ""
-            if last_entry.startswith("BLOCKED_") or last_entry == "DUPLICATE_DISCOVER":
+            if last_entry.startswith(("BLOCKED_", "UNKNOWN_")) or last_entry == "DUPLICATE_DISCOVER":
                 consecutive_refusals += 1
                 if consecutive_refusals >= 2:
                     print(f"⚠️ {consecutive_refusals} refused actions in a row. Escalating loop warning.")
