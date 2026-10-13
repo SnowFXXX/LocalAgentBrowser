@@ -5,6 +5,12 @@ import re
 from openai import AsyncOpenAI
 from playwright.async_api import async_playwright
 
+SEARCH_URL = "https://html.duckduckgo.com/html/?q="
+JOURNAL_WINDOW = 10      # Only the most recent journal entries are sent to the model
+MAX_PAGE_CHARS = 5000
+MAX_LINKS = 25
+MAX_JSON_RETRIES = 3
+
 SYSTEM_PROMPT = """You are an autonomous web discovery agent. Your job is to achieve the high-level OBJECTIVE by executing sequential actions.
 On every turn, evaluate the CURRENT ENVIRONMENT and your RESEARCH JOURNAL. You must output exactly ONE valid JSON block matching this structure:
 
@@ -14,10 +20,36 @@ On every turn, evaluate the CURRENT ENVIRONMENT and your RESEARCH JOURNAL. You m
   "parameter": "The search query string, the full target URL, the extracted summary data, or an empty string for FINISH"
 }
 
+Action guide:
+- SEARCH: parameter is a plain-text query (not a URL). Results appear as a numbered list with URLs.
+- NAVIGATE: parameter is a full URL copied exactly from the search results or page links you were shown.
+- DISCOVER: parameter is the concrete fact, command, or config text you found on the current page.
+- FINISH: only when your discoveries satisfy the objective.
+
 Strictly follow these rules:
 1. Do not repeat actions or URLs you have already visited unless necessary.
 2. Avoid circular loops; if a path is a dead end, pivot your search parameters or navigate away.
 3. Output ONLY raw JSON. No markdown wrappers, no backticks, no conversational filler."""
+
+RESPONSE_FORMAT = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "agent_action",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "thought_process": {"type": "string"},
+                "action": {"type": "string", "enum": ["SEARCH", "NAVIGATE", "DISCOVER", "FINISH"]},
+                "parameter": {"type": "string"}
+            },
+            "required": ["thought_process", "action", "parameter"]
+        }
+    }
+}
+
+def normalize_url(url):
+    return url.split("#")[0].rstrip("/") if url else url
 
 def determine_url(action, parameter):
     if isinstance(parameter, list):
@@ -26,100 +58,163 @@ def determine_url(action, parameter):
         clean_param = str(parameter)
 
     clean_param = clean_param.strip().strip('"').strip("'")
-    
+
     if action == "NAVIGATE":
         if "#" in clean_param:
             clean_param = clean_param.split("#")[0]
-            
+
         if clean_param.startswith(('http://', 'https://')):
             return clean_param
         return f"https://{clean_param}"
     elif action == "SEARCH":
-        if "google.com/search?" in clean_param:
+        # If the model hands back a full search engine URL, pull the query back out of it
+        if clean_param.startswith(('http://', 'https://')) and ("duckduckgo.com" in clean_param or "google.com/search" in clean_param):
             parsed_url = urllib.parse.urlparse(clean_param)
             query_dict = urllib.parse.parse_qs(parsed_url.query)
             if 'q' in query_dict:
-                clean_param = query_dict['q'][0] if isinstance(query_dict['q'], list) else query_dict['q']
-        
+                clean_param = query_dict['q'][0]
+
         clean_query = clean_param.replace('+', ' ')
         encoded = urllib.parse.quote_plus(clean_query)
-        return f"https://www.google.com/search?q={encoded}"
+        return f"{SEARCH_URL}{encoded}"
     return None
 
-async def run_agent_turn(client, browser_context, objective, journal, current_url, loop_warning=None):
+def decode_ddg_link(href):
+    # DuckDuckGo wraps result links as //duckduckgo.com/l/?uddg=<encoded-target>&rut=...
+    if not href:
+        return ""
+    full = urllib.parse.urljoin("https://duckduckgo.com", href)
+    parsed = urllib.parse.urlparse(full)
+    if parsed.netloc.endswith("duckduckgo.com") and parsed.path.startswith("/l/"):
+        target = urllib.parse.parse_qs(parsed.query).get("uddg")
+        if target:
+            return target[0]
+    return full
+
+async def extract_search_results(page):
+    results = await page.evaluate("""() => Array.from(document.querySelectorAll('.result:not(.result--ad)')).map(r => {
+        const a = r.querySelector('a.result__a');
+        const s = r.querySelector('.result__snippet');
+        return a ? {title: a.innerText.trim(), href: a.getAttribute('href'), snippet: s ? s.innerText.trim() : ''} : null;
+    }).filter(Boolean)""")
+
+    lines = []
+    for i, r in enumerate(results[:15], start=1):
+        lines.append(f"[{i}] {r['title']}\n    URL: {decode_ddg_link(r['href'])}\n    {r['snippet']}")
+    return "\n\n".join(lines)
+
+async def extract_page_content(page):
+    body_text = await page.evaluate("""() => {
+        const root = document.querySelector('main, article, [role=main]') || document.body;
+        return root ? root.innerText : '';
+    }""")
+    body_text = re.sub(r'\n\s*\n+', '\n\n', body_text or "").strip()
+    if len(body_text) > MAX_PAGE_CHARS:
+        body_text = body_text[:MAX_PAGE_CHARS] + "\n\n[... Text Truncated for Context Security ...]"
+
+    # a.href resolves relative links (e.g. /docs/intro) to absolute URLs
+    links = await page.evaluate("""() => Array.from(document.querySelectorAll('a[href]'))
+        .map(a => ({text: a.innerText.trim().replace(/\\s+/g, ' '), href: a.href.split('#')[0]}))
+        .filter(l => l.href.startsWith('http') && l.text.length >= 4)""")
+    seen = set()
+    link_lines = []
+    for l in links:
+        if l["href"] in seen or normalize_url(l["href"]) == normalize_url(page.url):
+            continue
+        seen.add(l["href"])
+        link_lines.append(f"- {l['text'][:80]} -> {l['href']}")
+        if len(link_lines) >= MAX_LINKS:
+            break
+
+    return body_text, "\n".join(link_lines)
+
+async def build_environment(page, current_url):
+    if not current_url:
+        return "[Empty or No Target Page Loaded Yet]"
+    try:
+        if "duckduckgo.com" in current_url:
+            results = await extract_search_results(page)
+            if results:
+                return f"Search Results:\n{results}"
+            body_text, _ = await extract_page_content(page)
+            return f"[No search results parsed - possibly no matches or a bot-check page]\n{body_text[:1500]}"
+
+        body_text, link_lines = await extract_page_content(page)
+        return f"Page Text:\n{body_text or '[No readable text]'}\n\nLinks On Page:\n{link_lines or '[None]'}"
+    except Exception as e:
+        return f"[Error reading page content: {e}]"
+
+def extract_message_content(response):
+    choices = getattr(response, "choices", None)
+    if choices is None and isinstance(response, dict):
+        choices = response.get("choices", [])
+
+    if isinstance(choices, list) and len(choices) > 0:
+        first_choice = choices[0]
+    else:
+        first_choice = choices
+
+    if hasattr(first_choice, "message"):
+        return (first_choice.message.content or "").strip()
+    elif isinstance(first_choice, dict) and "message" in first_choice:
+        msg = first_choice["message"]
+        return msg.get("content", "").strip() if isinstance(msg, dict) else msg.content.strip()
+    return first_choice.get("message", {}).get("content", "").strip()
+
+async def run_agent_turn(client, page, objective, journal, current_url, loop_warning=None):
     print("🔍 Scraping and preparing current environment text layout...")
-    page_text = ""
-    
-    if current_url:
-        try:
-            pages = browser_context.pages
-            if pages:
-                page = pages[-1]
-                locators = await page.locator("p, h1, h2, h3, li, span, div").all_inner_texts()
-                content_blocks = [t.strip() for t in locators if len(t.strip()) > 35 and "JavaScript" not in t and "function()" not in t]
-                clean_blocks = list(dict.fromkeys(content_blocks))
-                
-                sliced_blocks = clean_blocks[:6]
-                page_text = "\n\n".join(sliced_blocks)
-                
-                if len(page_text) > 6000:
-                    page_text = page_text[:6000] + "\n\n[... Text Truncated for Context Security ...]"
-        except Exception as e:
-            page_text = f"[Error reading page text layouts: {e}]"
+    environment = await build_environment(page, current_url)
 
     warning_prompt = f"\n⚠️ LOOP DETECTION WARNING: {loop_warning}\n" if loop_warning else ""
+    discoveries = [e["extracted_data"] for e in journal if e.get("action") == "DISCOVER"]
+    recent_journal = journal[-JOURNAL_WINDOW:]
 
     user_payload = f"""### HIGH-LEVEL OBJECTIVE
 {objective}
 
 ### CURRENT ENVIRONMENT
 Active URL: {current_url if current_url else "None (Loop Initializing)"}
-Extracted Layout Text:
-{page_text if page_text else "[Empty or No Target Page Loaded Yet]"}{warning_prompt}
+{environment}{warning_prompt}
 
-### PERSISTENT RESEARCH JOURNAL (Your Historical Actions & Findings)
-{json.dumps(journal, indent=2)}
+### DISCOVERIES SO FAR ({len(discoveries)})
+{json.dumps(discoveries, indent=2) if discoveries else "[None yet]"}
+
+### RECENT RESEARCH JOURNAL (Last {len(recent_journal)} of {len(journal)} entries)
+{json.dumps(recent_journal, indent=2)}
 
 Determine your next tactical move. Output your decision in the mandatory JSON format:"""
 
-    response = await client.chat.completions.create(
-        model="qwen2.5-7b-instruct",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_payload}
-        ],
-        temperature=0.2
-    )
-    
-    choices = getattr(response, "choices", None)
-    if choices is None and isinstance(response, dict):
-        choices = response.get("choices", [])
-        
-    if isinstance(choices, list) and len(choices) > 0:
-        first_choice = choices[0]
-    else:
-        first_choice = choices
-    
-    if hasattr(first_choice, "message"):
-        raw_content = first_choice.message.content.strip()
-    elif isinstance(first_choice, dict) and "message" in first_choice:
-        msg = first_choice["message"]
-        raw_content = msg.get("content", "").strip() if isinstance(msg, dict) else msg.content.strip()
-    else:
-        raw_content = first_choice.get("message", {}).get("content", "").strip()
+    for attempt in range(1, MAX_JSON_RETRIES + 1):
+        response = await client.chat.completions.create(
+            model="qwen2.5-7b-instruct",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_payload}
+            ],
+            temperature=0.2,
+            response_format=RESPONSE_FORMAT
+        )
+        raw_content = extract_message_content(response)
 
-    if raw_content.startswith("```"):
-        raw_content = re.sub(r'^```json\s*|^```\s*|```$', '', raw_content, flags=re.MULTILINE).strip()
-        
-    action_decision = json.loads(raw_content)
-    return action_decision
+        if raw_content.startswith("```"):
+            raw_content = re.sub(r'^```json\s*|^```\s*|```$', '', raw_content, flags=re.MULTILINE).strip()
+
+        try:
+            action_decision = json.loads(raw_content)
+            if isinstance(action_decision, dict):
+                return action_decision
+            print(f"⚠️ Model returned non-object JSON (attempt {attempt}/{MAX_JSON_RETRIES}).")
+        except json.JSONDecodeError:
+            print(f"⚠️ Model returned invalid JSON (attempt {attempt}/{MAX_JSON_RETRIES}): {raw_content[:200]}")
+
+    raise ValueError(f"No valid JSON decision after {MAX_JSON_RETRIES} attempts.")
 
 async def main():
     client = AsyncOpenAI(
         base_url="http://localhost:1234/v1",
         api_key="lm-studio"
     )
-    
+
     print("🤖 ==================================================== 🤖")
     print("🚀 Initializing Autonomous Discovery Agent Setup...")
     objective = input("🎯 Define the Agent's High-Level Objective: ").strip()
@@ -127,18 +222,18 @@ async def main():
         print("⚠️ Objective cannot be empty.")
         return
 
-    journal = []  
+    journal = []
     current_url = None
     turn_counter = 1
-    max_turns = 100  
+    max_turns = 100
     parameter_history = {}
     loop_msg = None
-    
+
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False)
+        # No user_agent override: headed Chromium already reports a real, version-matched Chrome UA
         context = await browser.new_context(
             java_script_enabled=True,
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
             viewport={"width": 1280, "height": 720}
         )
         await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
@@ -146,57 +241,70 @@ async def main():
 
         while turn_counter <= max_turns:
             print(f"\n🧠 [TURN {turn_counter}/{max_turns}] Active reasoning cycle executing...")
-            
+
             try:
-                decision = await run_agent_turn(client, context, objective, journal, current_url, loop_warning=loop_msg)
+                decision = await run_agent_turn(client, page, objective, journal, current_url, loop_warning=loop_msg)
                 thought = decision.get("thought_process", "No reasoning recorded.")
-                action = decision.get("action", "FINISH")
+                action = str(decision.get("action", "FINISH")).upper()
                 parameter = decision.get("parameter", "")
                 loop_msg = None
+            except ValueError as parse_err:
+                print(f"⚠️ {parse_err} Skipping turn.")
+                journal.append({"turn": turn_counter, "action": "INVALID_OUTPUT", "error": str(parse_err)})
+                turn_counter += 1
+                continue
             except Exception as err:
                 print(f"❌ Local AI API transaction failed: {err}")
                 print("💡 Check that LM Studio is actively running and model 'qwen2.5-7b-instruct' is loaded.")
                 break
-            
+
             print(f"💡 Agent Thoughts: {thought}")
             print(f"🎬 Chosen Action: [{action}] -> Parameter: {parameter}")
-            
-            param_key = str(parameter).strip()
+
+            param_key = f"{action}:{str(parameter).strip().lower()}"
             parameter_history[param_key] = parameter_history.get(param_key, 0) + 1
 
             if parameter_history[param_key] > 1 and action != "FINISH":
                 print(f"⚠️ Tracked parameter overuse detected! Preparing loop warning context flag.")
-                loop_msg = f"You have issued the parameter '{param_key}' multiple times. Pivot your query variations immediately."
+                loop_msg = f"You have issued {action} '{parameter}' {parameter_history[param_key]} times. Pivot your query variations immediately."
 
             if action == "FINISH":
                 print("\n🎯 Agent has signaled mission complete. Writing final summary report...")
                 journal.append({"turn": turn_counter, "thought": thought, "action": "FINISH", "finding": parameter})
                 break
-                
+
             elif action in ["SEARCH", "NAVIGATE"]:
                 target_url = determine_url(action, parameter)
-                
-                if target_url and current_url and target_url.split("?")[0] == current_url.split("?")[0]:
-                    print(f"⚠️ Anti-Loop Warning: Model requested duplicate target URL domain endpoint.")
-                    journal.append({"turn": turn_counter, "thought": thought, "action": f"BLOCKED_{action}", "reason": "Already resting on target URL destination layout contents."})
-                    action = "DISCOVER"
-                    parameter = f"Current page context info verified at destination: {current_url}"
+
+                # Compare full URLs so a new query on the same search endpoint is never treated as a duplicate
+                if target_url and current_url and normalize_url(target_url) == normalize_url(current_url):
+                    print(f"⚠️ Anti-Loop Warning: Model requested the exact URL it is already on.")
+                    journal.append({"turn": turn_counter, "thought": thought, "action": f"BLOCKED_{action}", "requested": parameter,
+                                    "reason": "You are already on this exact URL. Use the Current Environment content, or choose a different query/URL."})
+                    loop_msg = f"Your {action} '{parameter}' was blocked because you are already on that page."
                 else:
                     print(f"🌐 Driving Playwright to cross-domain target: {target_url}")
                     try:
-                        await page.goto(target_url)
-                        await asyncio.sleep(10)  
-                        await page.wait_for_load_state("networkidle")
+                        await page.goto(target_url, wait_until="domcontentloaded", timeout=30000)
+                        try:
+                            await page.wait_for_load_state("networkidle", timeout=5000)
+                        except Exception:
+                            pass  # Busy pages rarely go fully idle; the DOM is already usable
+                        await asyncio.sleep(1)
                         current_url = page.url
-                        journal.append({"turn": turn_counter, "thought": thought, "action": action, "destination": current_url})
+                        journal.append({"turn": turn_counter, "thought": thought, "action": action, "requested": parameter, "destination": current_url})
                     except Exception as b_err:
                         print(f"❌ Failed to reach target destination: {b_err}")
-                        journal.append({"turn": turn_counter, "thought": thought, "action": f"FAILED_{action}", "error": str(b_err)})
-            
-            if action == "DISCOVER":
+                        journal.append({"turn": turn_counter, "thought": thought, "action": f"FAILED_{action}", "requested": parameter, "error": str(b_err)})
+
+            elif action == "DISCOVER":
                 print(f"📝 Logging critical discovery element: {parameter}")
-                journal.append({"turn": turn_counter, "thought": thought, "action": "DISCOVER", "extracted_data": parameter})
-            
+                journal.append({"turn": turn_counter, "thought": thought, "action": "DISCOVER", "source": current_url, "extracted_data": parameter})
+
+            else:
+                print(f"⚠️ Unknown action '{action}' ignored.")
+                journal.append({"turn": turn_counter, "thought": thought, "action": f"UNKNOWN_{action}", "requested": parameter})
+
             with open("research_log.txt", "w", encoding="utf-8") as log:
                 log.write(f"OBJECTIVE: {objective}\n")
                 log.write(json.dumps(journal, indent=2))
