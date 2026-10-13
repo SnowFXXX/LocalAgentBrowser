@@ -15,7 +15,7 @@ PAGE_PART_CHARS = 2500   # Pages are shown in parts of about this size; READ_MOR
 MAX_LINKS = 15
 MAX_JSON_RETRIES = 3
 MAX_CHEAP_RETRIES = 2    # Refused replies re-asked within the same turn before the refusal costs a whole turn
-MAX_FOLLOWUPS = 4        # Same-page turns that continue one conversation before a fresh full prompt
+MAX_FOLLOWUPS = 12       # Turns that continue one conversation before a fresh full prompt (the token budget usually ends it first)
 MAX_CONVERSATION_TOKENS = 5500  # Start fresh before the conversation nears LM Studio's 8192-token context
 TURN_PAUSE_SECONDS = 1
 
@@ -301,7 +301,9 @@ def is_known_discovery(parameter, journal):
     return bool(new_lines) and new_lines <= known_lines
 
 def read_more_target(parameter, page_state):
-    return int(parameter) - 1 if parameter.isdigit() else page_state["index"] + 1
+    # The model sometimes writes "2 of 2" or "part 3"; the first number is the part it means
+    number = re.search(r'\d+', parameter)
+    return int(number.group()) - 1 if number else page_state["index"] + 1
 
 def check_decision(action, parameter, journal, tried, page_state, current_url):
     """Refusals that can be decided before acting. Returns (journal action, reason), or None if the decision may proceed."""
@@ -386,24 +388,30 @@ def extract_message_content(response):
     return first_choice.get("message", {}).get("content", "").strip()
 
 def new_conversation():
-    return {"messages": None, "url": None, "followups": 0, "tokens": 0, "note": None}
+    return {"messages": None, "followups": 0, "tokens": 0, "note": None, "note_url": None}
+
+def set_note(conversation, note, current_url):
+    # A note is only used if the agent is still on the page it describes when the next turn starts
+    conversation.update(note=note, note_url=normalize_url(current_url) if current_url else None)
 
 async def run_agent_turn(client, page, objective, journal, current_url, tried, page_state, conversation, loop_warning=None):
     warning_prompt = f"\n\n⚠️ LOOP DETECTION WARNING: {loop_warning}" if loop_warning else ""
 
-    # Same-page turns continue the previous conversation: LM Studio has already processed all of it,
-    # so only the short note about what changed is new. A new page, too many follow-ups, or a long
-    # conversation starts over with a full prompt.
-    if (conversation["messages"] and conversation["note"] and current_url
-            and conversation["url"] == normalize_url(current_url)
+    # Turns continue the previous conversation: LM Studio has already processed all of it, so only the
+    # note about what changed (a result, a new page part, or a whole new page) is new. Too many
+    # follow-ups, or a conversation nearing the context limit, starts over with a full prompt.
+    note = conversation["note"]
+    estimated_tokens = conversation["tokens"] + len(note or "") // 3
+    if (conversation["messages"] and note and current_url
+            and conversation["note_url"] == normalize_url(current_url)
             and conversation["followups"] < MAX_FOLLOWUPS
-            and conversation["tokens"] < MAX_CONVERSATION_TOKENS):
+            and estimated_tokens < MAX_CONVERSATION_TOKENS):
         conversation["followups"] += 1
-        print(f"⚡ Same page: continuing the conversation (follow-up {conversation['followups']}/{MAX_FOLLOWUPS})")
-        messages = conversation["messages"] + [{"role": "user", "content": f"{conversation['note']}{warning_prompt}\n\n{TURN_INSTRUCTIONS}"}]
+        print(f"⚡ Continuing the conversation (follow-up {conversation['followups']}/{MAX_FOLLOWUPS}, ~{estimated_tokens} tokens)")
+        messages = conversation["messages"] + [{"role": "user", "content": f"{note}{warning_prompt}\n\n{TURN_INSTRUCTIONS}"}]
     else:
         messages = await build_full_prompt(page, objective, journal, current_url, tried, page_state, warning_prompt)
-        conversation.update(url=normalize_url(current_url) if current_url else None, followups=0)
+        conversation["followups"] = 0
     conversation["note"] = None
 
     decision, refused, messages, tokens = await request_decision(client, messages, journal, tried, page_state, current_url)
@@ -572,7 +580,7 @@ async def main():
                 print(f"⚠️ Action refused: {refusal[1]}")
                 journal.append({"turn": turn_counter, "thought": thought, "action": refusal[0], "requested": parameter, "reason": refusal[1]})
                 loop_msg = f"Your {action} was refused. {refusal[1]}"
-                conversation["note"] = "RESULT: Nothing changed; the CURRENT ENVIRONMENT above is unchanged."
+                set_note(conversation, "RESULT: Nothing changed; the CURRENT ENVIRONMENT above is unchanged.", current_url)
 
             elif action == "FINISH":
                 print("\n🎯 Agent has signaled mission complete. Writing final summary report...")
@@ -611,19 +619,30 @@ async def main():
                         tried["urls"].append(target_url)
                     journal.append({"turn": turn_counter, "thought": thought, "action": f"FAILED_{action}", "requested": parameter, "error": str(b_err)})
 
+                # The new page joins the running conversation instead of forcing a full prompt rebuild
+                outcome = journal[-1]
+                if "error" in outcome:
+                    result = f"RESULT: {outcome['action']} '{parameter}' failed: {outcome['error'][:200]}"
+                else:
+                    added = search_query(parameter) if action == "SEARCH" else target_url
+                    result = f"RESULT: {action} '{parameter}' done. ALREADY TRIED now also includes: {added}"
+                environment = await build_environment(page, current_url, page_state, {normalize_url(u) for u in tried["urls"]})
+                set_note(conversation, f"{result}\n\n### CURRENT ENVIRONMENT (replaces the earlier one)\n"
+                                       f"Active URL: {current_url}\n{environment}", current_url)
+
             elif action == "READ_MORE":
                 target = read_more_target(parameter, page_state)
                 page_state["index"] = target
                 print(f"📖 Showing part {target + 1} of {len(page_state['parts'])} of the current page.")
                 journal.append({"turn": turn_counter, "thought": thought, "action": "READ_MORE", "part": f"{target + 1} of {len(page_state['parts'])}"})
-                conversation["note"] = (f"RESULT: READ_MORE done. The CURRENT ENVIRONMENT now shows:\n{render_part(page_state)}\n"
-                                        f"The links listed earlier for this page still apply.")
+                set_note(conversation, f"RESULT: READ_MORE done. The CURRENT ENVIRONMENT now shows:\n{render_part(page_state)}\n"
+                                       f"The links listed earlier for this page still apply.", current_url)
 
             elif action == "DISCOVER":
                 print(f"📝 Logging critical discovery element: {parameter}")
                 journal.append({"turn": turn_counter, "thought": thought, "action": "DISCOVER", "source": current_url, "extracted_data": parameter})
-                conversation["note"] = ("RESULT: Your DISCOVER was recorded and is now part of DISCOVERIES SO FAR. "
-                                        "The CURRENT ENVIRONMENT above is unchanged. Do not record the same information again.")
+                set_note(conversation, "RESULT: Your DISCOVER was recorded and is now part of DISCOVERIES SO FAR. "
+                                       "The CURRENT ENVIRONMENT above is unchanged. Do not record the same information again.", current_url)
 
             # A single refusal gets a short warning; repeated refusals get an explicit list of other options
             last_entry = journal[-1]["action"] if journal else ""
