@@ -283,7 +283,8 @@ async def build_environment(page, current_url, page_state, visited_urls=frozense
 
         # Parts are cached per URL so part numbers stay stable while the model reads through a page
         if page_state["url"] != normalize_url(current_url):
-            page_state.update(url=normalize_url(current_url), parts=await extract_page_parts(page), index=0)
+            page_state.update(url=normalize_url(current_url), parts=await extract_page_parts(page), index=0,
+                              seen_parts={0}, visit_discoveries=0, leave_confirmed=False)
         link_lines = await extract_page_links(page, shown_links)
         return f"{render_part(page_state)}\n\nLinks On Page:\n{link_lines or '[None]'}"
     except Exception as e:
@@ -342,6 +343,23 @@ def read_more_target(parameter, page_state):
     number = re.search(r'\d+', parameter)
     return int(number.group()) - 1 if number else page_state["index"] + 1
 
+def leave_check(action, page_state, current_url):
+    # The model often left content pages without recording what it needed from them. The first attempt to
+    # leave a page it has recorded nothing from gets a cheap retry asking it to confirm; repeating the same
+    # action then goes through, so tasks where leaving without a discovery is normal lose only one retry.
+    # Search result pages are exempt (page_state only tracks content pages).
+    parts = page_state["parts"]
+    on_page = current_url and page_state["url"] == normalize_url(current_url) and parts
+    if not on_page or page_state.get("visit_discoveries") or page_state.get("leave_confirmed"):
+        return None
+    page_state["leave_confirmed"] = True  # Asked once per visit
+    unread = len(parts) - len(page_state.get("seen_parts", {0}))
+    unread_note = f" {unread} of its {len(parts)} parts are still unread." if unread else ""
+    read_more = ", or READ_MORE if the unread parts may have it" if unread else ""
+    return ("CONFIRM_LEAVE", f"You are about to leave {current_url} without recording anything from it.{unread_note} "
+            f"If it has information relevant to the objective, DISCOVER it now{read_more}. "
+            f"If it truly has nothing relevant, repeat your {action} to leave.")
+
 def check_decision(action, parameter, journal, tried, page_state, current_url):
     """Refusals that can be decided before acting. Returns (journal action, reason), or None if the decision may proceed."""
     if action == "SEARCH":
@@ -360,6 +378,8 @@ def check_decision(action, parameter, journal, tried, page_state, current_url):
         # Going back to an earlier page is allowed; the cap stops back-and-forth loops between pages
         if [normalize_url(u) for u in tried["urls"]].count(target) >= MAX_VISITS_PER_URL:
             return "BLOCKED_NAVIGATE", f"This URL was already visited {MAX_VISITS_PER_URL} times. Pick a different page."
+    if action in ("SEARCH", "NAVIGATE"):
+        return leave_check(action, page_state, current_url)
     elif action == "READ_MORE":
         total = len(page_state["parts"])
         target = read_more_target(parameter, page_state)
@@ -566,7 +586,10 @@ async def request_decision(client, messages, journal, tried, page_state, current
         refused.append({"action": action, "parameter": parameter, "journal_action": refusal[0], "reason": refusal[1]})
         print(f"♻️ Cheap retry {len(refused)}/{MAX_CHEAP_RETRIES}: [{action}] refused. {refusal[1]}")
         correction = refusal_correction(action, refusal[1], page_state, current_url)
-        if len(refused) >= 2:
+        if refusal[0] == "CONFIRM_LEAVE":
+            # Not a true refusal: repeating the action is an allowed answer, so no "do not repeat" wording
+            correction = f"CHECK: {refusal[1]} Reply with only the JSON object."
+        elif len(refused) >= 2:
             correction = escalation_message(len(refused), action, refusal[1], page_state, current_url) + "\nReply with only the JSON object."
         messages += [{"role": "assistant", "content": original_content}, {"role": "user", "content": correction}]
 
@@ -709,6 +732,7 @@ async def main():
             elif action == "READ_MORE":
                 target = read_more_target(parameter, page_state)
                 page_state["index"] = target
+                page_state.setdefault("seen_parts", {0}).add(target)
                 print(f"📖 Showing part {target + 1} of {len(page_state['parts'])} of the current page.")
                 journal.append({"turn": turn_counter, "thought": thought, "action": "READ_MORE", "part": f"{target + 1} of {len(page_state['parts'])}"})
                 set_note(conversation, f"RESULT: READ_MORE done. The CURRENT ENVIRONMENT now shows:\n{render_part(page_state)}\n"
@@ -717,6 +741,7 @@ async def main():
             elif action == "DISCOVER":
                 print(f"📝 Logging critical discovery element: {parameter}")
                 journal.append({"turn": turn_counter, "thought": thought, "action": "DISCOVER", "source": current_url, "extracted_data": parameter})
+                page_state["visit_discoveries"] = page_state.get("visit_discoveries", 0) + 1
                 set_note(conversation, "RESULT: Your DISCOVER was recorded and is now part of DISCOVERIES SO FAR. "
                                        "The CURRENT ENVIRONMENT above is unchanged. Do not record the same information again.", current_url)
 
