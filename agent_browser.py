@@ -14,7 +14,8 @@ MAX_SNIPPET_CHARS = 200
 PAGE_PART_CHARS = 2500   # Pages are shown in parts of about this size; READ_MORE shows the next part
 MAX_LINKS = 15
 MAX_JSON_RETRIES = 3
-MAX_CHEAP_RETRIES = 2    # Refused replies re-asked within the same turn before the refusal costs a whole turn
+MAX_VISITS_PER_URL = 3   # Returning to an earlier page is allowed; this caps back-and-forth loops
+MAX_CHEAP_RETRIES = 2   # Refused replies re-asked within the same turn before the refusal costs a whole turn
 MAX_FOLLOWUPS = 12       # Turns that continue one conversation before a fresh full prompt (the token budget usually ends it first)
 MAX_CONVERSATION_TOKENS = 5500  # Start fresh before the conversation nears LM Studio's 8192-token context
 TURN_PAUSE_SECONDS = 1
@@ -37,7 +38,7 @@ Action guide:
 
 Strictly follow these rules:
 1. If the current page contains information relevant to the objective that is not already in DISCOVERIES SO FAR, your action MUST be DISCOVER before you leave the page.
-2. Never repeat a query or URL listed under ALREADY TRIED; repeats are blocked automatically.
+2. Never repeat a search query, and never NAVIGATE to the page you are already on. You may return to a previously visited URL when it still has information you need, at most 3 visits per URL. These limits are enforced automatically.
 3. Prefer primary, authoritative sources over copies and summaries of them.
 4. Output ONLY raw JSON. No markdown wrappers, no backticks, no conversational filler."""
 
@@ -348,8 +349,12 @@ def check_decision(action, parameter, journal, tried, page_state, current_url):
     elif action == "NAVIGATE":
         if not parameter.strip():
             return "BLOCKED_NAVIGATE", "NAVIGATE needs a full URL in the parameter."
-        if normalize_url(determine_url(action, parameter)) in {normalize_url(u) for u in tried["urls"]}:
-            return "BLOCKED_NAVIGATE", "This URL was already visited. Pick a URL not listed under ALREADY TRIED."
+        target = normalize_url(determine_url(action, parameter))
+        if current_url and target == normalize_url(current_url):
+            return "BLOCKED_NAVIGATE", "You are already on this page. Use READ_MORE to see its other parts, DISCOVER from it, or go somewhere else."
+        # Going back to an earlier page is allowed; the cap stops back-and-forth loops between pages
+        if [normalize_url(u) for u in tried["urls"]].count(target) >= MAX_VISITS_PER_URL:
+            return "BLOCKED_NAVIGATE", f"This URL was already visited {MAX_VISITS_PER_URL} times. Pick a different page."
     elif action == "READ_MORE":
         total = len(page_state["parts"])
         target = read_more_target(parameter, page_state)
@@ -375,7 +380,7 @@ def action_options(page_state, current_url):
     else:
         read_more = "READ_MORE is not available here"
     return (f"- {read_more}\n"
-            f"- NAVIGATE to a link not listed under ALREADY TRIED\n"
+            f"- NAVIGATE to another page: a new link, or an earlier page that still has information you need\n"
             f"- SEARCH with a new query\n"
             f"- FINISH if DISCOVERIES SO FAR already satisfies the objective")
 
@@ -417,6 +422,14 @@ def extract_message_content(response):
         msg = first_choice["message"]
         return msg.get("content", "").strip() if isinstance(msg, dict) else msg.content.strip()
     return first_choice.get("message", {}).get("content", "").strip()
+
+def visited_summary(urls):
+    counts = {}
+    for u in urls:
+        counts[normalize_url(u)] = counts.get(normalize_url(u), 0) + 1
+    if not counts:
+        return "[None]"
+    return json.dumps([u if n == 1 else f"{u} (visited {n} times)" for u, n in counts.items()])
 
 def new_conversation():
     return {"messages": None, "followups": 0, "tokens": 0, "note": None, "note_url": None, "shown_links": set()}
@@ -472,9 +485,9 @@ async def build_full_prompt(page, objective, journal, current_url, tried, page_s
 ### RECENT RESEARCH JOURNAL
 {json.dumps(recent_journal, indent=2)}
 
-### ALREADY TRIED (Do not repeat)
-Queries: {json.dumps(tried["queries"]) if tried["queries"] else "[None]"}
-URLs: {json.dumps(tried["urls"]) if tried["urls"] else "[None]"}
+### ALREADY TRIED
+Queries (do not repeat): {json.dumps(tried["queries"]) if tried["queries"] else "[None]"}
+URLs visited (you may return to one that still has information you need, at most {MAX_VISITS_PER_URL} visits each): {visited_summary(tried["urls"])}
 
 ### CURRENT ENVIRONMENT
 Active URL: {current_url if current_url else "None (Loop Initializing)"}
@@ -534,6 +547,11 @@ async def request_decision(client, messages, journal, tried, page_state, current
         if len(refused) >= 2:
             correction = escalation_message(len(refused), action, refusal[1], page_state, current_url) + "\nReply with only the JSON object."
         messages += [{"role": "assistant", "content": original_content}, {"role": "user", "content": correction}]
+
+def write_research_log(objective, journal):
+    with open("research_log.txt", "w", encoding="utf-8") as log:
+        log.write(f"OBJECTIVE: {objective}\n")
+        log.write(json.dumps(journal, indent=2))
 
 async def load_page(page, url=None):
     if url:
@@ -657,6 +675,9 @@ async def main():
                 else:
                     added = search_query(parameter) if action == "SEARCH" else target_url
                     result = f"RESULT: {action} '{parameter}' done. ALREADY TRIED now also includes: {added}"
+                    if action == "NAVIGATE":
+                        visits = [normalize_url(u) for u in tried["urls"]].count(normalize_url(target_url))
+                        result = f"RESULT: NAVIGATE '{parameter}' done (visit {visits} of {MAX_VISITS_PER_URL} allowed for this URL)."
                 environment = await build_environment(page, current_url, page_state, {normalize_url(u) for u in tried["urls"]}, conversation["shown_links"])
                 set_note(conversation, f"{result}\n\n### CURRENT ENVIRONMENT (replaces the earlier one)\n"
                                        f"Active URL: {current_url}\n{environment}", current_url)
@@ -685,14 +706,14 @@ async def main():
             else:
                 consecutive_refusals = 0
 
-            with open("research_log.txt", "w", encoding="utf-8") as log:
-                log.write(f"OBJECTIVE: {objective}\n")
-                log.write(json.dumps(journal, indent=2))
+            write_research_log(objective, journal)
 
             turn_counter += 1
             print("\n⏱️ Cycle pacing check complete. Refreshing navigation loop pipeline...")
             await asyncio.sleep(TURN_PAUSE_SECONDS)
 
+        # Written again here because FINISH leaves the loop before the per-turn write
+        write_research_log(objective, journal)
         print("\n🔒 Shutting down browser instance. Research log finalized in research_log.txt.")
         await browser.close()
 
