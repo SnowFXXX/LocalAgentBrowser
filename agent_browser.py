@@ -20,6 +20,7 @@ MAX_FOLLOWUPS = 12       # Turns that continue one conversation before a fresh f
 MAX_CONVERSATION_TOKENS = 5500  # Start fresh before the conversation nears LM Studio's 8192-token context
 TURN_PAUSE_SECONDS = 1
 STALL_TURNS = 4          # Turns without a new discovery before the model is asked to check its progress
+OBJECTIVE_CHECK_EVERY = 8  # Turns between scheduled objective checks, which happen even while discoveries continue
 
 SYSTEM_PROMPT = """You are an autonomous web discovery agent. Your job is to achieve the high-level OBJECTIVE by executing sequential actions.
 On every turn, evaluate the CURRENT ENVIRONMENT and your RESEARCH JOURNAL. You must output exactly ONE valid JSON block matching this structure:
@@ -588,6 +589,7 @@ async def main():
     loop_msg = None
     consecutive_refusals = 0
     turns_without_discovery = 0
+    turns_since_objective_check = 0
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False)
@@ -721,6 +723,20 @@ async def main():
                             "with a summary of the result in the parameter. If not, state in thought_process exactly "
                             "what is still missing, then go and find that specific thing.")
                 loop_msg = f"{loop_msg}\n{progress}" if loop_msg else progress
+                turns_since_objective_check = 0
+            else:
+                # Discoveries on loosely related topics keep resetting the stall count, so the objective is
+                # also re-checked on a fixed schedule to stop the model drifting away from it
+                turns_since_objective_check += 1
+                if turns_since_objective_check >= OBJECTIVE_CHECK_EVERY:
+                    turns_since_objective_check = 0
+                    count = sum(1 for e in journal if e.get("action") == "DISCOVER")
+                    print(f"🧭 Objective check after {turn_counter} turns ({count} discoveries).")
+                    check = (f"OBJECTIVE CHECK: you have recorded {count} discoveries in {turn_counter} turns. Re-read the "
+                             "OBJECTIVE. If DISCOVERIES SO FAR satisfy it, choose FINISH with a summary of the result in the "
+                             "parameter. If not, state in thought_process exactly what is still missing and go directly for it; "
+                             "do not spend turns on topics outside the objective.")
+                    loop_msg = f"{loop_msg}\n{check}" if loop_msg else check
 
             write_research_log(objective, journal)
 
