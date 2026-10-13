@@ -19,6 +19,7 @@ MAX_CHEAP_RETRIES = 2   # Refused replies re-asked within the same turn before t
 MAX_FOLLOWUPS = 12       # Turns that continue one conversation before a fresh full prompt (the token budget usually ends it first)
 MAX_CONVERSATION_TOKENS = 5500  # Start fresh before the conversation nears LM Studio's 8192-token context
 TURN_PAUSE_SECONDS = 1
+STALL_TURNS = 4          # Turns without a new discovery before the model is asked to check its progress
 
 SYSTEM_PROMPT = """You are an autonomous web discovery agent. Your job is to achieve the high-level OBJECTIVE by executing sequential actions.
 On every turn, evaluate the CURRENT ENVIRONMENT and your RESEARCH JOURNAL. You must output exactly ONE valid JSON block matching this structure:
@@ -586,6 +587,7 @@ async def main():
     conversation = new_conversation()
     loop_msg = None
     consecutive_refusals = 0
+    turns_without_discovery = 0
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False)
@@ -705,6 +707,20 @@ async def main():
                     loop_msg = escalation_message(consecutive_refusals, action, journal[-1].get("reason", ""), page_state, current_url)
             else:
                 consecutive_refusals = 0
+
+            # Without a nudge the model keeps browsing after it already has enough; after several turns
+            # with no new discovery it is asked to weigh its discoveries against the objective
+            if action == "DISCOVER" and last_entry == "DISCOVER":
+                turns_without_discovery = 0
+            else:
+                turns_without_discovery += 1
+            if turns_without_discovery >= STALL_TURNS:
+                print(f"⚠️ No new discoveries in {turns_without_discovery} turns. Adding progress check.")
+                progress = (f"PROGRESS CHECK: no new discoveries in the last {turns_without_discovery} turns. "
+                            "Compare DISCOVERIES SO FAR with the OBJECTIVE. If the objective is satisfied, choose FINISH "
+                            "with a summary of the result in the parameter. If not, state in thought_process exactly "
+                            "what is still missing, then go and find that specific thing.")
+                loop_msg = f"{loop_msg}\n{progress}" if loop_msg else progress
 
             write_research_log(objective, journal)
 
