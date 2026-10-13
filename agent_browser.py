@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 import json
 import urllib.parse
 import re
@@ -20,9 +20,14 @@ Strictly follow these rules:
 3. Output ONLY raw JSON. No markdown wrappers, no backticks, no conversational filler."""
 
 def determine_url(action, parameter):
-    clean_param = parameter.strip().strip('"').strip("'")
+    if isinstance(parameter, list):
+        clean_param = str(parameter[0]) if len(parameter) > 0 else ""
+    else:
+        clean_param = str(parameter)
+
+    clean_param = clean_param.strip().strip('"').strip("'")
+    
     if action == "NAVIGATE":
-        # FIXED: Automatically strip out trailing anchor/hash fragments to prevent hidden loop traps
         if "#" in clean_param:
             clean_param = clean_param.split("#")[0]
             
@@ -34,14 +39,14 @@ def determine_url(action, parameter):
             parsed_url = urllib.parse.urlparse(clean_param)
             query_dict = urllib.parse.parse_qs(parsed_url.query)
             if 'q' in query_dict:
-                clean_param = query_dict['q']
+                clean_param = query_dict['q'][0] if isinstance(query_dict['q'], list) else query_dict['q']
         
         clean_query = clean_param.replace('+', ' ')
         encoded = urllib.parse.quote_plus(clean_query)
         return f"https://www.google.com/search?q={encoded}"
     return None
 
-async def run_agent_turn(client, browser_context, objective, journal, current_url):
+async def run_agent_turn(client, browser_context, objective, journal, current_url, loop_warning=None):
     print("🔍 Scraping and preparing current environment text layout...")
     page_text = ""
     
@@ -62,13 +67,15 @@ async def run_agent_turn(client, browser_context, objective, journal, current_ur
         except Exception as e:
             page_text = f"[Error reading page text layouts: {e}]"
 
+    warning_prompt = f"\n⚠️ LOOP DETECTION WARNING: {loop_warning}\n" if loop_warning else ""
+
     user_payload = f"""### HIGH-LEVEL OBJECTIVE
 {objective}
 
 ### CURRENT ENVIRONMENT
 Active URL: {current_url if current_url else "None (Loop Initializing)"}
 Extracted Layout Text:
-{page_text if page_text else "[Empty or No Target Page Loaded Yet]"}
+{page_text if page_text else "[Empty or No Target Page Loaded Yet]"}{warning_prompt}
 
 ### PERSISTENT RESEARCH JOURNAL (Your Historical Actions & Findings)
 {json.dumps(journal, indent=2)}
@@ -124,6 +131,8 @@ async def main():
     current_url = None
     turn_counter = 1
     max_turns = 100  
+    parameter_history = {}
+    loop_msg = None
     
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False)
@@ -139,10 +148,11 @@ async def main():
             print(f"\n🧠 [TURN {turn_counter}/{max_turns}] Active reasoning cycle executing...")
             
             try:
-                decision = await run_agent_turn(client, context, objective, journal, current_url)
+                decision = await run_agent_turn(client, context, objective, journal, current_url, loop_warning=loop_msg)
                 thought = decision.get("thought_process", "No reasoning recorded.")
                 action = decision.get("action", "FINISH")
                 parameter = decision.get("parameter", "")
+                loop_msg = None
             except Exception as err:
                 print(f"❌ Local AI API transaction failed: {err}")
                 print("💡 Check that LM Studio is actively running and model 'qwen2.5-7b-instruct' is loaded.")
@@ -151,6 +161,13 @@ async def main():
             print(f"💡 Agent Thoughts: {thought}")
             print(f"🎬 Chosen Action: [{action}] -> Parameter: {parameter}")
             
+            param_key = str(parameter).strip()
+            parameter_history[param_key] = parameter_history.get(param_key, 0) + 1
+
+            if parameter_history[param_key] > 1 and action != "FINISH":
+                print(f"⚠️ Tracked parameter overuse detected! Preparing loop warning context flag.")
+                loop_msg = f"You have issued the parameter '{param_key}' multiple times. Pivot your query variations immediately."
+
             if action == "FINISH":
                 print("\n🎯 Agent has signaled mission complete. Writing final summary report...")
                 journal.append({"turn": turn_counter, "thought": thought, "action": "FINISH", "finding": parameter})
@@ -159,11 +176,9 @@ async def main():
             elif action in ["SEARCH", "NAVIGATE"]:
                 target_url = determine_url(action, parameter)
                 
-                # FIXED: Deduplication Filter blocks immediate loops to the same resource domain endpoint
                 if target_url and current_url and target_url.split("?")[0] == current_url.split("?")[0]:
-                    print(f"⚠️ Anti-Loop Warning: Model requested duplicate target. Intercepting and appending environment data updates instead.")
+                    print(f"⚠️ Anti-Loop Warning: Model requested duplicate target URL domain endpoint.")
                     journal.append({"turn": turn_counter, "thought": thought, "action": f"BLOCKED_{action}", "reason": "Already resting on target URL destination layout contents."})
-                    # Force data extraction to break the model's stuck perspective pattern
                     action = "DISCOVER"
                     parameter = f"Current page context info verified at destination: {current_url}"
                 else:
@@ -178,7 +193,6 @@ async def main():
                         print(f"❌ Failed to reach target destination: {b_err}")
                         journal.append({"turn": turn_counter, "thought": thought, "action": f"FAILED_{action}", "error": str(b_err)})
             
-            # Use separate conditional block so intercepted loop requests can fall directly through here
             if action == "DISCOVER":
                 print(f"📝 Logging critical discovery element: {parameter}")
                 journal.append({"turn": turn_counter, "thought": thought, "action": "DISCOVER", "extracted_data": parameter})
