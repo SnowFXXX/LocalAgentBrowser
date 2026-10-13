@@ -8,7 +8,8 @@ from playwright.async_api import async_playwright
 
 SEARCH_URL = "https://html.duckduckgo.com/html/?q="
 JOURNAL_BATCH = 6        # The prompt shows 6-11 recent journal entries; old ones are dropped 6 at a time
-MAX_THOUGHT_CHARS = 120  # Old reasoning is trimmed in the prompt; the full text stays in research_log.txt
+MAX_JOURNAL_DETAIL_CHARS = 120  # Longest query/URL/request text shown per journal line
+MAX_THOUGHT_CHARS = 120 # Old reasoning is trimmed in the prompt; the full text stays in research_log.txt
 MAX_SEARCH_RESULTS = 8
 MAX_SNIPPET_CHARS = 200
 PAGE_PART_CHARS = 2500   # Pages are shown in parts of about this size; READ_MORE shows the next part
@@ -21,6 +22,8 @@ MAX_CONVERSATION_TOKENS = 5500  # Start fresh before the conversation nears LM S
 TURN_PAUSE_SECONDS = 1
 STALL_TURNS = 4          # Turns without a new discovery before the model is asked to check its progress
 OBJECTIVE_CHECK_EVERY = 8  # Turns between scheduled objective checks, which happen even while discoveries continue
+READ_FIRST = ("First, if the CURRENT ENVIRONMENT (or an unread part of this page, via READ_MORE) contains information "
+              "relevant to the objective that is not yet in DISCOVERIES SO FAR, DISCOVER it now.")
 
 SYSTEM_PROMPT = """You are an autonomous web discovery agent. Your job is to achieve the high-level OBJECTIVE by executing sequential actions.
 On every turn, evaluate the CURRENT ENVIRONMENT and your RESEARCH JOURNAL. You must output exactly ONE valid JSON block matching this structure:
@@ -399,14 +402,31 @@ def escalation_message(refusals, last_action, last_reason, page_state, current_u
 def compact_journal(journal):
     # Dropping old entries in batches (not one per turn) keeps the start of the journal unchanged
     # between turns, so LM Studio can reuse its cached processing of it
+    # One line per entry instead of indented JSON: same information at about a third of the tokens
     start = max(0, (len(journal) // JOURNAL_BATCH - 1) * JOURNAL_BATCH)
-    compact = []
-    for entry in journal[start:]:
-        e = {k: v for k, v in entry.items() if k != "extracted_data"}
-        if len(e.get("thought", "")) > MAX_THOUGHT_CHARS:
-            e["thought"] = e["thought"][:MAX_THOUGHT_CHARS] + "..."
-        compact.append(e)
-    return compact
+    return "\n".join(journal_line(e) for e in journal[start:]) or "[None yet]"
+
+def journal_line(e):
+    action = e.get("action", "")
+    if action == "DISCOVER":
+        detail = "(recorded in DISCOVERIES SO FAR)"
+    elif action == "FINISH":
+        detail = str(e.get("finding", ""))[:200]
+    else:
+        detail = str(e.get("requested") or e.get("part") or "")
+    detail = " ".join(detail.split())  # Refused discoveries carry multi-line text; keep each entry on one line
+    if len(detail) > MAX_JOURNAL_DETAIL_CHARS:
+        detail = detail[:MAX_JOURNAL_DETAIL_CHARS] + "..."
+    destination = e.get("destination", "")
+    if action == "NAVIGATE" and destination and normalize_url(destination) != normalize_url(detail):
+        detail += f" (landed on {destination})"
+    line = f"T{e.get('turn')} {action} {detail}".rstrip()
+    if e.get("reason") or e.get("error"):
+        line += f" -> {e.get('reason') or e.get('error')}"
+    thought = e.get("thought", "")
+    if thought:
+        line += f" | thought: {thought[:MAX_THOUGHT_CHARS] + '...' if len(thought) > MAX_THOUGHT_CHARS else thought}"
+    return line
 
 def extract_message_content(response):
     choices = getattr(response, "choices", None)
@@ -485,7 +505,7 @@ async def build_full_prompt(page, objective, journal, current_url, tried, page_s
 {json.dumps(discoveries, indent=2) if discoveries else "[None yet]"}
 
 ### RECENT RESEARCH JOURNAL
-{json.dumps(recent_journal, indent=2)}
+{recent_journal}
 
 ### ALREADY TRIED
 Queries (do not repeat): {json.dumps(tried["queries"]) if tried["queries"] else "[None]"}
@@ -716,10 +736,12 @@ async def main():
                 turns_without_discovery = 0
             else:
                 turns_without_discovery += 1
-            if turns_without_discovery >= STALL_TURNS:
+            # Fires every STALL_TURNS stalled turns rather than every turn: repeated each turn it crowded out
+            # the current page and pushed the model to navigate away without reading what was in front of it
+            if turns_without_discovery and turns_without_discovery % STALL_TURNS == 0:
                 print(f"⚠️ No new discoveries in {turns_without_discovery} turns. Adding progress check.")
-                progress = (f"PROGRESS CHECK: no new discoveries in the last {turns_without_discovery} turns. "
-                            "Compare DISCOVERIES SO FAR with the OBJECTIVE. If the objective is satisfied, choose FINISH "
+                progress = (f"PROGRESS CHECK: no new discoveries in the last {turns_without_discovery} turns. {READ_FIRST} "
+                            "Then compare DISCOVERIES SO FAR with the OBJECTIVE. If the objective is satisfied, choose FINISH "
                             "with a summary of the result in the parameter. If not, state in thought_process exactly "
                             "what is still missing, then go and find that specific thing.")
                 loop_msg = f"{loop_msg}\n{progress}" if loop_msg else progress
@@ -732,8 +754,8 @@ async def main():
                     turns_since_objective_check = 0
                     count = sum(1 for e in journal if e.get("action") == "DISCOVER")
                     print(f"🧭 Objective check after {turn_counter} turns ({count} discoveries).")
-                    check = (f"OBJECTIVE CHECK: you have recorded {count} discoveries in {turn_counter} turns. Re-read the "
-                             "OBJECTIVE. If DISCOVERIES SO FAR satisfy it, choose FINISH with a summary of the result in the "
+                    check = (f"OBJECTIVE CHECK: you have recorded {count} discoveries in {turn_counter} turns. {READ_FIRST} "
+                             "Then re-read the OBJECTIVE. If DISCOVERIES SO FAR satisfy it, choose FINISH with a summary of the result in the "
                              "parameter. If not, state in thought_process exactly what is still missing and go directly for it; "
                              "do not spend turns on topics outside the objective.")
                     loop_msg = f"{loop_msg}\n{check}" if loop_msg else check
