@@ -45,7 +45,8 @@ STALL_TURNS = 4          # Turns without a new discovery before the model is ask
 OBJECTIVE_CHECK_EVERY = 8  # Turns between scheduled objective checks, which happen even while discoveries continue
 READ_FIRST = ("First, if the CURRENT ENVIRONMENT (or an unread part of this page, via READ_MORE) contains information "
               "relevant to the objective that is not yet in DISCOVERIES SO FAR, DISCOVER it now.")
-CHECK_PARTS = "split the OBJECTIVE into its separate parts and check each one against DISCOVERIES SO FAR."
+CHECK_PARTS = ("split the OBJECTIVE into its separate parts and, in thought_process, write each part followed by the "
+               "discovery that covers it, or 'not covered'.")
 FINAL_RESULT = ("the complete final result the objective asks for (for example the answer, opinion, summary or "
                 "deliverable, not just a list of what you found)")
 FINISH_CHECK = (f"Before finishing, {CHECK_PARTS} If any part is not covered yet, do not finish: choose the action that "
@@ -419,19 +420,38 @@ def check_decision(action, parameter, journal, tried, page_state, current_url):
         if is_known_discovery(parameter, journal):
             return "DUPLICATE_DISCOVER", "Everything in that DISCOVER is already recorded in DISCOVERIES SO FAR."
     elif action == "FINISH":
-        return finish_check(tried)
+        return finish_check(tried, journal)
     else:
         return f"UNKNOWN_{action}", f"'{action}' is not a valid action."
     return None
 
-def finish_check(tried):
+def finish_check(tried, journal):
     # Asked to judge whether its discoveries "satisfy" the objective, a small model says yes too easily: on an
     # opinion task it finished after one source and gave a summary instead of the opinion asked for. The first
     # FINISH of each turn gets a cheap retry asking for a part-by-part check; repeating FINISH then goes through.
     if tried.get("finish_confirmed"):
         return None
     tried["finish_confirmed"] = True  # Reset at the start of every turn
-    return "CONFIRM_FINISH", FINISH_CHECK
+    return "CONFIRM_FINISH", f"{source_note(journal)} {FINISH_CHECK}"
+
+def source_note(journal):
+    # Facts, not a rule: some objectives need one source and some need many, so the model is only shown how
+    # many pages its discoveries came from (it judged one blog as covering "traditions around the world")
+    sources = []
+    for e in journal:
+        if e.get("action") == "DISCOVER":
+            source = normalize_url(e.get("source") or "") or "an unknown page"
+            if source not in sources:
+                sources.append(source)
+    found = sum(1 for e in journal if e.get("action") == "DISCOVER")
+    if not found:
+        return "You have no discoveries yet."
+    if found == 1:
+        return f"Your only discovery comes from {sources[0]}. Consider whether the objective needs more."
+    if len(sources) == 1:
+        return (f"All {found} of your discoveries come from a single page ({sources[0]}). "
+                "Consider whether the objective needs other sources.")
+    return f"Your {found} discoveries come from {len(sources)} different pages."
 
 def action_options(page_state, current_url):
     on_page = current_url and page_state["url"] == normalize_url(current_url) and page_state["parts"]
@@ -836,7 +856,8 @@ async def main():
                         turns_since_objective_check = 0
                         count = sum(1 for e in journal if e.get("action") == "DISCOVER")
                         print(f"🧭 Objective check after {turn_counter} turns ({count} discoveries).")
-                        check = (f"OBJECTIVE CHECK: you have recorded {count} discoveries in {turn_counter} turns. {READ_FIRST} "
+                        check = (f"OBJECTIVE CHECK: you have recorded {count} discoveries in {turn_counter} turns. "
+                             f"{source_note(journal)} {READ_FIRST} "
                                  f"Then {CHECK_PARTS} If every part is covered, choose FINISH with {FINAL_RESULT} in the "
                                  "parameter. If not, state in thought_process exactly what is still missing and go directly for it; "
                                  "do not spend turns on topics outside the objective.")

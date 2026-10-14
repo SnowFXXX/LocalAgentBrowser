@@ -80,8 +80,21 @@ def test_finish_check_asks_once_then_lets_finish_through():
     page = recorded_page(DOCS)
     first = ab.check_decision("FINISH", "my answer", [], tried, page, DOCS)
     assert first[0] == "CONFIRM_FINISH"
-    assert "separate parts" in first[1] and "repeat FINISH" in first[1] and "opinion" in first[1]
+    assert "separate parts" in first[1] and "'not covered'" in first[1] and "repeat FINISH" in first[1]
     assert ab.check_decision("FINISH", "my answer", [], tried, page, DOCS) is None
+
+
+@pytest.mark.parametrize("sources, expected", [
+    ([], "You have no discoveries yet."),
+    ([DOCS], f"Your only discovery comes from {DOCS}."),
+    ([DOCS, DOCS + "/", DOCS + "#part"], f"All 3 of your discoveries come from a single page ({DOCS})."),
+    ([DOCS, GUIDE, DOCS], "Your 3 discoveries come from 2 different pages."),
+], ids=["none", "one discovery", "one page", "two pages"])
+def test_source_note(sources, expected):
+    journal = [{"action": "DISCOVER", "source": s, "extracted_data": f"fact {i}"} for i, s in enumerate(sources)]
+    assert ab.source_note(journal).startswith(expected)
+    finish = ab.check_decision("FINISH", "answer", journal, {"queries": [], "urls": []}, recorded_page(DOCS), DOCS)
+    assert finish[1].startswith(expected)
 
 
 class TestLeaveCheck:

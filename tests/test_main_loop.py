@@ -70,7 +70,9 @@ def test_full_run(monkeypatch, tmp_path):
     assert "PROGRESS CHECK" in last_message(calls[10])
     assert not any("PROGRESS CHECK" in last_message(c) for c in calls[:10])
     assert not any("OBJECTIVE CHECK" in last_message(c) for c in calls), "default schedule should not fire in 8 turns"
-    assert "CHECK: Before finishing" in last_message(calls[11]) and "Do NOT" not in last_message(calls[11])
+    finish_check = last_message(calls[11])
+    assert "Before finishing" in finish_check and "Do NOT" not in finish_check
+    assert f"Your only discovery comes from {A}" in finish_check
     assert actions[-1] == "FINISH" and journal[-1]["finding"] == "final answer", "FINISH must be saved to the log"
 
     report = (tmp_path / ab.REPORT_FILE).read_text(encoding="utf-8")

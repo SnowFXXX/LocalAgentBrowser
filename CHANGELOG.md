@@ -4,6 +4,18 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.30] - 2026-10-14
+### Changed
+- The part-by-part check asks the model to write each part of the objective followed by the discovery that
+  covers it (or "not covered"), so claiming full coverage needs evidence for each part.
+- The finish check and the scheduled objective check state how many pages the discoveries come from, and
+  point it out when everything comes from a single page. This is information, not a rule: some objectives
+  need one source, others many.
+
+On the cats objective the agent now named six traditions (Egypt, Norse, Celtic, Islam, Eastern European
+folklore, Japan) from two sources and stated its own opinion, in 18 turns (37 minutes of model time) instead
+of finishing after one blog. It recorded that opinion as a discovery, though, which the next version fixes.
+
 ## [1.29] - 2026-10-14
 Testing a very different objective (research how spiritual traditions view cats, then form an opinion)
 showed the agent finishing after 9 turns with three findings from a single blog, naming no traditions, and
