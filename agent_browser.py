@@ -43,7 +43,8 @@ MAX_JSON_RETRIES = 3
 MAX_VISITS_PER_URL = 3   # Returning to an earlier page is allowed; this caps back-and-forth loops
 MAX_CHEAP_RETRIES = 2   # Refused replies re-asked within the same turn before the refusal costs a whole turn
 MAX_FOLLOWUPS = 12       # Turns that continue one conversation before a fresh full prompt (the token budget usually ends it first)
-MAX_CONVERSATION_TOKENS = int(CONTEXT_LENGTH * 0.67)  # Start fresh with room left for the next page and the reply
+MAX_CONVERSATION_TOKENS = int(CONTEXT_LENGTH * 0.75)  # Start fresh with room left for the next page and the reply
+MAX_DISCOVERY_PROMPT_CHARS = 250  # Discoveries are shortened to this in fresh prompts; the log keeps the full text
 TURN_PAUSE_SECONDS = 1
 STALL_TURNS = 4          # Turns without a new discovery before the model is asked to check its progress
 COMPOSE_MAX_TOKENS = 900  # Length limit for the separately written final result
@@ -56,8 +57,11 @@ CHECK_PARTS = ("split the OBJECTIVE into its separate parts and, in thought_proc
                "never as a DISCOVER.")
 FINAL_RESULT = ("the complete final result the objective asks for (for example the answer, opinion, summary or "
                 "deliverable, not just a list of what you found)")
+GIVE_UP_RULE = ("If you have already looked for a part in several places without finding it, it may not be available: "
+                "finish anyway and say in the final result what could not be found.")
 FINISH_CHECK = (f"Before finishing, {CHECK_PARTS} If any part is 'not covered', do not finish: choose the action that "
-                f"works on that part. If every other part is covered, repeat FINISH with {FINAL_RESULT} in the parameter.")
+                f"works on that part ({GIVE_UP_RULE}) If every other part is covered, repeat FINISH with {FINAL_RESULT} "
+                "in the parameter.")
 
 SYSTEM_PROMPT = """You are an autonomous web discovery agent. Your job is to achieve the high-level OBJECTIVE by executing sequential actions.
 On every turn, evaluate the CURRENT ENVIRONMENT and your RESEARCH JOURNAL. You must output exactly ONE valid JSON block matching this structure:
@@ -417,14 +421,17 @@ def read_more_target(parameter, page_state):
     number = re.search(r'\d+', parameter)
     return int(number.group()) - 1 if number else page_state["index"] + 1
 
-def leave_check(action, page_state, current_url):
+def leave_check(action, page_state, current_url, journal=()):
     # The model often left content pages without recording what it needed from them. The first attempt to
     # leave a page it has recorded nothing from gets a cheap retry asking it to confirm; repeating the same
     # action then goes through, so tasks where leaving without a discovery is normal lose only one retry.
     # Search result pages are exempt (page_state only tracks content pages).
     parts = page_state["parts"]
     on_page = current_url and page_state["url"] == normalize_url(current_url) and parts
-    if not on_page or page_state.get("visit_discoveries") or page_state.get("leave_confirmed"):
+    # Anything recorded from this page counts, on this visit or an earlier one
+    recorded_here = any(e.get("action") == "DISCOVER" and normalize_url(e.get("source") or "") == normalize_url(current_url)
+                        for e in journal)
+    if not on_page or recorded_here or page_state.get("visit_discoveries") or page_state.get("leave_confirmed"):
         return None
     page_state["leave_confirmed"] = True  # Asked once per visit
     unread = len(parts) - len(page_state.get("seen_parts", {0}))
@@ -462,7 +469,7 @@ def check_decision(action, parameter, journal, tried, page_state, current_url):
         if [normalize_url(u) for u in tried["urls"]].count(target) >= MAX_VISITS_PER_URL:
             return "BLOCKED_NAVIGATE", f"This URL was already visited {MAX_VISITS_PER_URL} times. Pick a different page."
     if action in ("SEARCH", "NAVIGATE"):
-        return leave_check(action, page_state, current_url)
+        return leave_check(action, page_state, current_url, journal)
     elif action == "READ_MORE":
         total = len(page_state["parts"])
         target = read_more_target(parameter, page_state)
@@ -596,6 +603,10 @@ def visited_summary(urls):
         return "[None]"
     return json.dumps([u if n == 1 else f"{u} (visited {n} times)" for u, n in counts.items()])
 
+def shorten(text, limit):
+    text = " ".join(str(text).split())
+    return text if len(text) <= limit else text[:limit].rstrip() + "..."
+
 def new_conversation():
     return {"messages": None, "followups": 0, "tokens": 0, "note": None, "note_url": None, "shown_links": set()}
 
@@ -634,7 +645,9 @@ async def build_full_prompt(page, objective, journal, current_url, tried, page_s
     print("🔍 Scraping and preparing current environment text layout...")
     environment = await build_environment(page, current_url, page_state, {normalize_url(u) for u in tried["urls"]}, shown_links)
 
-    discoveries = [e["extracted_data"] for e in journal if e.get("action") == "DISCOVER"]
+    # Shortened in the prompt (the full text is in the log and the report, and duplicates are checked against
+    # it in code): the growing discoveries list had become a quarter of every fresh prompt
+    discoveries = [shorten(e["extracted_data"], MAX_DISCOVERY_PROMPT_CHARS) for e in journal if e.get("action") == "DISCOVER"]
     recent_journal = compact_journal(journal)
 
     # LM Studio only reuses the part of the prompt that is identical to the previous turn's, up to the
@@ -968,7 +981,7 @@ async def main():
                     progress = (f"PROGRESS CHECK: no new discoveries in the last {turns_without_discovery} turns. {READ_FIRST} "
                                 f"Then {CHECK_PARTS} If every part is covered, choose FINISH with {FINAL_RESULT} in the "
                                 "parameter. If not, state in thought_process exactly what is still missing, then go and find "
-                                "that specific thing.")
+                                f"that specific thing. {GIVE_UP_RULE}")
                     loop_msg = f"{loop_msg}\n{progress}" if loop_msg else progress
                     turns_since_objective_check = 0
                 else:
@@ -983,10 +996,12 @@ async def main():
                              f"{source_note(journal)} {READ_FIRST} "
                                  f"Then {CHECK_PARTS} If every part is covered, choose FINISH with {FINAL_RESULT} in the "
                                  "parameter. If not, state in thought_process exactly what is still missing and go directly for it; "
-                                 "do not spend turns on topics outside the objective.")
+                                 f"do not spend turns on topics outside the objective. {GIVE_UP_RULE}")
                         loop_msg = f"{loop_msg}\n{check}" if loop_msg else check
 
+                # Saved every turn as well, so a crash or a killed process still leaves a current report
                 write_research_log(objective, journal)
+                write_report(objective, journal)
 
                 turn_counter += 1
                 print("\n⏱️ Cycle pacing check complete. Refreshing navigation loop pipeline...")

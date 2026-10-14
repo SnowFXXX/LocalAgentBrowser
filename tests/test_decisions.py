@@ -89,6 +89,7 @@ def test_finish_check_asks_once_then_lets_finish_through():
     assert first[0] == "CONFIRM_FINISH"
     assert "separate parts" in first[1] and "'not covered'" in first[1] and "repeat FINISH" in first[1]
     assert "'written at FINISH'" in first[1] and "never as a DISCOVER" in first[1]
+    assert "say in the final result what could not be found" in first[1]
     assert ab.check_decision("FINISH", "my answer", [], tried, page, DOCS) is None
 
 
@@ -112,6 +113,11 @@ class TestLeaveCheck:
         assert first[0] == "CONFIRM_LEAVE"
         assert "2 of its 3 parts are still unread" in first[1] and "repeat your NAVIGATE" in first[1]
         assert decide("NAVIGATE", DOCS, page, GUIDE, urls=[DOCS, GUIDE]) is None
+
+    def test_no_check_when_something_was_recorded_here_on_an_earlier_visit(self):
+        journal = [{"action": "DISCOVER", "source": GUIDE + "/", "extracted_data": "fact"}]
+        assert ab.check_decision("NAVIGATE", DOCS, journal, {"queries": [], "urls": [DOCS, GUIDE]},
+                                 unrecorded_page(GUIDE), GUIDE) is None
 
     def test_no_check_after_recording_something(self):
         assert decide("SEARCH", "new q", recorded_page(GUIDE), GUIDE) is None

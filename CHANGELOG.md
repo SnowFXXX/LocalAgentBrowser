@@ -4,6 +4,25 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.34] - 2026-10-14
+### Changed
+- Fresh prompts show each discovery shortened to 250 characters; the log and report keep the full text, and
+  duplicates are still checked against it. The growing discoveries list had become a quarter of every fresh
+  prompt.
+- The conversation budget is 75% of the context length (was 67%), so fresh prompts are needed less often.
+- The finish, progress and objective checks say that a part not found after looking in several places may
+  not be available: finish anyway and say in the final result what could not be found.
+- The leave check is skipped for a page the agent has recorded something from on any visit, not just the
+  current one.
+### Fixed
+- `research_report.md` is now updated every turn. It was only written when the run ended normally, so a
+  killed process (or a crash) left no report.
+
+Regression run on the original Playwright objective, compared with 1.33: fresh prompts averaged 162 s
+instead of 234 s and took 16% of the model time instead of 28%. The run was stopped after 50 minutes with
+6 findings: with an objective forbidding FINISH until everything is "fully validated", the agent kept
+looking for parameter schemas the documentation does not contain.
+
 ## [1.33] - 2026-10-14
 ### Added
 - Page outline: a page of 5 or more parts is first shown with a list of the headings in each part, and

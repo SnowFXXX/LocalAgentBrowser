@@ -69,6 +69,16 @@ class TestCheapRetries:
         assert len(model.calls) == 1 and not refused
 
 
+def test_fresh_prompt_shortens_long_discoveries(scrapes):
+    long_fact = "A long recorded finding. " * 40
+    client, model = fake_client([reply("READ_MORE", "")])
+    journal = discoveries(long_fact)
+    turn(client, journal=journal)
+    prompt = model.calls[0][1]["content"]
+    assert long_fact.strip() not in prompt and "A long recorded finding." in prompt and "..." in prompt
+    assert journal[0]["extracted_data"] == long_fact, "the journal keeps the full text"
+
+
 class TestComposeFinalResult:
     def test_sees_only_the_objective_and_discoveries(self):
         client, model = fake_client(["Plain final text."])

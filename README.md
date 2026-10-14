@@ -167,7 +167,7 @@ Measured on an Intel i5-9500 (6 cores, no GPU) with Qwen2.5-7B-Instruct Q4_K_M a
 |---|---|
 | Follow-up on the same page (finding recorded, retry) | 35–60 s |
 | Next part of a page, or a new page appended | 100–230 s |
-| Fresh prompt (start, or after the context budget is reached) | about 240 s |
+| Fresh prompt (start, or after the context budget is reached) | about 160–240 s |
 | Writing the final result (once, at the end) | about 150 s |
 
 A GPU or a smaller model will be much faster.
@@ -208,6 +208,10 @@ turn that brings in a new page takes a few minutes. See [Performance](#performan
 - **A small model's judgement is the ceiling.** It sometimes drifts to loosely related pages, prefers
   secondary sources or stays with one source too long, and results vary with the first pages a search turns
   up; every finding is in `research_report.md` regardless.
+- **Very strict objectives can keep it searching.** An objective that forbids finishing until everything is
+  "fully validated" can keep the agent looking for something the web may not contain. It is told to finish
+  and name what it could not find after looking in several places, but a 7B model does not always judge
+  when that point has come; the turn limit (100) and Ctrl+C still apply, and the report is always current.
 - **Check the citations.** The final result only uses recorded findings, but a 7B model sometimes puts the
   wrong number on a citation, so verify a claim against the listed findings before relying on it.
 - **Some sites refuse automated browsers** (HTTP 403). The agent respects that and does not try to disguise
