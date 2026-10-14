@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Virtual environments
+venv/
+.venv/
+
+# Agent output
+research_log.txt
+run_output/
+
+# Local backups (every version is in the git history instead)
+old versions/
