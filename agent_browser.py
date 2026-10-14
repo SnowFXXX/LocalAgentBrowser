@@ -42,7 +42,8 @@ MAX_FOLLOWUPS = 12       # Turns that continue one conversation before a fresh f
 MAX_CONVERSATION_TOKENS = int(CONTEXT_LENGTH * 0.67)  # Start fresh with room left for the next page and the reply
 TURN_PAUSE_SECONDS = 1
 STALL_TURNS = 4          # Turns without a new discovery before the model is asked to check its progress
-OBJECTIVE_CHECK_EVERY = 8  # Turns between scheduled objective checks, which happen even while discoveries continue
+COMPOSE_MAX_TOKENS = 900  # Length limit for the separately written final result
+OBJECTIVE_CHECK_EVERY = 8 # Turns between scheduled objective checks, which happen even while discoveries continue
 READ_FIRST = ("First, if the CURRENT ENVIRONMENT (or an unread part of this page, via READ_MORE) contains information "
               "relevant to the objective that is not yet in DISCOVERIES SO FAR, DISCOVER it now.")
 CHECK_PARTS = ("split the OBJECTIVE into its separate parts and, in thought_process, write each part followed by the "
@@ -687,16 +688,53 @@ def write_report(objective, journal):
     with open(REPORT_FILE, "w", encoding="utf-8") as report:
         report.write("\n".join(lines) + "\n")
 
+COMPOSE_SYSTEM = ("You write the final result of a web research task, using only the findings that were recorded "
+                  "during it.")
+
+async def compose_final_result(client, objective, journal, draft):
+    """Writes the final result in a model call whose only job is writing.
+
+    Deciding what to browse and writing the deliverable compete for a small model's attention: in a live run
+    its reasoning noted the objective's request for an opinion was not covered, then it finished with a list
+    of findings anyway. Given only the objective and every discovery, it can focus on what was asked for.
+    """
+    found = [e for e in journal if e.get("action") == "DISCOVER"]
+    listing = "\n\n".join(f"[{i}] (from {e.get('source') or 'an unknown page'})\n{e['extracted_data']}"
+                          for i, e in enumerate(found, start=1)) or "[None]"
+    request = (f"### OBJECTIVE\n{objective}\n\n### DISCOVERIES\n{listing}\n\n### DRAFT FROM THE RESEARCH\n{draft or '[None]'}\n\n"
+               "Write the complete final result the OBJECTIVE asks for: do exactly what it asks (for example answer "
+               "the question, write the summary or the plan, or give the opinion). Use only the information in the "
+               "DISCOVERIES and do not add facts from anywhere else. Refer to the discoveries that support each point "
+               "by their numbers, like [2], and only cite a number for something that discovery actually says. If the "
+               "objective asks for your own view, opinion or recommendation, give it in a paragraph that starts with "
+               "'My view:'. If something the objective asks for is missing from the discoveries, say so. Write plain "
+               "text, not JSON.")
+    # A fresh prompt with only the discoveries, not the browsing conversation: continuing that conversation let
+    # the model use page text it had read but not recorded, and cite discovery numbers that did not say it
+    messages = [{"role": "system", "content": COMPOSE_SYSTEM}, {"role": "user", "content": request}]
+    response = await client.chat.completions.create(model=MODEL, messages=messages, temperature=0.3,
+                                                    max_tokens=COMPOSE_MAX_TOKENS)
+    text = extract_message_content(response)
+    if text.startswith("{"):  # Habit from every earlier turn: unwrap a JSON reply instead of reporting it raw
+        try:
+            reply = json.loads(text)
+            text = str(reply.get("parameter") or reply.get("thought_process") or text)
+        except (json.JSONDecodeError, AttributeError):
+            pass
+    return text.strip()
+
 async def load_page(page, url=None):
+    """Loads a URL (or reloads the page) and returns Playwright's response, which may be None."""
     if url:
-        await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        response = await page.goto(url, wait_until="domcontentloaded", timeout=30000)
     else:
-        await page.reload(wait_until="domcontentloaded", timeout=30000)
+        response = await page.reload(wait_until="domcontentloaded", timeout=30000)
     try:
         await page.wait_for_load_state("networkidle", timeout=5000)
     except Exception:
         pass  # Busy pages rarely go fully idle; the DOM is already usable
     await asyncio.sleep(1)
+    return response
 
 async def main():
     client = AsyncOpenAI(
@@ -769,16 +807,24 @@ async def main():
                     set_note(conversation, f"RESULT: Nothing changed. {where_you_are(page_state, current_url)}", current_url)
 
                 elif action == "FINISH":
-                    print("\n🎯 Agent has signaled mission complete. Writing final summary report...")
-                    journal.append({"turn": turn_counter, "thought": thought, "action": "FINISH", "finding": parameter})
+                    print("\n🎯 Agent has signaled mission complete. Writing the final result...")
+                    finish_entry = {"turn": turn_counter, "thought": thought, "action": "FINISH", "finding": parameter}
+                    journal.append(finish_entry)
+                    try:
+                        final = await compose_final_result(client, objective, journal, parameter)
+                        if final:
+                            finish_entry.update(draft=parameter, finding=final)
+                    except Exception as err:
+                        print(f"⚠️ Could not write the final result separately ({err}); keeping the agent's FINISH text.")
                     break
 
                 elif action in ["SEARCH", "NAVIGATE"]:
                     target_url = determine_url(action, parameter)
                     print(f"🌐 Driving Playwright to cross-domain target: {target_url}")
                     try:
-                        await load_page(page, target_url)
+                        response = await load_page(page, target_url)
                         current_url = page.url
+                        status = getattr(response, "status", None) or 0
 
                         if action == "SEARCH":
                             # The search engine sometimes returns an error page; reload once before giving up
@@ -798,7 +844,15 @@ async def main():
                             tried["urls"].append(target_url)
                             if normalize_url(current_url) != normalize_url(target_url):
                                 tried["urls"].append(current_url)  # Also remember where redirects landed
-                            journal.append({"turn": turn_counter, "thought": thought, "action": action, "requested": parameter, "destination": current_url})
+                            if status >= 400:
+                                # Often a guessed URL; reported as a failure so the model does not treat the
+                                # error page as content (and is not asked to record something from it)
+                                print(f"❌ The page returned HTTP {status}.")
+                                journal.append({"turn": turn_counter, "thought": thought, "action": "FAILED_NAVIGATE", "requested": parameter,
+                                                "error": f"The page returned HTTP {status} (for example 404: not found). "
+                                                         "Use a link shown on a page or in search results instead of guessing URLs."})
+                            else:
+                                journal.append({"turn": turn_counter, "thought": thought, "action": action, "requested": parameter, "destination": current_url})
                     except Exception as b_err:
                         print(f"❌ Failed to reach target destination: {b_err}")
                         if action == "NAVIGATE":
@@ -816,6 +870,8 @@ async def main():
                             visits = [normalize_url(u) for u in tried["urls"]].count(normalize_url(target_url))
                             result = f"RESULT: NAVIGATE '{parameter}' done (visit {visits} of {MAX_VISITS_PER_URL} allowed for this URL)."
                     environment = await build_environment(page, current_url, page_state, {normalize_url(u) for u in tried["urls"]}, conversation["shown_links"])
+                    if "error" in outcome and page_state["url"] == normalize_url(current_url):
+                        page_state["leave_confirmed"] = True  # Nothing to record on an error page
                     set_note(conversation, f"{result}\n\n### CURRENT ENVIRONMENT (replaces the earlier one)\n"
                                            f"Active URL: {current_url}\n{environment}", current_url)
 

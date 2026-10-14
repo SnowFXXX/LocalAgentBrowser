@@ -4,6 +4,23 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.32] - 2026-10-14
+### Added
+- The final result is written in a separate model call after FINISH, given only the objective, every
+  discovery (numbered, with its source) and the agent's draft. It must use only the discoveries, cite them
+  by number, and put the agent's own view (when the objective asks for one) in a paragraph starting
+  "My view:". The report shows this result; the agent's own FINISH text is kept in the log as `draft`.
+  In a live run the agent's reasoning noted that the requested opinion was missing, then finished with a
+  list of findings anyway; replaying this step on that run's findings produced a cited result with a clear
+  opinion in about 150 s. Citation numbers from a 7B model are not always right, so the README says to check.
+- Pages answering with an HTTP error (404, 403 and so on) are recorded as failed navigations with the status,
+  and leaving them needs no confirmation. In a live run a guessed URL returned 404 and the agent was asked to
+  record something from the error page.
+### Notes
+- An earlier version of this step continued the browsing conversation to reuse LM Studio's cache. It then
+  used page text the agent had read but not recorded, and cited discoveries that did not say it (including
+  a claim contradicting the cited discovery). It now always uses a fresh prompt; this was about as fast.
+
 ## [1.31] - 2026-10-14
 ### Fixed
 - The model recorded its own opinion as a discovery, attributed to a web page. The part-by-part check now

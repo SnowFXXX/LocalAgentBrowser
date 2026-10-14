@@ -106,7 +106,7 @@ current page, and answers with exactly one JSON action:
 | `NAVIGATE` | Opens a URL taken from the results or from the current page's links |
 | `READ_MORE` | Shows the next part of a long page (pages are read in parts of about 2,500 characters) |
 | `DISCOVER` | Records information from the current page as a finding |
-| `FINISH` | Ends the run with the final result (after checking each part of the objective is covered) |
+| `FINISH` | Ends the run (after checking each part of the objective is covered); the final result is then written in a separate step |
 
 ```mermaid
 flowchart LR
@@ -130,8 +130,12 @@ flowchart LR
   something, or repeat the action to leave.
 - **Progress and objective checks.** After 4 turns without a new finding, and every 8 turns regardless, the
   model is asked to check each part of the objective against its findings, then finish or name what is still
-  missing. Finishing itself gets the same part-by-part check, and the final answer must be the result the
-  objective asks for, not just a list of findings.
+  missing. Finishing itself gets the same part-by-part check.
+- **Writing is a separate step.** When the agent finishes, one more model call writes the final result from
+  only the objective and the recorded findings, citing them by number, with the agent's own view (if the
+  objective asks for one) in a paragraph starting "My view:". A small model writes far better when that is
+  its only job, and every claim stays traceable to a recorded finding.
+- **Error pages are recognised.** A page answering 404, 403 and so on counts as a failed visit, not content.
 - **Readable pages.** Navigation menus, footers and cookie banners are hidden; code blocks and tables are
   never split between parts; links already shown are not repeated.
 
@@ -163,6 +167,7 @@ Measured on an Intel i5-9500 (6 cores, no GPU) with Qwen2.5-7B-Instruct Q4_K_M a
 | Follow-up on the same page (finding recorded, retry) | 35–60 s |
 | Next part of a page, or a new page appended | 100–230 s |
 | Fresh prompt (start, or after the context budget is reached) | about 240 s |
+| Writing the final result (once, at the end) | about 150 s |
 
 A GPU or a smaller model will be much faster.
 
@@ -200,7 +205,12 @@ turn that brings in a new page takes a few minutes. See [Performance](#performan
   a single source; the check before finishing (1.29) improved the final answer, and work on judging coverage
   continues. More kinds of tasks are still to be tried.
 - **A small model's judgement is the ceiling.** It sometimes drifts to loosely related pages, prefers
-  secondary sources or stays with one source too long; every finding is in `research_report.md` regardless.
+  secondary sources or stays with one source too long, and results vary with the first pages a search turns
+  up; every finding is in `research_report.md` regardless.
+- **Check the citations.** The final result only uses recorded findings, but a 7B model sometimes puts the
+  wrong number on a citation, so verify a claim against the listed findings before relying on it.
+- **Some sites refuse automated browsers** (HTTP 403). The agent respects that and does not try to disguise
+  itself; it moves on to other sources.
 - **Reading only.** The agent searches, opens pages and reads them. It does not click, fill in forms or sign in.
 - **Web pages go into the prompt.** A page can contain text written to manipulate the model (prompt
   injection), so treat findings as unverified. See [SECURITY.md](SECURITY.md).

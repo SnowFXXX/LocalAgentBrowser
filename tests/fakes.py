@@ -73,9 +73,11 @@ class FakeSite:
 
             async def goto(self, url, **kwargs):
                 self.url = url
+                known = "duckduckgo" in url or url.split("#")[0].rstrip("/") in site.pages
+                return types.SimpleNamespace(status=200 if known else 404)
 
             async def reload(self, **kwargs):
-                pass
+                return types.SimpleNamespace(status=200)
 
             async def wait_for_load_state(self, *args, **kwargs):
                 pass

@@ -69,6 +69,23 @@ class TestCheapRetries:
         assert len(model.calls) == 1 and not refused
 
 
+class TestComposeFinalResult:
+    def test_sees_only_the_objective_and_discoveries(self):
+        client, model = fake_client(["Plain final text."])
+        journal = discoveries("fact one", "fact two")
+        text = asyncio.run(ab.compose_final_result(client, "the objective", journal, "draft"))
+        assert text == "Plain final text."
+        system, user = model.calls[0]
+        assert system == {"role": "system", "content": ab.COMPOSE_SYSTEM} and len(model.calls[0]) == 2
+        assert "### OBJECTIVE\nthe objective" in user["content"]
+        assert "[1] (from an unknown page)\nfact one" in user["content"] and "[2] (from an unknown page)\nfact two" in user["content"]
+        assert "Use only the information in the DISCOVERIES" in user["content"] and "'My view:'" in user["content"]
+
+    def test_unwraps_a_json_reply(self):
+        client, _ = fake_client([reply("FINISH", "My view: supported by [1].")])
+        assert asyncio.run(ab.compose_final_result(client, "objective", discoveries("x"), "")) == "My view: supported by [1]."
+
+
 class TestConversation:
     def test_turns_continue_one_conversation(self, scrapes):
         client, model = fake_client([reply("DISCOVER", "fact one"), reply("NAVIGATE", URL2), reply("DISCOVER", "fact two")])

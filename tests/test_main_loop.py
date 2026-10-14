@@ -30,6 +30,7 @@ SCRIPT = [
     reply("NAVIGATE", A),              #         repeated -> goes through (going back to A is allowed)
     reply("FINISH", "done"),           # turn 8: finish check
     reply("FINISH", "final answer"),   #         repeated with the final result -> finished
+    "Composed final result citing [1].",  # the separate call that writes the final result (plain text)
 ]
 
 
@@ -57,8 +58,9 @@ def test_full_run(monkeypatch, tmp_path):
     actions = [e["action"] for e in journal]
 
     assert len(calls) == len(SCRIPT)
-    assert [i for i, c in enumerate(calls) if len(c) == 2] == [0], "only the first call should build a full prompt"
-    assert all(calls[i][:len(calls[i - 1])] == calls[i - 1] for i in range(1, len(calls))), "each call must extend the previous"
+    last = len(calls) - 1  # the final result is written from its own fresh prompt
+    assert [i for i, c in enumerate(calls) if len(c) == 2] == [0, last], "only the first call (and the final result) are fresh"
+    assert all(calls[i][:len(calls[i - 1])] == calls[i - 1] for i in range(1, last)), "each browsing call must extend the previous"
     assert "Search Results" in last_message(calls[1])
     assert "Page Text (part 1 of" in last_message(calls[2]) and "Page B" in last_message(calls[2])
     assert actions.count("REFUSED_IN_TURN") == 4 and "BLOCKED_NAVIGATE" in actions
@@ -74,12 +76,32 @@ def test_full_run(monkeypatch, tmp_path):
     finish_check = last_message(calls[11])
     assert "Before finishing" in finish_check and "Do NOT" not in finish_check
     assert f"Your only discovery comes from {A}" in finish_check
-    assert actions[-1] == "FINISH" and journal[-1]["finding"] == "final answer", "FINISH must be saved to the log"
+    compose_request = last_message(calls[12])
+    assert len(calls[12]) == 2, "the final result is written from a fresh prompt, not the browsing conversation"
+    assert f"[1] (from {A})\nfact from a" in compose_request and "DRAFT FROM THE RESEARCH\nfinal answer" in compose_request
+    assert actions[-1] == "FINISH", "FINISH must be saved to the log"
+    assert journal[-1]["finding"] == "Composed final result citing [1]." and journal[-1]["draft"] == "final answer"
 
     report = (tmp_path / ab.REPORT_FILE).read_text(encoding="utf-8")
     assert "**Objective:** test objective" in report and "finished by the agent on turn 8" in report
-    assert "## Final result\n\nfinal answer" in report
+    assert "## Final result\n\nComposed final result citing [1]." in report
     assert "## Discoveries (1)" in report and f"Turn 3, from {A}" in report and "fact from a" in report
+
+
+def test_error_pages_are_failed_navigations(monkeypatch, tmp_path):
+    missing = "https://docs.example/guessed-page"
+    script = [
+        reply("SEARCH", "docs a"),
+        reply("NAVIGATE", missing),        # 404 -> recorded as a failed navigation
+        reply("NAVIGATE", A),              # leaving the error page needs no confirmation
+        reply("FINISH", "a"), reply("FINISH", "a"), "Final.",
+    ]
+    calls, journal = run_agent(monkeypatch, tmp_path, script=script)
+    failed = [e for e in journal if e["action"] == "FAILED_NAVIGATE"]
+    assert len(failed) == 1 and "HTTP 404" in failed[0]["error"]
+    assert "failed: The page returned HTTP 404" in last_message(calls[2])
+    assert not any(e["action"] == "REFUSED_IN_TURN" and "leave" in e.get("reason", "") for e in journal)
+    assert len(calls) == len(script)
 
 
 def test_report_is_written_when_the_run_stops_early(monkeypatch, tmp_path):
