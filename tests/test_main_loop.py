@@ -64,6 +64,7 @@ def test_full_run(monkeypatch, tmp_path):
     assert actions.count("REFUSED_IN_TURN") == 4 and "BLOCKED_NAVIGATE" in actions
     assert not any("done (visit" in last_message(c) for c in calls[4:7]), "a refused NAVIGATE must not report 'done'"
     assert "part 2 of" in last_message(calls[7]).lower()
+    assert f"You are on {A} (part 2 of" in last_message(calls[7]), "notes must say which page is current"
     assert "(1 links already listed" in last_message(calls[8])
     assert "CHECK: You are about to leave" in last_message(calls[9]) and "Do NOT" not in last_message(calls[9])
     assert "visit 2 of 3" in last_message(calls[10])

@@ -46,11 +46,13 @@ OBJECTIVE_CHECK_EVERY = 8  # Turns between scheduled objective checks, which hap
 READ_FIRST = ("First, if the CURRENT ENVIRONMENT (or an unread part of this page, via READ_MORE) contains information "
               "relevant to the objective that is not yet in DISCOVERIES SO FAR, DISCOVER it now.")
 CHECK_PARTS = ("split the OBJECTIVE into its separate parts and, in thought_process, write each part followed by the "
-               "discovery that covers it, or 'not covered'.")
+               "discovery that covers it, or 'not covered'. Parts that ask for your own answer, opinion, summary or other "
+               "output are not found on pages: mark them 'written at FINISH' and write them in the FINISH parameter, "
+               "never as a DISCOVER.")
 FINAL_RESULT = ("the complete final result the objective asks for (for example the answer, opinion, summary or "
                 "deliverable, not just a list of what you found)")
-FINISH_CHECK = (f"Before finishing, {CHECK_PARTS} If any part is not covered yet, do not finish: choose the action that "
-                f"works on that part. If every part is covered, repeat FINISH with {FINAL_RESULT} in the parameter.")
+FINISH_CHECK = (f"Before finishing, {CHECK_PARTS} If any part is 'not covered', do not finish: choose the action that "
+                f"works on that part. If every other part is covered, repeat FINISH with {FINAL_RESULT} in the parameter.")
 
 SYSTEM_PROMPT = """You are an autonomous web discovery agent. Your job is to achieve the high-level OBJECTIVE by executing sequential actions.
 On every turn, evaluate the CURRENT ENVIRONMENT and your RESEARCH JOURNAL. You must output exactly ONE valid JSON block matching this structure:
@@ -65,7 +67,7 @@ Action guide:
 - SEARCH: parameter is a plain-text query (not a URL). Results appear as a numbered list with URLs.
 - NAVIGATE: parameter is a full URL copied exactly from the search results or page links you were shown.
 - READ_MORE: long pages are shown in parts. Use an empty parameter to see the next part, or a part number to jump to that part.
-- DISCOVER: parameter is the information you found on the current page that serves the objective. DISCOVER does not extract anything for you: you must write the information itself into the parameter. An empty DISCOVER is refused. Copy exact text where precision matters. You may group several related details from the same page into one DISCOVER.
+- DISCOVER: parameter is the information you found on the current page that serves the objective. DISCOVER does not extract anything for you: you must write the information itself into the parameter. An empty DISCOVER is refused. Copy exact text where precision matters. You may group several related details from the same page into one DISCOVER. Only information found on the page belongs in a DISCOVER; your own conclusions and opinions go in the FINISH parameter.
 - FINISH: only when your discoveries cover every part of the objective. The parameter must contain the complete final result the objective asks for (for example the answer, opinion, summary or deliverable), not just a list of what you found.
 
 Strictly follow these rules:
@@ -401,7 +403,8 @@ def check_decision(action, parameter, journal, tried, page_state, current_url):
             return "BLOCKED_NAVIGATE", "NAVIGATE needs a full URL in the parameter."
         target = normalize_url(determine_url(action, parameter))
         if current_url and target == normalize_url(current_url):
-            return "BLOCKED_NAVIGATE", "You are already on this page. Use READ_MORE to see its other parts, DISCOVER from it, or go somewhere else."
+            return "BLOCKED_NAVIGATE", (f"{where_you_are(page_state, current_url)} You are already on this page. "
+                                        "Use READ_MORE to see its other parts, DISCOVER from it, or go somewhere else.")
         # Going back to an earlier page is allowed; the cap stops back-and-forth loops between pages
         if [normalize_url(u) for u in tried["urls"]].count(target) >= MAX_VISITS_PER_URL:
             return "BLOCKED_NAVIGATE", f"This URL was already visited {MAX_VISITS_PER_URL} times. Pick a different page."
@@ -411,9 +414,10 @@ def check_decision(action, parameter, journal, tried, page_state, current_url):
         total = len(page_state["parts"])
         target = read_more_target(parameter, page_state)
         if not (current_url and page_state["url"] == normalize_url(current_url)) or total == 0:
-            return "BLOCKED_READ_MORE", "The current page has no parts to read. Use SEARCH or NAVIGATE first."
+            return "BLOCKED_READ_MORE", f"{where_you_are(page_state, current_url)} This page has no parts to read."
         if not 0 <= target < total:
-            return "BLOCKED_READ_MORE", f"There is no part {target + 1}; this page has {total} part(s) and you are on part {page_state['index'] + 1}."
+            return "BLOCKED_READ_MORE", (f"There is no part {target + 1}. {where_you_are(page_state, current_url)} "
+                                         f"This page has {total} part(s).")
     elif action == "DISCOVER":
         if not discovery_lines(parameter):
             return "BLOCKED_DISCOVER", "The DISCOVER parameter was empty. Put the actual information in the parameter."
@@ -424,6 +428,15 @@ def check_decision(action, parameter, journal, tried, page_state, current_url):
     else:
         return f"UNKNOWN_{action}", f"'{action}' is not a valid action."
     return None
+
+def where_you_are(page_state, current_url):
+    # With several pages in one conversation the model lost track of which one was current (it paged through
+    # a 3-part article asking for "part 3 of 4" of a page it had left), so notes and refusals always say so
+    if not current_url:
+        return "No page is open yet."
+    if page_state["url"] == normalize_url(current_url) and page_state["parts"]:
+        return f"You are on {current_url} (part {page_state['index'] + 1} of {len(page_state['parts'])})."
+    return f"You are on {current_url}."
 
 def finish_check(tried, journal):
     # Asked to judge whether its discoveries "satisfy" the objective, a small model says yes too easily: on an
@@ -753,7 +766,7 @@ async def main():
                     print(f"⚠️ Action refused: {refusal[1]}")
                     journal.append({"turn": turn_counter, "thought": thought, "action": refusal[0], "requested": parameter, "reason": refusal[1]})
                     loop_msg = f"Your {action} was refused. {refusal[1]}"
-                    set_note(conversation, "RESULT: Nothing changed; the CURRENT ENVIRONMENT above is unchanged.", current_url)
+                    set_note(conversation, f"RESULT: Nothing changed. {where_you_are(page_state, current_url)}", current_url)
 
                 elif action == "FINISH":
                     print("\n🎯 Agent has signaled mission complete. Writing final summary report...")
@@ -812,7 +825,8 @@ async def main():
                     page_state.setdefault("seen_parts", {0}).add(target)
                     print(f"📖 Showing part {target + 1} of {len(page_state['parts'])} of the current page.")
                     journal.append({"turn": turn_counter, "thought": thought, "action": "READ_MORE", "part": f"{target + 1} of {len(page_state['parts'])}"})
-                    set_note(conversation, f"RESULT: READ_MORE done. The CURRENT ENVIRONMENT now shows:\n{render_part(page_state)}\n"
+                    set_note(conversation, f"RESULT: READ_MORE done. {where_you_are(page_state, current_url)} "
+                                           f"The CURRENT ENVIRONMENT now shows:\n{render_part(page_state)}\n"
                                            f"The links listed earlier for this page still apply.", current_url)
 
                 elif action == "DISCOVER":
@@ -820,7 +834,8 @@ async def main():
                     journal.append({"turn": turn_counter, "thought": thought, "action": "DISCOVER", "source": current_url, "extracted_data": parameter})
                     page_state["visit_discoveries"] = page_state.get("visit_discoveries", 0) + 1
                     set_note(conversation, "RESULT: Your DISCOVER was recorded and is now part of DISCOVERIES SO FAR. "
-                                           "The CURRENT ENVIRONMENT above is unchanged. Do not record the same information again.", current_url)
+                                           f"{where_you_are(page_state, current_url)} The page is unchanged. "
+                                           "Do not record the same information again.", current_url)
 
                 # A single refusal gets a short warning; repeated refusals get an explicit list of other options
                 last_entry = journal[-1]["action"] if journal else ""

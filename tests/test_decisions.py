@@ -57,6 +57,13 @@ def test_navigating_to_the_current_page_is_refused():
     assert result[0] == "BLOCKED_NAVIGATE" and "already on this page" in result[1]
 
 
+def test_refusals_name_the_current_page():
+    page = recorded_page(GUIDE, parts=("a", "b", "c"), index=2)
+    result = decide("READ_MORE", "4 of 4", page, GUIDE)
+    assert result[0] == "BLOCKED_READ_MORE" and f"You are on {GUIDE} (part 3 of 3)" in result[1]
+    assert f"You are on {GUIDE}" in decide("NAVIGATE", GUIDE, page, GUIDE, urls=[GUIDE])[1]
+
+
 def test_visit_cap():
     page = recorded_page(GUIDE)
     assert decide("NAVIGATE", DOCS, page, GUIDE, urls=[DOCS, GUIDE, DOCS, GUIDE]) is None  # 3rd visit allowed
@@ -81,6 +88,7 @@ def test_finish_check_asks_once_then_lets_finish_through():
     first = ab.check_decision("FINISH", "my answer", [], tried, page, DOCS)
     assert first[0] == "CONFIRM_FINISH"
     assert "separate parts" in first[1] and "'not covered'" in first[1] and "repeat FINISH" in first[1]
+    assert "'written at FINISH'" in first[1] and "never as a DISCOVER" in first[1]
     assert ab.check_decision("FINISH", "my answer", [], tried, page, DOCS) is None
 
 

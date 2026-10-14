@@ -4,6 +4,19 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.31] - 2026-10-14
+### Fixed
+- The model recorded its own opinion as a discovery, attributed to a web page. The part-by-part check now
+  says parts asking for the agent's own answer, opinion or summary are "written at FINISH", never as a
+  DISCOVER, and the system prompt limits DISCOVER to information found on the page.
+- With several pages in one conversation the model lost track of which page was current (it asked for
+  "part 3 of 4" of a 3-part page it had moved to). Every result note and refusal now states the current URL
+  and part.
+
+Rerun on the cats objective: no opinion was recorded as a discovery and no page confusion occurred, but this
+run's search led to a generic blog, and the agent stayed with that single source and finished with a list of
+findings instead of an opinion. Results vary strongly with the first page found.
+
 ## [1.30] - 2026-10-14
 ### Changed
 - The part-by-part check asks the model to write each part of the objective followed by the discovery that
