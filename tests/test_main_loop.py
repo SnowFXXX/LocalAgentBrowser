@@ -1,0 +1,80 @@
+"""Runs the real main() loop against a fake website and a scripted model, exercising every kind of turn
+end to end in about a second."""
+import asyncio
+import builtins
+import json
+import urllib.parse
+
+import agent_browser as ab
+from fakes import FakeSite, fake_client, reply
+
+A, B = "https://docs.example/a", "https://docs.example/b"
+SITE = FakeSite(
+    pages={
+        A: ("Intro paragraph.\n\n" + "Long paragraph about setup. " * 120 + "\n\nFinal words.",
+            [("Menu", "https://docs.example/menu"), ("Page B", B)]),
+        B: ("Page B text with a fact.", [("Menu", "https://docs.example/menu"), ("Back to A", A)]),
+    },
+    results=[{"title": "Doc A", "href": "//duckduckgo.com/l/?uddg=" + urllib.parse.quote(A), "snippet": "about a"}],
+)
+SCRIPT = [
+    reply("SEARCH", "docs a"),         # turn 1: fresh prompt
+    reply("NAVIGATE", A),              # turn 2: search results arrive as a follow-up note
+    reply("DISCOVER", "fact from a"),  # turn 3: page A arrives as a follow-up note
+    reply("NAVIGATE", A),              # turn 4: already on A -> cheap retry
+    reply("NAVIGATE", A),              #         again -> cheap retry 2
+    reply("NAVIGATE", A),              #         again -> refused for the turn
+    reply("READ_MORE", "2 of 3"),      # turn 5
+    reply("NAVIGATE", B),              # turn 6: A had a discovery, so no leave check
+    reply("NAVIGATE", A),              # turn 7: nothing recorded on B -> leave check
+    reply("NAVIGATE", A),              #         repeated -> goes through (going back to A is allowed)
+    reply("FINISH", "done"),           # turn 8
+]
+
+
+def run_agent(monkeypatch, tmp_path, objective_check_every=None):
+    client, model = fake_client(SCRIPT, prompt_tokens=None)
+    real_sleep = asyncio.sleep
+    monkeypatch.setattr(ab, "async_playwright", SITE.playwright)
+    monkeypatch.setattr(ab, "AsyncOpenAI", lambda **kwargs: client)
+    monkeypatch.setattr(ab.asyncio, "sleep", lambda seconds, *a, **k: real_sleep(0, *a, **k))
+    monkeypatch.setattr(builtins, "input", lambda prompt="": "test objective")
+    monkeypatch.chdir(tmp_path)
+    if objective_check_every:
+        monkeypatch.setattr(ab, "OBJECTIVE_CHECK_EVERY", objective_check_every)
+    asyncio.run(ab.main())
+    journal = json.loads((tmp_path / "research_log.txt").read_text(encoding="utf-8").split("\n", 1)[1])
+    return model.calls, journal
+
+
+def last_message(call):
+    return call[-1]["content"]
+
+
+def test_full_run(monkeypatch, tmp_path):
+    calls, journal = run_agent(monkeypatch, tmp_path)
+    actions = [e["action"] for e in journal]
+
+    assert len(calls) == len(SCRIPT)
+    assert [i for i, c in enumerate(calls) if len(c) == 2] == [0], "only the first call should build a full prompt"
+    assert all(calls[i][:len(calls[i - 1])] == calls[i - 1] for i in range(1, len(calls))), "each call must extend the previous"
+    assert "Search Results" in last_message(calls[1])
+    assert "Page Text (part 1 of" in last_message(calls[2]) and "Page B" in last_message(calls[2])
+    assert actions.count("REFUSED_IN_TURN") == 3 and "BLOCKED_NAVIGATE" in actions
+    assert not any("done (visit" in last_message(c) for c in calls[4:7]), "a refused NAVIGATE must not report 'done'"
+    assert "part 2 of" in last_message(calls[7]).lower()
+    assert "(1 links already listed" in last_message(calls[8])
+    assert "CHECK: You are about to leave" in last_message(calls[9]) and "Do NOT" not in last_message(calls[9])
+    assert "visit 2 of 3" in last_message(calls[10])
+    assert "PROGRESS CHECK" in last_message(calls[10])
+    assert not any("PROGRESS CHECK" in last_message(c) for c in calls[:10])
+    assert not any("OBJECTIVE CHECK" in last_message(c) for c in calls), "default schedule should not fire in 8 turns"
+    assert actions[-1] == "FINISH" and journal[-1]["finding"] == "done", "FINISH must be saved to the log"
+
+
+def test_objective_check_schedule(monkeypatch, tmp_path):
+    calls, _ = run_agent(monkeypatch, tmp_path, objective_check_every=3)
+    fired = [i for i, c in enumerate(calls) if "OBJECTIVE CHECK" in last_message(c)]
+    assert fired == [3, 8], "after turns 3 and 6"
+    assert "recorded 1 discoveries in 3 turns" in last_message(calls[3])
+    assert "PROGRESS CHECK" in last_message(calls[10]) and "OBJECTIVE CHECK" not in last_message(calls[10])
