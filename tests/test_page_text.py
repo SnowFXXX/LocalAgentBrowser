@@ -26,6 +26,24 @@ def test_parts_respect_the_size_limit_and_keep_all_text():
     assert all(f"Paragraph {i}." in "\n".join(parts) for i in range(40))
 
 
+def test_outline_labels_parts_by_their_headings():
+    mark = ab.HEADING_MARK
+    parts = [f"{mark}Getting started\nIntro text.", "Plain paragraph with no heading at all.",
+             f"Text before.\n{mark}Planner\nMore.\n{mark}  Generator  \nEven more.", "```\ncode first\n```"]
+    clean, outline = ab.build_outline(parts)
+    assert outline == ["Getting started", "Plain paragraph with no heading at all.", "Planner / Generator", "code first"]
+    assert all(mark not in part for part in clean) and clean[0] == "Getting started\nIntro text."
+
+
+def test_outline_is_shown_only_for_long_pages():
+    short = {"parts": ["a"] * 4, "outline": [f"Section {i}" for i in range(4)], "index": 0}
+    long = {"parts": ["a"] * 33, "outline": [f"Section {i}" for i in range(33)], "index": 0}
+    assert "Page Outline" not in ab.render_part(short, with_outline=True)
+    rendered = ab.render_part(long, with_outline=True)
+    assert rendered.startswith("Page Outline (33 parts") and "  33. Section 32" in rendered
+    assert "Page Outline" not in ab.render_part(long), "READ_MORE notes do not repeat the outline"
+
+
 def test_render_part_footer():
     page = {"parts": ["one", "two"], "index": 0}
     assert "READ_MORE shows part 2 of 2" in ab.render_part(page)

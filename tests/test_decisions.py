@@ -119,6 +119,12 @@ class TestLeaveCheck:
     def test_no_check_when_leaving_a_search_results_page(self):
         assert decide("NAVIGATE", DOCS, unrecorded_page(GUIDE), SEARCH_PAGE, urls=[DOCS, GUIDE]) is None
 
+    def test_long_page_points_to_the_outline_instead_of_the_unread_count(self):
+        page = unrecorded_page(GUIDE, parts=[f"p{i}" for i in range(33)])
+        message = decide("NAVIGATE", DOCS, page, GUIDE, urls=[DOCS, GUIDE])[1]
+        assert "long page (33 parts, 32 unread)" in message and "outline" in message
+        assert "32 of its 33 parts are still unread" not in message
+
     def test_fully_read_page_has_no_unread_note(self):
         page = unrecorded_page(GUIDE)
         page["seen_parts"] = {0, 1, 2}

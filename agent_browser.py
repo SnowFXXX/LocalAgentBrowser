@@ -35,6 +35,10 @@ MAX_SEARCH_RESULTS = 8
 MAX_SNIPPET_CHARS = 200
 PAGE_PART_CHARS = 2500   # Pages are shown in parts of about this size; READ_MORE shows the next part
 MAX_LINKS = 15
+OUTLINE_MIN_PARTS = 5    # Pages with at least this many parts get an outline of what each part covers
+MAX_OUTLINE_LINES = 40
+MAX_OUTLINE_LABEL = 90
+LONG_PAGE_UNREAD = 3     # Above this many unread parts, the leave check points to the outline instead of the count
 MAX_JSON_RETRIES = 3
 MAX_VISITS_PER_URL = 3   # Returning to an earlier page is allowed; this caps back-and-forth loops
 MAX_CHEAP_RETRIES = 2   # Refused replies re-asked within the same turn before the refusal costs a whole turn
@@ -97,10 +101,12 @@ RESPONSE_FORMAT = {
 BLOCK_START = "[[[BLOCK_START {}]]]"
 BLOCK_END = "[[[BLOCK_END]]]"
 BLOCK_PATTERN = re.compile(r'\[\[\[BLOCK_START (\w+)\]\]\](.*?)\[\[\[BLOCK_END\]\]\]', re.S)
+HEADING_MARK = "[[[H]]]"
 
 # Hides navigation menus, footers and cookie/consent banners, wraps code blocks and tables in markers
-# so they are never split, reads the visible text, then restores the page exactly as it was.
-PAGE_TEXT_JS = r"""([blockStart, blockEnd]) => {
+# so they are never split, marks headings for the page outline, reads the visible text, then restores
+# the page exactly as it was.
+PAGE_TEXT_JS = r"""([blockStart, blockEnd, headingMark]) => {
     const clutter = new Set();
     document.querySelectorAll('nav, footer, [role=navigation], [role=contentinfo]').forEach(el => clutter.add(el));
     document.querySelectorAll('#onetrust-banner-sdk, #onetrust-consent-sdk, #CybotCookiebotDialog, #usercentrics-root, .qc-cmp2-container, .fc-consent-root, #truste-consent-track').forEach(el => clutter.add(el));
@@ -127,6 +133,12 @@ PAGE_TEXT_JS = r"""([blockStart, blockEnd]) => {
             el.parentNode.insertBefore(start, el);
             el.parentNode.insertBefore(end, el.nextSibling);
             markers.push(start, end);
+        });
+        document.querySelectorAll('h1, h2, h3, h4').forEach(el => {
+            if (el.closest('pre, table')) return;
+            const mark = document.createTextNode(headingMark);
+            el.insertBefore(mark, el.firstChild);
+            markers.push(mark);
         });
         let text = document.body ? document.body.innerText : '';
         // Safety net: if hiding clutter removed most of the page, the "clutter" was the content
@@ -271,8 +283,24 @@ def split_into_parts(text, limit=PAGE_PART_CHARS):
     return parts
 
 async def extract_page_parts(page):
-    text = await page.evaluate(PAGE_TEXT_JS, [BLOCK_START, BLOCK_END])
-    return split_into_parts(text or "")
+    """Returns the page split into parts, and an outline label for each part."""
+    text = await page.evaluate(PAGE_TEXT_JS, [BLOCK_START, BLOCK_END, HEADING_MARK])
+    return build_outline(split_into_parts(text or ""))
+
+def build_outline(parts):
+    """Strips the heading markers and labels each part with its headings (or its first line if it has none)."""
+    clean, outline = [], []
+    for part in parts:
+        headings = [" ".join(h.split()) for h in re.findall(re.escape(HEADING_MARK) + r"([^\n]*)", part) if h.strip()]
+        text = part.replace(HEADING_MARK, "")
+        if headings:
+            label = " / ".join(headings)
+        else:
+            # First line with real text, skipping code-fence lines (```)
+            label = next((line.strip() for line in text.splitlines() if line.strip().strip("`").strip()), "(no text)")
+        clean.append(text)
+        outline.append(label if len(label) <= MAX_OUTLINE_LABEL else label[:MAX_OUTLINE_LABEL] + "...")
+    return clean, outline
 
 async def extract_page_links(page, shown_links=None):
     # Links come from the whole page, menus included, since navigation menus are how sites are used
@@ -308,19 +336,20 @@ async def build_environment(page, current_url, page_state, visited_urls=frozense
             results = await extract_search_results(page, visited_urls)
             if results:
                 return f"Search Results:\n{results}"
-            parts = await extract_page_parts(page)
+            parts, _ = await extract_page_parts(page)
             return f"[No search results parsed - possibly no matches or a search engine error]\n{parts[0][:1500] if parts else ''}"
 
         # Parts are cached per URL so part numbers stay stable while the model reads through a page
         if page_state["url"] != normalize_url(current_url):
-            page_state.update(url=normalize_url(current_url), parts=await extract_page_parts(page), index=0,
+            parts, outline = await extract_page_parts(page)
+            page_state.update(url=normalize_url(current_url), parts=parts, outline=outline, index=0,
                               seen_parts={0}, visit_discoveries=0, leave_confirmed=False)
         link_lines = await extract_page_links(page, shown_links)
-        return f"{render_part(page_state)}\n\nLinks On Page:\n{link_lines or '[None]'}"
+        return f"{render_part(page_state, with_outline=True)}\n\nLinks On Page:\n{link_lines or '[None]'}"
     except Exception as e:
         return f"[Error reading page content: {e}]"
 
-def render_part(page_state):
+def render_part(page_state, with_outline=False):
     parts, index = page_state["parts"], page_state["index"]
     if not parts:
         return "Page Text:\n[No readable text]"
@@ -328,7 +357,22 @@ def render_part(page_state):
         footer = f"[Page continues: READ_MORE shows part {index + 2} of {len(parts)}]"
     else:
         footer = "[End of page]"
-    return f"Page Text (part {index + 1} of {len(parts)}):\n{parts[index]}\n{footer}"
+    text = f"Page Text (part {index + 1} of {len(parts)}):\n{parts[index]}\n{footer}"
+    if with_outline:
+        text = f"{render_outline(page_state)}{text}"
+    return text
+
+def render_outline(page_state):
+    # On a long page the model read part after part in order (part 4 of 33, nothing new) because it could
+    # not see where anything was; the outline lets it jump to the part it needs, like skimming headings
+    outline = page_state.get("outline") or []
+    if len(outline) < OUTLINE_MIN_PARTS:
+        return ""
+    lines = [f"  {i}. {label}" for i, label in enumerate(outline[:MAX_OUTLINE_LINES], start=1)]
+    if len(outline) > MAX_OUTLINE_LINES:
+        lines.append(f"  ... ({len(outline) - MAX_OUTLINE_LINES} more parts)")
+    return (f"Page Outline ({len(outline)} parts; READ_MORE with a part number jumps straight to that part):\n"
+            + "\n".join(lines) + "\n\n")
 
 QUOTE_STYLES = str.maketrans({"‘": "'", "’": "'", "“": "'", "”": "'", '"': "'", "`": "'"})
 
@@ -384,8 +428,16 @@ def leave_check(action, page_state, current_url):
         return None
     page_state["leave_confirmed"] = True  # Asked once per visit
     unread = len(parts) - len(page_state.get("seen_parts", {0}))
-    unread_note = f" {unread} of its {len(parts)} parts are still unread." if unread else ""
-    read_more = ", or READ_MORE if the unread parts may have it" if unread else ""
+    if unread > LONG_PAGE_UNREAD:
+        # Counting unread parts of a long page pushed the model to read all of them in order
+        unread_note = (f" It is a long page ({len(parts)} parts, {unread} unread): use its outline to judge "
+                       "whether a part is worth reading.")
+        read_more = ", or READ_MORE with the number of a part from the outline that is likely to have it"
+    elif unread:
+        unread_note = f" {unread} of its {len(parts)} parts are still unread."
+        read_more = ", or READ_MORE if the unread parts may have it"
+    else:
+        unread_note = read_more = ""
     return ("CONFIRM_LEAVE", f"You are about to leave {current_url} without recording anything from it.{unread_note} "
             f"If it has information relevant to the objective, DISCOVER it now{read_more}. "
             f"If it truly has nothing relevant, repeat your {action} to leave.")

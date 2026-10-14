@@ -4,6 +4,21 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.33] - 2026-10-14
+### Added
+- Page outline: a page of 5 or more parts is first shown with a list of the headings in each part, and
+  `READ_MORE <number>` jumps straight to a part. On a 34-part guide the agent had been reading part after
+  part in order (part 4 of 33 with nothing new); with the outline it jumped straight to "Install the correct
+  loop definitions" (part 4) and recorded the four `--loop` values.
+### Changed
+- The leave check no longer counts the unread parts of a long page (which pushed the model to read them all
+  in order); it points to the outline instead.
+
+Regression run on the original Playwright objective: the outline, error-page handling, leave check and
+progress check all worked live, and the agent recorded 8 relevant findings, but it had not finished after
+72 minutes. Fresh-prompt rebuilds took 28% of the model time, and the part-by-part check kept it looking for
+"parameter schemas" the documentation does not contain. The next version addresses both.
+
 ## [1.32] - 2026-10-14
 ### Added
 - The final result is written in a separate model call after FINISH, given only the objective, every

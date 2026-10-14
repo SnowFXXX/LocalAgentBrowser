@@ -137,7 +137,8 @@ flowchart LR
   its only job, and every claim stays traceable to a recorded finding.
 - **Error pages are recognised.** A page answering 404, 403 and so on counts as a failed visit, not content.
 - **Readable pages.** Navigation menus, footers and cookie banners are hidden; code blocks and tables are
-  never split between parts; links already shown are not repeated.
+  never split between parts; links already shown are not repeated. Long pages come with an outline of the
+  headings in each part, so the agent can jump to the part it needs instead of reading in order.
 
 ### Built for slow hardware
 
