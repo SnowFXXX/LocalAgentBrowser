@@ -8,6 +8,10 @@ decides when it's done, all on your own computer.**
 ![Python 3.10–3.13](https://img.shields.io/badge/python-3.10%E2%80%933.13-blue.svg)
 ![Runs locally](https://img.shields.io/badge/LLM-local%20(LM%20Studio)-green.svg)
 
+<p align="center">
+  <img src="docs/social-preview.png" alt="LocalAgentBrowser: SEARCH, NAVIGATE, READ_MORE, DISCOVER, FINISH. No cloud AI, 7B model on a CPU, LM Studio and Playwright." width="820">
+</p>
+
 A local language model served by [LM Studio](https://lmstudio.ai) decides what to do next, and
 [Playwright](https://playwright.dev/python/) carries it out in a visible Chromium window you can watch. Built
 and tuned to work well with a **small 7B model on a CPU, no GPU required**.
