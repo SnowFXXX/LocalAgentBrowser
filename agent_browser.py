@@ -1,10 +1,30 @@
+"""LocalAgentBrowser: an autonomous web agent driven by a local language model.
+
+A model served by LM Studio decides, one JSON action at a time, whether to SEARCH, NAVIGATE, READ_MORE,
+DISCOVER or FINISH; Playwright carries the actions out in a visible Chromium window. Everything the
+agent does and finds is written to research_log.txt.
+
+Run:  python agent_browser.py   (or `localagentbrowser` once installed; it asks for the objective)
+
+Settings (environment variables):
+    LMSTUDIO_BASE_URL        OpenAI-compatible server address   (default http://localhost:1234/v1)
+    LMSTUDIO_MODEL           model identifier                   (default qwen2.5-7b-instruct)
+    LMSTUDIO_API_KEY         API key, if the server needs one   (default lm-studio)
+    LMSTUDIO_CONTEXT_LENGTH  context length the model is loaded with (default 8192)
+"""
 import asyncio
 import json
+import os
 import urllib.parse
 import re
 import unicodedata
 from openai import AsyncOpenAI
 from playwright.async_api import async_playwright
+
+BASE_URL = os.environ.get("LMSTUDIO_BASE_URL", "http://localhost:1234/v1")
+MODEL = os.environ.get("LMSTUDIO_MODEL", "qwen2.5-7b-instruct")
+API_KEY = os.environ.get("LMSTUDIO_API_KEY", "lm-studio")
+CONTEXT_LENGTH = int(os.environ.get("LMSTUDIO_CONTEXT_LENGTH", "8192"))
 
 SEARCH_URL = "https://html.duckduckgo.com/html/?q="
 JOURNAL_BATCH = 6        # The prompt shows 6-11 recent journal entries; old ones are dropped 6 at a time
@@ -18,7 +38,7 @@ MAX_JSON_RETRIES = 3
 MAX_VISITS_PER_URL = 3   # Returning to an earlier page is allowed; this caps back-and-forth loops
 MAX_CHEAP_RETRIES = 2   # Refused replies re-asked within the same turn before the refusal costs a whole turn
 MAX_FOLLOWUPS = 12       # Turns that continue one conversation before a fresh full prompt (the token budget usually ends it first)
-MAX_CONVERSATION_TOKENS = 5500  # Start fresh before the conversation nears LM Studio's 8192-token context
+MAX_CONVERSATION_TOKENS = int(CONTEXT_LENGTH * 0.67)  # Start fresh with room left for the next page and the reply
 TURN_PAUSE_SECONDS = 1
 STALL_TURNS = 4          # Turns without a new discovery before the model is asked to check its progress
 OBJECTIVE_CHECK_EVERY = 8  # Turns between scheduled objective checks, which happen even while discoveries continue
@@ -255,17 +275,17 @@ async def extract_page_links(page, shown_links=None):
     seen = set()
     link_lines = []
     omitted = 0
-    for l in links:
-        if l["href"] in seen or normalize_url(l["href"]) == normalize_url(page.url):
+    for link in links:
+        if link["href"] in seen or normalize_url(link["href"]) == normalize_url(page.url):
             continue
-        seen.add(l["href"])
-        if shown_links is not None and l["href"] in shown_links:
+        seen.add(link["href"])
+        if shown_links is not None and link["href"] in shown_links:
             omitted += 1
             continue
         if len(link_lines) < MAX_LINKS:
-            link_lines.append(f"- {l['text'][:60]} -> {l['href']}")
+            link_lines.append(f"- {link['text'][:60]} -> {link['href']}")
             if shown_links is not None:
-                shown_links.add(l["href"])
+                shown_links.add(link["href"])
     if omitted:
         link_lines.append(f"({omitted} links already listed earlier in this conversation are not repeated)")
     return "\n".join(link_lines)
@@ -551,7 +571,7 @@ async def request_decision(client, messages, journal, tried, page_state, current
     json_failures = 0
     while True:
         response = await client.chat.completions.create(
-            model="qwen2.5-7b-instruct",
+            model=MODEL,
             messages=messages,
             temperature=0.2,
             response_format=RESPONSE_FORMAT
@@ -570,7 +590,7 @@ async def request_decision(client, messages, journal, tried, page_state, current
             json_failures += 1
             print(f"⚠️ Model returned invalid JSON (attempt {json_failures}/{MAX_JSON_RETRIES}): {raw_content[:200]}")
             if json_failures >= MAX_JSON_RETRIES:
-                raise ValueError(f"No valid JSON decision after {MAX_JSON_RETRIES} attempts.")
+                raise ValueError(f"No valid JSON decision after {MAX_JSON_RETRIES} attempts.") from parse_err
             messages += [{"role": "assistant", "content": original_content},
                          {"role": "user", "content": f"That reply was not a valid JSON object ({parse_err}). Reply with only the JSON object in the mandatory format."}]
             continue
@@ -611,8 +631,8 @@ async def load_page(page, url=None):
 
 async def main():
     client = AsyncOpenAI(
-        base_url="http://localhost:1234/v1",
-        api_key="lm-studio"
+        base_url=BASE_URL,
+        api_key=API_KEY
     )
 
     print("🤖 ==================================================== 🤖")
@@ -641,7 +661,6 @@ async def main():
             java_script_enabled=True,
             viewport={"width": 1280, "height": 720}
         )
-        await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
         page = await context.new_page()
 
         while turn_counter <= max_turns:
@@ -660,7 +679,7 @@ async def main():
                 continue
             except Exception as err:
                 print(f"❌ Local AI API transaction failed: {err}")
-                print("💡 Check that LM Studio is actively running and model 'qwen2.5-7b-instruct' is loaded.")
+                print(f"💡 Check that LM Studio is running at {BASE_URL} and model '{MODEL}' is loaded.")
                 break
 
             # Replies refused and retried within this turn stay in the journal so the model sees what failed
@@ -796,5 +815,13 @@ async def main():
         print("\n🔒 Shutting down browser instance. Research log finalized in research_log.txt.")
         await browser.close()
 
+def run():
+    """Command-line entry point (installed as `localagentbrowser`)."""
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n⏹️ Stopped. Findings so far are in research_log.txt.")
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    run()
