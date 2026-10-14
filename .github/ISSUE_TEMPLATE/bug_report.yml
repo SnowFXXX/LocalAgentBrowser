@@ -1,0 +1,47 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to report this! The more detail you can give, the faster it can be fixed.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did the agent do, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: The objective you gave the agent (remove anything private).
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Console output or research log excerpt
+      description: The relevant part of the console output or research_log.txt.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Agent version
+      description: From CHANGELOG.md, or the commit you are on.
+      placeholder: "1.28"
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model and LM Studio version
+      placeholder: "qwen2.5-7b-instruct Q4_K_M, LM Studio 0.3.x"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Operating system, Python version and hardware
+      placeholder: "Windows 11, Python 3.13, CPU only (i5-9500)"
