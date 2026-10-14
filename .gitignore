@@ -9,6 +9,7 @@ venv/
 
 # Agent output
 research_log.txt
+research_report.md
 run_output/
 
 # Local backups (every version is in the git history instead)

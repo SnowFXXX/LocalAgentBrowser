@@ -38,7 +38,7 @@ def decide(action, parameter, page_state, current_url, queries=(), urls=(), jour
     ("DISCOVER", "", "BLOCKED_DISCOVER"),
     ("DISCOVER", "already recorded fact", "DUPLICATE_DISCOVER"),
     ("DISCOVER", "something new", None),
-    ("FINISH", "", None),
+    ("FINISH", "summary", "CONFIRM_FINISH"),
     ("JUMP", "x", "UNKNOWN_JUMP"),
 ])
 def test_check_decision(action, parameter, expected):
@@ -73,6 +73,15 @@ def test_visited_summary_counts_each_url_once():
 def test_read_more_target(parameter, expected_part):
     page = {"url": "u", "parts": list("abcde"), "index": 0}
     assert ab.read_more_target(parameter, page) + 1 == expected_part
+
+
+def test_finish_check_asks_once_then_lets_finish_through():
+    tried = {"queries": [], "urls": []}
+    page = recorded_page(DOCS)
+    first = ab.check_decision("FINISH", "my answer", [], tried, page, DOCS)
+    assert first[0] == "CONFIRM_FINISH"
+    assert "separate parts" in first[1] and "repeat FINISH" in first[1] and "opinion" in first[1]
+    assert ab.check_decision("FINISH", "my answer", [], tried, page, DOCS) is None
 
 
 class TestLeaveCheck:

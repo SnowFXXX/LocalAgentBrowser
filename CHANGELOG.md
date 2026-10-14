@@ -4,6 +4,27 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.29] - 2026-10-14
+Testing a very different objective (research how spiritual traditions view cats, then form an opinion)
+showed the agent finishing after 9 turns with three findings from a single blog, naming no traditions, and
+giving a summary instead of the opinion asked for. Its own reasoning said it should review the objective,
+then it finished anyway.
+### Added
+- Check before finishing: the first FINISH of a turn gets a cheap retry asking the model to split the
+  objective into its parts and check each against its discoveries, and to finish only with the result the
+  objective asks for (an answer, opinion, summary or deliverable), not just a list of findings. Repeating
+  FINISH then goes through.
+- `research_report.md`: a readable report with the final result and every discovery with its source,
+  written however the run ends (FINISH, the turn limit, Ctrl+C or a lost connection).
+### Changed
+- The progress and objective checks use the same part-by-part wording instead of asking whether the
+  discoveries "satisfy" the objective, which a small model answers yes to too easily.
+- The system prompt's FINISH rule asks for every part to be covered and the final result in the parameter.
+
+Rerunning the same objective: the check fired and the model named both parts of the objective, and its final
+result now states a position instead of only summarising. It still judged one blog as covering "traditions
+around the world", so coverage judgement needs more work.
+
 ## [1.28] - 2026-10-13
 Preparing for publication.
 ### Added

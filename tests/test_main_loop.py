@@ -28,12 +28,13 @@ SCRIPT = [
     reply("NAVIGATE", B),              # turn 6: A had a discovery, so no leave check
     reply("NAVIGATE", A),              # turn 7: nothing recorded on B -> leave check
     reply("NAVIGATE", A),              #         repeated -> goes through (going back to A is allowed)
-    reply("FINISH", "done"),           # turn 8
+    reply("FINISH", "done"),           # turn 8: finish check
+    reply("FINISH", "final answer"),   #         repeated with the final result -> finished
 ]
 
 
-def run_agent(monkeypatch, tmp_path, objective_check_every=None):
-    client, model = fake_client(SCRIPT, prompt_tokens=None)
+def run_agent(monkeypatch, tmp_path, objective_check_every=None, script=SCRIPT):
+    client, model = fake_client(script, prompt_tokens=None)
     real_sleep = asyncio.sleep
     monkeypatch.setattr(ab, "async_playwright", SITE.playwright)
     monkeypatch.setattr(ab, "AsyncOpenAI", lambda **kwargs: client)
@@ -60,7 +61,7 @@ def test_full_run(monkeypatch, tmp_path):
     assert all(calls[i][:len(calls[i - 1])] == calls[i - 1] for i in range(1, len(calls))), "each call must extend the previous"
     assert "Search Results" in last_message(calls[1])
     assert "Page Text (part 1 of" in last_message(calls[2]) and "Page B" in last_message(calls[2])
-    assert actions.count("REFUSED_IN_TURN") == 3 and "BLOCKED_NAVIGATE" in actions
+    assert actions.count("REFUSED_IN_TURN") == 4 and "BLOCKED_NAVIGATE" in actions
     assert not any("done (visit" in last_message(c) for c in calls[4:7]), "a refused NAVIGATE must not report 'done'"
     assert "part 2 of" in last_message(calls[7]).lower()
     assert "(1 links already listed" in last_message(calls[8])
@@ -69,7 +70,21 @@ def test_full_run(monkeypatch, tmp_path):
     assert "PROGRESS CHECK" in last_message(calls[10])
     assert not any("PROGRESS CHECK" in last_message(c) for c in calls[:10])
     assert not any("OBJECTIVE CHECK" in last_message(c) for c in calls), "default schedule should not fire in 8 turns"
-    assert actions[-1] == "FINISH" and journal[-1]["finding"] == "done", "FINISH must be saved to the log"
+    assert "CHECK: Before finishing" in last_message(calls[11]) and "Do NOT" not in last_message(calls[11])
+    assert actions[-1] == "FINISH" and journal[-1]["finding"] == "final answer", "FINISH must be saved to the log"
+
+    report = (tmp_path / ab.REPORT_FILE).read_text(encoding="utf-8")
+    assert "**Objective:** test objective" in report and "finished by the agent on turn 8" in report
+    assert "## Final result\n\nfinal answer" in report
+    assert "## Discoveries (1)" in report and f"Turn 3, from {A}" in report and "fact from a" in report
+
+
+def test_report_is_written_when_the_run_stops_early(monkeypatch, tmp_path):
+    # The scripted model runs out of replies on turn 4, which ends the run like a lost LM Studio connection
+    run_agent(monkeypatch, tmp_path, script=SCRIPT[:3])
+    report = (tmp_path / ab.REPORT_FILE).read_text(encoding="utf-8")
+    assert "stopped before the agent finished (after turn 3)" in report
+    assert "## Discoveries (1)" in report and "fact from a" in report
 
 
 def test_objective_check_schedule(monkeypatch, tmp_path):

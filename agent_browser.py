@@ -27,6 +27,7 @@ API_KEY = os.environ.get("LMSTUDIO_API_KEY", "lm-studio")
 CONTEXT_LENGTH = int(os.environ.get("LMSTUDIO_CONTEXT_LENGTH", "8192"))
 
 SEARCH_URL = "https://html.duckduckgo.com/html/?q="
+REPORT_FILE = "research_report.md"
 JOURNAL_BATCH = 6        # The prompt shows 6-11 recent journal entries; old ones are dropped 6 at a time
 MAX_JOURNAL_DETAIL_CHARS = 120  # Longest query/URL/request text shown per journal line
 MAX_THOUGHT_CHARS = 120 # Old reasoning is trimmed in the prompt; the full text stays in research_log.txt
@@ -44,6 +45,11 @@ STALL_TURNS = 4          # Turns without a new discovery before the model is ask
 OBJECTIVE_CHECK_EVERY = 8  # Turns between scheduled objective checks, which happen even while discoveries continue
 READ_FIRST = ("First, if the CURRENT ENVIRONMENT (or an unread part of this page, via READ_MORE) contains information "
               "relevant to the objective that is not yet in DISCOVERIES SO FAR, DISCOVER it now.")
+CHECK_PARTS = "split the OBJECTIVE into its separate parts and check each one against DISCOVERIES SO FAR."
+FINAL_RESULT = ("the complete final result the objective asks for (for example the answer, opinion, summary or "
+                "deliverable, not just a list of what you found)")
+FINISH_CHECK = (f"Before finishing, {CHECK_PARTS} If any part is not covered yet, do not finish: choose the action that "
+                f"works on that part. If every part is covered, repeat FINISH with {FINAL_RESULT} in the parameter.")
 
 SYSTEM_PROMPT = """You are an autonomous web discovery agent. Your job is to achieve the high-level OBJECTIVE by executing sequential actions.
 On every turn, evaluate the CURRENT ENVIRONMENT and your RESEARCH JOURNAL. You must output exactly ONE valid JSON block matching this structure:
@@ -59,7 +65,7 @@ Action guide:
 - NAVIGATE: parameter is a full URL copied exactly from the search results or page links you were shown.
 - READ_MORE: long pages are shown in parts. Use an empty parameter to see the next part, or a part number to jump to that part.
 - DISCOVER: parameter is the information you found on the current page that serves the objective. DISCOVER does not extract anything for you: you must write the information itself into the parameter. An empty DISCOVER is refused. Copy exact text where precision matters. You may group several related details from the same page into one DISCOVER.
-- FINISH: only when your discoveries satisfy the objective.
+- FINISH: only when your discoveries cover every part of the objective. The parameter must contain the complete final result the objective asks for (for example the answer, opinion, summary or deliverable), not just a list of what you found.
 
 Strictly follow these rules:
 1. If the current page contains information relevant to the objective that is not already in DISCOVERIES SO FAR, your action MUST be DISCOVER before you leave the page.
@@ -412,9 +418,20 @@ def check_decision(action, parameter, journal, tried, page_state, current_url):
             return "BLOCKED_DISCOVER", "The DISCOVER parameter was empty. Put the actual information in the parameter."
         if is_known_discovery(parameter, journal):
             return "DUPLICATE_DISCOVER", "Everything in that DISCOVER is already recorded in DISCOVERIES SO FAR."
-    elif action != "FINISH":
+    elif action == "FINISH":
+        return finish_check(tried)
+    else:
         return f"UNKNOWN_{action}", f"'{action}' is not a valid action."
     return None
+
+def finish_check(tried):
+    # Asked to judge whether its discoveries "satisfy" the objective, a small model says yes too easily: on an
+    # opinion task it finished after one source and gave a summary instead of the opinion asked for. The first
+    # FINISH of each turn gets a cheap retry asking for a part-by-part check; repeating FINISH then goes through.
+    if tried.get("finish_confirmed"):
+        return None
+    tried["finish_confirmed"] = True  # Reset at the start of every turn
+    return "CONFIRM_FINISH", FINISH_CHECK
 
 def action_options(page_state, current_url):
     on_page = current_url and page_state["url"] == normalize_url(current_url) and page_state["parts"]
@@ -606,7 +623,7 @@ async def request_decision(client, messages, journal, tried, page_state, current
         refused.append({"action": action, "parameter": parameter, "journal_action": refusal[0], "reason": refusal[1]})
         print(f"♻️ Cheap retry {len(refused)}/{MAX_CHEAP_RETRIES}: [{action}] refused. {refusal[1]}")
         correction = refusal_correction(action, refusal[1], page_state, current_url)
-        if refusal[0] == "CONFIRM_LEAVE":
+        if refusal[0] in ("CONFIRM_LEAVE", "CONFIRM_FINISH"):
             # Not a true refusal: repeating the action is an allowed answer, so no "do not repeat" wording
             correction = f"CHECK: {refusal[1]} Reply with only the JSON object."
         elif len(refused) >= 2:
@@ -617,6 +634,25 @@ def write_research_log(objective, journal):
     with open("research_log.txt", "w", encoding="utf-8") as log:
         log.write(f"OBJECTIVE: {objective}\n")
         log.write(json.dumps(journal, indent=2))
+
+def write_report(objective, journal):
+    """A readable report with the final result and every discovery, so nothing depends on the model's
+    summary being complete. Written however the run ends."""
+    finish = next((e for e in reversed(journal) if e.get("action") == "FINISH"), None)
+    found = [e for e in journal if e.get("action") == "DISCOVER"]
+    last_turn = journal[-1].get("turn", 0) if journal else 0
+    lines = ["# Research report", "", f"**Objective:** {objective}", ""]
+    if finish:
+        lines += [f"**Status:** finished by the agent on turn {finish.get('turn')}", "", "## Final result", "",
+                  finish.get("finding") or "_(The agent finished without writing a final result.)_"]
+    else:
+        lines += [f"**Status:** stopped before the agent finished (after turn {last_turn})", "", "## Final result", "",
+                  "_(The agent did not finish; see the discoveries below.)_"]
+    lines += ["", f"## Discoveries ({len(found)})"]
+    for i, e in enumerate(found, start=1):
+        lines += ["", f"### {i}. Turn {e.get('turn')}, from {e.get('source') or 'unknown page'}", "", e["extracted_data"]]
+    with open(REPORT_FILE, "w", encoding="utf-8") as report:
+        report.write("\n".join(lines) + "\n")
 
 async def load_page(page, url=None):
     if url:
@@ -663,156 +699,160 @@ async def main():
         )
         page = await context.new_page()
 
-        while turn_counter <= max_turns:
-            print(f"\n🧠 [TURN {turn_counter}/{max_turns}] Active reasoning cycle executing...")
+        try:
+            while turn_counter <= max_turns:
+                print(f"\n🧠 [TURN {turn_counter}/{max_turns}] Active reasoning cycle executing...")
+                tried["finish_confirmed"] = False  # The finish check runs once per turn
 
-            try:
-                decision, refused = await run_agent_turn(client, page, objective, journal, current_url, tried, page_state, conversation, loop_warning=loop_msg)
-                thought = decision.get("thought_process", "No reasoning recorded.")
-                action = str(decision.get("action", "FINISH")).upper()
-                parameter = str(decision.get("parameter", "")).strip()
-                loop_msg = None
-            except ValueError as parse_err:
-                print(f"⚠️ {parse_err} Skipping turn.")
-                journal.append({"turn": turn_counter, "action": "INVALID_OUTPUT", "error": str(parse_err)})
-                turn_counter += 1
-                continue
-            except Exception as err:
-                print(f"❌ Local AI API transaction failed: {err}")
-                print(f"💡 Check that LM Studio is running at {BASE_URL} and model '{MODEL}' is loaded.")
-                break
-
-            # Replies refused and retried within this turn stay in the journal so the model sees what failed
-            for r in refused:
-                journal.append({"turn": turn_counter, "action": "REFUSED_IN_TURN", "requested": f"{r['action']} {r['parameter'][:120]}", "reason": r["reason"]})
-
-            print(f"💡 Agent Thoughts: {thought}")
-            print(f"🎬 Chosen Action: [{action}] -> Parameter: {parameter}")
-
-            refusal = check_decision(action, parameter, journal, tried, page_state, current_url)
-            if refusal:
-                # Only reached once this turn's cheap retries are used up
-                print(f"⚠️ Action refused: {refusal[1]}")
-                journal.append({"turn": turn_counter, "thought": thought, "action": refusal[0], "requested": parameter, "reason": refusal[1]})
-                loop_msg = f"Your {action} was refused. {refusal[1]}"
-                set_note(conversation, "RESULT: Nothing changed; the CURRENT ENVIRONMENT above is unchanged.", current_url)
-
-            elif action == "FINISH":
-                print("\n🎯 Agent has signaled mission complete. Writing final summary report...")
-                journal.append({"turn": turn_counter, "thought": thought, "action": "FINISH", "finding": parameter})
-                break
-
-            elif action in ["SEARCH", "NAVIGATE"]:
-                target_url = determine_url(action, parameter)
-                print(f"🌐 Driving Playwright to cross-domain target: {target_url}")
                 try:
-                    await load_page(page, target_url)
-                    current_url = page.url
+                    decision, refused = await run_agent_turn(client, page, objective, journal, current_url, tried, page_state, conversation, loop_warning=loop_msg)
+                    thought = decision.get("thought_process", "No reasoning recorded.")
+                    action = str(decision.get("action", "FINISH")).upper()
+                    parameter = str(decision.get("parameter", "")).strip()
+                    loop_msg = None
+                except ValueError as parse_err:
+                    print(f"⚠️ {parse_err} Skipping turn.")
+                    journal.append({"turn": turn_counter, "action": "INVALID_OUTPUT", "error": str(parse_err)})
+                    turn_counter += 1
+                    continue
+                except Exception as err:
+                    print(f"❌ Local AI API transaction failed: {err}")
+                    print(f"💡 Check that LM Studio is running at {BASE_URL} and model '{MODEL}' is loaded.")
+                    break
 
-                    if action == "SEARCH":
-                        # The search engine sometimes returns an error page; reload once before giving up
-                        if await count_search_results(page) == 0:
-                            print("⚠️ Search returned no results. Retrying once...")
-                            await asyncio.sleep(3)
-                            await load_page(page)
-                            current_url = page.url
-                        if await count_search_results(page) == 0:
-                            print("❌ Search still returned no results.")
-                            journal.append({"turn": turn_counter, "thought": thought, "action": "FAILED_SEARCH", "requested": parameter,
-                                            "error": "No results (search engine error or no matches). This query may be tried again."})
+                # Replies refused and retried within this turn stay in the journal so the model sees what failed
+                for r in refused:
+                    journal.append({"turn": turn_counter, "action": "REFUSED_IN_TURN", "requested": f"{r['action']} {r['parameter'][:120]}", "reason": r["reason"]})
+
+                print(f"💡 Agent Thoughts: {thought}")
+                print(f"🎬 Chosen Action: [{action}] -> Parameter: {parameter}")
+
+                refusal = check_decision(action, parameter, journal, tried, page_state, current_url)
+                if refusal:
+                    # Only reached once this turn's cheap retries are used up
+                    print(f"⚠️ Action refused: {refusal[1]}")
+                    journal.append({"turn": turn_counter, "thought": thought, "action": refusal[0], "requested": parameter, "reason": refusal[1]})
+                    loop_msg = f"Your {action} was refused. {refusal[1]}"
+                    set_note(conversation, "RESULT: Nothing changed; the CURRENT ENVIRONMENT above is unchanged.", current_url)
+
+                elif action == "FINISH":
+                    print("\n🎯 Agent has signaled mission complete. Writing final summary report...")
+                    journal.append({"turn": turn_counter, "thought": thought, "action": "FINISH", "finding": parameter})
+                    break
+
+                elif action in ["SEARCH", "NAVIGATE"]:
+                    target_url = determine_url(action, parameter)
+                    print(f"🌐 Driving Playwright to cross-domain target: {target_url}")
+                    try:
+                        await load_page(page, target_url)
+                        current_url = page.url
+
+                        if action == "SEARCH":
+                            # The search engine sometimes returns an error page; reload once before giving up
+                            if await count_search_results(page) == 0:
+                                print("⚠️ Search returned no results. Retrying once...")
+                                await asyncio.sleep(3)
+                                await load_page(page)
+                                current_url = page.url
+                            if await count_search_results(page) == 0:
+                                print("❌ Search still returned no results.")
+                                journal.append({"turn": turn_counter, "thought": thought, "action": "FAILED_SEARCH", "requested": parameter,
+                                                "error": "No results (search engine error or no matches). This query may be tried again."})
+                            else:
+                                tried["queries"].append(search_query(parameter))
+                                journal.append({"turn": turn_counter, "thought": thought, "action": action, "requested": parameter, "destination": current_url})
                         else:
-                            tried["queries"].append(search_query(parameter))
+                            tried["urls"].append(target_url)
+                            if normalize_url(current_url) != normalize_url(target_url):
+                                tried["urls"].append(current_url)  # Also remember where redirects landed
                             journal.append({"turn": turn_counter, "thought": thought, "action": action, "requested": parameter, "destination": current_url})
+                    except Exception as b_err:
+                        print(f"❌ Failed to reach target destination: {b_err}")
+                        if action == "NAVIGATE":
+                            tried["urls"].append(target_url)
+                        journal.append({"turn": turn_counter, "thought": thought, "action": f"FAILED_{action}", "requested": parameter, "error": str(b_err)})
+
+                    # The new page joins the running conversation instead of forcing a full prompt rebuild
+                    outcome = journal[-1]
+                    if "error" in outcome:
+                        result = f"RESULT: {outcome['action']} '{parameter}' failed: {outcome['error'][:200]}"
                     else:
-                        tried["urls"].append(target_url)
-                        if normalize_url(current_url) != normalize_url(target_url):
-                            tried["urls"].append(current_url)  # Also remember where redirects landed
-                        journal.append({"turn": turn_counter, "thought": thought, "action": action, "requested": parameter, "destination": current_url})
-                except Exception as b_err:
-                    print(f"❌ Failed to reach target destination: {b_err}")
-                    if action == "NAVIGATE":
-                        tried["urls"].append(target_url)
-                    journal.append({"turn": turn_counter, "thought": thought, "action": f"FAILED_{action}", "requested": parameter, "error": str(b_err)})
+                        added = search_query(parameter) if action == "SEARCH" else target_url
+                        result = f"RESULT: {action} '{parameter}' done. ALREADY TRIED now also includes: {added}"
+                        if action == "NAVIGATE":
+                            visits = [normalize_url(u) for u in tried["urls"]].count(normalize_url(target_url))
+                            result = f"RESULT: NAVIGATE '{parameter}' done (visit {visits} of {MAX_VISITS_PER_URL} allowed for this URL)."
+                    environment = await build_environment(page, current_url, page_state, {normalize_url(u) for u in tried["urls"]}, conversation["shown_links"])
+                    set_note(conversation, f"{result}\n\n### CURRENT ENVIRONMENT (replaces the earlier one)\n"
+                                           f"Active URL: {current_url}\n{environment}", current_url)
 
-                # The new page joins the running conversation instead of forcing a full prompt rebuild
-                outcome = journal[-1]
-                if "error" in outcome:
-                    result = f"RESULT: {outcome['action']} '{parameter}' failed: {outcome['error'][:200]}"
+                elif action == "READ_MORE":
+                    target = read_more_target(parameter, page_state)
+                    page_state["index"] = target
+                    page_state.setdefault("seen_parts", {0}).add(target)
+                    print(f"📖 Showing part {target + 1} of {len(page_state['parts'])} of the current page.")
+                    journal.append({"turn": turn_counter, "thought": thought, "action": "READ_MORE", "part": f"{target + 1} of {len(page_state['parts'])}"})
+                    set_note(conversation, f"RESULT: READ_MORE done. The CURRENT ENVIRONMENT now shows:\n{render_part(page_state)}\n"
+                                           f"The links listed earlier for this page still apply.", current_url)
+
+                elif action == "DISCOVER":
+                    print(f"📝 Logging critical discovery element: {parameter}")
+                    journal.append({"turn": turn_counter, "thought": thought, "action": "DISCOVER", "source": current_url, "extracted_data": parameter})
+                    page_state["visit_discoveries"] = page_state.get("visit_discoveries", 0) + 1
+                    set_note(conversation, "RESULT: Your DISCOVER was recorded and is now part of DISCOVERIES SO FAR. "
+                                           "The CURRENT ENVIRONMENT above is unchanged. Do not record the same information again.", current_url)
+
+                # A single refusal gets a short warning; repeated refusals get an explicit list of other options
+                last_entry = journal[-1]["action"] if journal else ""
+                if last_entry.startswith(("BLOCKED_", "UNKNOWN_")) or last_entry == "DUPLICATE_DISCOVER":
+                    consecutive_refusals += 1
+                    if consecutive_refusals >= 2:
+                        print(f"⚠️ {consecutive_refusals} refused actions in a row. Escalating loop warning.")
+                        loop_msg = escalation_message(consecutive_refusals, action, journal[-1].get("reason", ""), page_state, current_url)
                 else:
-                    added = search_query(parameter) if action == "SEARCH" else target_url
-                    result = f"RESULT: {action} '{parameter}' done. ALREADY TRIED now also includes: {added}"
-                    if action == "NAVIGATE":
-                        visits = [normalize_url(u) for u in tried["urls"]].count(normalize_url(target_url))
-                        result = f"RESULT: NAVIGATE '{parameter}' done (visit {visits} of {MAX_VISITS_PER_URL} allowed for this URL)."
-                environment = await build_environment(page, current_url, page_state, {normalize_url(u) for u in tried["urls"]}, conversation["shown_links"])
-                set_note(conversation, f"{result}\n\n### CURRENT ENVIRONMENT (replaces the earlier one)\n"
-                                       f"Active URL: {current_url}\n{environment}", current_url)
+                    consecutive_refusals = 0
 
-            elif action == "READ_MORE":
-                target = read_more_target(parameter, page_state)
-                page_state["index"] = target
-                page_state.setdefault("seen_parts", {0}).add(target)
-                print(f"📖 Showing part {target + 1} of {len(page_state['parts'])} of the current page.")
-                journal.append({"turn": turn_counter, "thought": thought, "action": "READ_MORE", "part": f"{target + 1} of {len(page_state['parts'])}"})
-                set_note(conversation, f"RESULT: READ_MORE done. The CURRENT ENVIRONMENT now shows:\n{render_part(page_state)}\n"
-                                       f"The links listed earlier for this page still apply.", current_url)
-
-            elif action == "DISCOVER":
-                print(f"📝 Logging critical discovery element: {parameter}")
-                journal.append({"turn": turn_counter, "thought": thought, "action": "DISCOVER", "source": current_url, "extracted_data": parameter})
-                page_state["visit_discoveries"] = page_state.get("visit_discoveries", 0) + 1
-                set_note(conversation, "RESULT: Your DISCOVER was recorded and is now part of DISCOVERIES SO FAR. "
-                                       "The CURRENT ENVIRONMENT above is unchanged. Do not record the same information again.", current_url)
-
-            # A single refusal gets a short warning; repeated refusals get an explicit list of other options
-            last_entry = journal[-1]["action"] if journal else ""
-            if last_entry.startswith(("BLOCKED_", "UNKNOWN_")) or last_entry == "DUPLICATE_DISCOVER":
-                consecutive_refusals += 1
-                if consecutive_refusals >= 2:
-                    print(f"⚠️ {consecutive_refusals} refused actions in a row. Escalating loop warning.")
-                    loop_msg = escalation_message(consecutive_refusals, action, journal[-1].get("reason", ""), page_state, current_url)
-            else:
-                consecutive_refusals = 0
-
-            # Without a nudge the model keeps browsing after it already has enough; after several turns
-            # with no new discovery it is asked to weigh its discoveries against the objective
-            if action == "DISCOVER" and last_entry == "DISCOVER":
-                turns_without_discovery = 0
-            else:
-                turns_without_discovery += 1
-            # Fires every STALL_TURNS stalled turns rather than every turn: repeated each turn it crowded out
-            # the current page and pushed the model to navigate away without reading what was in front of it
-            if turns_without_discovery and turns_without_discovery % STALL_TURNS == 0:
-                print(f"⚠️ No new discoveries in {turns_without_discovery} turns. Adding progress check.")
-                progress = (f"PROGRESS CHECK: no new discoveries in the last {turns_without_discovery} turns. {READ_FIRST} "
-                            "Then compare DISCOVERIES SO FAR with the OBJECTIVE. If the objective is satisfied, choose FINISH "
-                            "with a summary of the result in the parameter. If not, state in thought_process exactly "
-                            "what is still missing, then go and find that specific thing.")
-                loop_msg = f"{loop_msg}\n{progress}" if loop_msg else progress
-                turns_since_objective_check = 0
-            else:
-                # Discoveries on loosely related topics keep resetting the stall count, so the objective is
-                # also re-checked on a fixed schedule to stop the model drifting away from it
-                turns_since_objective_check += 1
-                if turns_since_objective_check >= OBJECTIVE_CHECK_EVERY:
+                # Without a nudge the model keeps browsing after it already has enough; after several turns
+                # with no new discovery it is asked to weigh its discoveries against the objective
+                if action == "DISCOVER" and last_entry == "DISCOVER":
+                    turns_without_discovery = 0
+                else:
+                    turns_without_discovery += 1
+                # Fires every STALL_TURNS stalled turns rather than every turn: repeated each turn it crowded out
+                # the current page and pushed the model to navigate away without reading what was in front of it
+                if turns_without_discovery and turns_without_discovery % STALL_TURNS == 0:
+                    print(f"⚠️ No new discoveries in {turns_without_discovery} turns. Adding progress check.")
+                    progress = (f"PROGRESS CHECK: no new discoveries in the last {turns_without_discovery} turns. {READ_FIRST} "
+                                f"Then {CHECK_PARTS} If every part is covered, choose FINISH with {FINAL_RESULT} in the "
+                                "parameter. If not, state in thought_process exactly what is still missing, then go and find "
+                                "that specific thing.")
+                    loop_msg = f"{loop_msg}\n{progress}" if loop_msg else progress
                     turns_since_objective_check = 0
-                    count = sum(1 for e in journal if e.get("action") == "DISCOVER")
-                    print(f"🧭 Objective check after {turn_counter} turns ({count} discoveries).")
-                    check = (f"OBJECTIVE CHECK: you have recorded {count} discoveries in {turn_counter} turns. {READ_FIRST} "
-                             "Then re-read the OBJECTIVE. If DISCOVERIES SO FAR satisfy it, choose FINISH with a summary of the result in the "
-                             "parameter. If not, state in thought_process exactly what is still missing and go directly for it; "
-                             "do not spend turns on topics outside the objective.")
-                    loop_msg = f"{loop_msg}\n{check}" if loop_msg else check
+                else:
+                    # Discoveries on loosely related topics keep resetting the stall count, so the objective is
+                    # also re-checked on a fixed schedule to stop the model drifting away from it
+                    turns_since_objective_check += 1
+                    if turns_since_objective_check >= OBJECTIVE_CHECK_EVERY:
+                        turns_since_objective_check = 0
+                        count = sum(1 for e in journal if e.get("action") == "DISCOVER")
+                        print(f"🧭 Objective check after {turn_counter} turns ({count} discoveries).")
+                        check = (f"OBJECTIVE CHECK: you have recorded {count} discoveries in {turn_counter} turns. {READ_FIRST} "
+                                 f"Then {CHECK_PARTS} If every part is covered, choose FINISH with {FINAL_RESULT} in the "
+                                 "parameter. If not, state in thought_process exactly what is still missing and go directly for it; "
+                                 "do not spend turns on topics outside the objective.")
+                        loop_msg = f"{loop_msg}\n{check}" if loop_msg else check
 
+                write_research_log(objective, journal)
+
+                turn_counter += 1
+                print("\n⏱️ Cycle pacing check complete. Refreshing navigation loop pipeline...")
+                await asyncio.sleep(TURN_PAUSE_SECONDS)
+        finally:
+            # Always saved, however the run ends: FINISH, the turn limit, Ctrl+C or an outside time limit
             write_research_log(objective, journal)
+            write_report(objective, journal)
 
-            turn_counter += 1
-            print("\n⏱️ Cycle pacing check complete. Refreshing navigation loop pipeline...")
-            await asyncio.sleep(TURN_PAUSE_SECONDS)
-
-        # Written again here because FINISH leaves the loop before the per-turn write
-        write_research_log(objective, journal)
-        print("\n🔒 Shutting down browser instance. Research log finalized in research_log.txt.")
+        print(f"\n🔒 Shutting down browser instance. Report: {REPORT_FILE}; full journal: research_log.txt.")
         await browser.close()
 
 def run():

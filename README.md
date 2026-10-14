@@ -22,7 +22,8 @@ and tuned to work well with a **small 7B model on a CPU, no GPU required**.
 - 🛡️ **Keeps a small model on track.** Rules enforced in code stop loops, repeats and drifting, and the model
   is regularly asked to check its progress against the objective.
 - ⚡ **Built for slow hardware.** It reuses LM Studio's prompt cache, so most turns process only what changed.
-- 📝 **Everything is logged.** Every action, reason and finding goes to `research_log.txt` after every turn.
+- 📝 **A readable report every time.** `research_report.md` holds the final result and every finding with its
+  source, written however the run ends; `research_log.txt` keeps every action and reason.
 - ✅ **Tested.** 67 tests on Linux and Windows, Python 3.10–3.13, run in about a second with no model or browser.
 
 ## Contents
@@ -57,8 +58,9 @@ and tuned to work well with a **small 7B model on a CPU, no GPU required**.
    python agent_browser.py
    ```
 
-   Or install it as a command with `pip install .` and run `localagentbrowser`. Press Ctrl+C at any time to
-   stop; findings so far stay in `research_log.txt`.
+   Or install it as a command with `pip install .` and run `localagentbrowser`. When it finishes, read
+   `research_report.md`. Press Ctrl+C at any time to stop; the report is still written with everything found
+   so far.
 
 ## What a run looks like
 
@@ -104,7 +106,7 @@ current page, and answers with exactly one JSON action:
 | `NAVIGATE` | Opens a URL taken from the results or from the current page's links |
 | `READ_MORE` | Shows the next part of a long page (pages are read in parts of about 2,500 characters) |
 | `DISCOVER` | Records information from the current page as a finding |
-| `FINISH` | Ends the run with a summary |
+| `FINISH` | Ends the run with the final result (after checking each part of the objective is covered) |
 
 ```mermaid
 flowchart LR
@@ -114,7 +116,7 @@ flowchart LR
     C -->|refused: cheap retry| M
     C -->|accepted| B[Playwright<br/>Chromium]
     B -->|page text, links| P
-    C -->|FINISH| R[research_log.txt]
+    C -->|FINISH| R[research_report.md]
 ```
 
 ### Keeping a small model on track
@@ -127,8 +129,9 @@ flowchart LR
 - **Confirm before leaving.** Leaving a page without recording anything from it triggers one check: record
   something, or repeat the action to leave.
 - **Progress and objective checks.** After 4 turns without a new finding, and every 8 turns regardless, the
-  model is asked to compare its findings with the objective, then finish or name what is still missing.
-  These checks are what got the agent to finish on its own.
+  model is asked to check each part of the objective against its findings, then finish or name what is still
+  missing. Finishing itself gets the same part-by-part check, and the final answer must be the result the
+  objective asks for, not just a list of findings.
 - **Readable pages.** Navigation menus, footers and cookie banners are hidden; code blocks and tables are
   never split between parts; links already shown are not repeated.
 
@@ -182,7 +185,8 @@ No AI service is involved, and nothing about your run is uploaded. The agent doe
 though: search queries go to DuckDuckGo, and pages it opens load normally, as if you visited them yourself.
 
 **Where are the results?**
-In `research_log.txt` in the folder you ran it from, updated after every turn, including the final summary.
+In the folder you ran it from: `research_report.md` has the final result and every finding with its source,
+and `research_log.txt` has the full journal of actions and reasons, updated after every turn.
 
 **Why does a turn take minutes?**
 On a CPU the model reads the prompt slowly (about 8 tokens per second on the development machine), so a
@@ -191,10 +195,12 @@ turn that brings in a new page takes a few minutes. See [Performance](#performan
 
 ## Limitations
 
-- **Tuned on one kind of task.** Development and live testing used documentation research objectives. The
-  agent is meant to be general, but the rules and thresholds have not yet been tried on other kinds of tasks.
+- **Tried on two kinds of task so far.** Most tuning used a documentation research objective. A second, very
+  different objective (forming an opinion from several traditions) showed the agent finishing too early from
+  a single source; the check before finishing (1.29) improved the final answer, and work on judging coverage
+  continues. More kinds of tasks are still to be tried.
 - **A small model's judgement is the ceiling.** It sometimes drifts to loosely related pages, prefers
-  secondary sources and writes incomplete final summaries; the full findings are always in `research_log.txt`.
+  secondary sources or stays with one source too long; every finding is in `research_report.md` regardless.
 - **Reading only.** The agent searches, opens pages and reads them. It does not click, fill in forms or sign in.
 - **Web pages go into the prompt.** A page can contain text written to manipulate the model (prompt
   injection), so treat findings as unverified. See [SECURITY.md](SECURITY.md).
@@ -202,8 +208,8 @@ turn that brings in a new page takes a few minutes. See [Performance](#performan
 
 ## Roadmap
 
-- [ ] Try different kinds of objectives and adjust the rules that don't generalise
-- [ ] Include every finding in the final report, not only the model's own summary
+- [ ] Try more kinds of objectives and adjust the rules that don't generalise (two so far)
+- [x] Include every finding in the final report, not only the model's own summary (1.29)
 - [ ] Make fresh prompts (the slowest kind of turn) cheaper
 - [ ] Interacting with pages (clicking, forms) for tasks beyond reading
 
