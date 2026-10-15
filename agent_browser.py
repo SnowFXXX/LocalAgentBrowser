@@ -41,7 +41,8 @@ MAX_OUTLINE_LABEL = 90
 LONG_PAGE_UNREAD = 3     # Above this many unread parts, the leave check points to the outline instead of the count
 MAX_JSON_RETRIES = 3
 MAX_VISITS_PER_URL = 3   # Returning to an earlier page is allowed; this caps back-and-forth loops
-MAX_CHEAP_RETRIES = 2   # Refused replies re-asked within the same turn before the refusal costs a whole turn
+GAP_REFUSAL_LIMIT = 2    # FINISH attempts sent back per run because their own reasoning lists a part as not covered
+MAX_CHEAP_RETRIES = 2  # Refused replies re-asked within the same turn before the refusal costs a whole turn
 MAX_FOLLOWUPS = 12       # Turns that continue one conversation before a fresh full prompt (the token budget usually ends it first)
 MAX_CONVERSATION_TOKENS = int(CONTEXT_LENGTH * 0.75)  # Start fresh with room left for the next page and the reply
 MAX_DISCOVERY_PROMPT_CHARS = 250  # Discoveries are shortened to this in fresh prompts; the log keeps the full text
@@ -52,9 +53,9 @@ OBJECTIVE_CHECK_EVERY = 8 # Turns between scheduled objective checks, which happ
 READ_FIRST = ("First, if the CURRENT ENVIRONMENT (or an unread part of this page, via READ_MORE) contains information "
               "relevant to the objective that is not yet in DISCOVERIES SO FAR, DISCOVER it now.")
 CHECK_PARTS = ("split the OBJECTIVE into its separate parts and, in thought_process, write each part followed by the "
-               "discovery that covers it, or 'not covered'. Parts that ask for your own answer, opinion, summary or other "
-               "output are not found on pages: mark them 'written at FINISH' and write them in the FINISH parameter, "
-               "never as a DISCOVER.")
+               "discovery that covers it, or 'not covered'. Only parts that ask for your own answer, opinion, recommendation "
+               "or summary are 'written at FINISH' (write them in the FINISH parameter, never as a DISCOVER); information "
+               "the objective asks you to find is never 'written at FINISH': it is covered by a discovery or 'not covered'.")
 FINAL_RESULT = ("the complete final result the objective asks for (for example the answer, opinion, summary or "
                 "deliverable, not just a list of what you found)")
 GIVE_UP_RULE = ("If you have already looked for a part in several places without finding it, it may not be available: "
@@ -450,7 +451,18 @@ def leave_check(action, page_state, current_url, journal=()):
             f"If it has information relevant to the objective, DISCOVER it now{read_more}. "
             f"If it truly has nothing relevant, repeat your {action} to leave.")
 
-def check_decision(action, parameter, journal, tried, page_state, current_url):
+def gap_check(thought, tried):
+    # The model is asked to write 'not covered' for missing parts; on a comparison it wrote "Available Libraries:
+    # Not covered" and finished anyway. A FINISH whose own reasoning says that is sent back to work on the gap,
+    # at most GAP_REFUSAL_LIMIT times per run so a part that cannot be found does not block finishing for good
+    if "not covered" not in str(thought).lower() or tried.get("gap_refusals", 0) >= GAP_REFUSAL_LIMIT:
+        return None
+    tried["gap_refusals"] = tried.get("gap_refusals", 0) + 1
+    return ("BLOCKED_FINISH", "Your own check marks a part of the objective as 'not covered'. Do not finish yet: work on "
+            "that part, for example with a SEARCH aimed at it. Only if you have already looked for it without success, "
+            "FINISH and say in the final result what could not be found.")
+
+def check_decision(action, parameter, journal, tried, page_state, current_url, thought=""):
     """Refusals that can be decided before acting. Returns (journal action, reason), or None if the decision may proceed."""
     if action == "SEARCH":
         query = search_query(parameter)
@@ -485,7 +497,7 @@ def check_decision(action, parameter, journal, tried, page_state, current_url):
         if is_known_discovery(parameter, journal):
             return "DUPLICATE_DISCOVER", "Everything in that DISCOVER is already recorded in DISCOVERIES SO FAR."
     elif action == "FINISH":
-        return finish_check(tried, journal)
+        return finish_check(tried, journal) or gap_check(thought, tried)
     else:
         return f"UNKNOWN_{action}", f"'{action}' is not a valid action."
     return None
@@ -714,7 +726,8 @@ async def request_decision(client, messages, journal, tried, page_state, current
 
         action = str(action_decision.get("action", "FINISH")).upper()
         parameter = str(action_decision.get("parameter", "")).strip()
-        refusal = check_decision(action, parameter, journal, tried, page_state, current_url)
+        refusal = check_decision(action, parameter, journal, tried, page_state, current_url,
+                                 action_decision.get("thought_process", ""))
         if not refusal or len(refused) >= MAX_CHEAP_RETRIES:
             usage = getattr(response, "usage", None)
             tokens = (getattr(usage, "prompt_tokens", 0) or 0) + (getattr(usage, "completion_tokens", 0) or 0)
@@ -864,7 +877,7 @@ async def main():
                 print(f"💡 Agent Thoughts: {thought}")
                 print(f"🎬 Chosen Action: [{action}] -> Parameter: {parameter}")
 
-                refusal = check_decision(action, parameter, journal, tried, page_state, current_url)
+                refusal = check_decision(action, parameter, journal, tried, page_state, current_url, thought)
                 if refusal:
                     # Only reached once this turn's cheap retries are used up
                     print(f"⚠️ Action refused: {refusal[1]}")

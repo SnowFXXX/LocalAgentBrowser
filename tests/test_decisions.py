@@ -93,6 +93,18 @@ def test_finish_check_asks_once_then_lets_finish_through():
     assert ab.check_decision("FINISH", "my answer", [], tried, page, DOCS) is None
 
 
+def test_finish_is_sent_back_when_its_own_check_lists_a_gap():
+    tried = {"queries": [], "urls": [], "finish_confirmed": True}  # part-by-part check already done this turn
+    page = recorded_page(DOCS)
+    gap = "Performance: covered by [1]. Available libraries: Not covered. Written at FINISH."
+    first = ab.check_decision("FINISH", "answer", [], tried, page, DOCS, gap)
+    assert first[0] == "BLOCKED_FINISH" and "'not covered'" in first[1]
+    assert ab.check_decision("FINISH", "answer", [], tried, page, DOCS, "Every part is covered by [1] and [2].") is None
+    assert ab.check_decision("FINISH", "answer", [], tried, page, DOCS, gap)[0] == "BLOCKED_FINISH"
+    assert ab.check_decision("FINISH", "answer", [], tried, page, DOCS, gap) is None, \
+        f"after {ab.GAP_REFUSAL_LIMIT} refusals a gap that cannot be filled no longer blocks finishing"
+
+
 @pytest.mark.parametrize("sources, expected", [
     ([], "You have no discoveries yet."),
     ([DOCS], f"Your only discovery comes from {DOCS}."),

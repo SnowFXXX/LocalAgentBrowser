@@ -105,6 +105,7 @@ does not generalise; the [changelog](CHANGELOG.md) has the details.
 | Documentation research | Setup commands and file layout for Playwright's test agents | 1.27 | Finished on its own in 13 turns (~36 min) with commands, roles and file layout |
 | Opinion from several sources | How spiritual traditions view cats, then form an opinion | 1.30 | Six traditions from two sources and a stated opinion, in 18 turns (37 min of model time) |
 | Factual question | Tallest mountain in Africa, height in meters and feet | 1.35 | Correct, cited answer in 4 turns (12 min of model time); before 1.35 it kept reading after finding it |
+| Comparison and recommendation | Python vs Rust for command-line tools; recommend one for a beginner | 1.36 | Cited comparison of performance, learning and Python's libraries, recommending Python, in 16 turns (33 min); Rust's libraries were not covered |
 
 ## How it works
 

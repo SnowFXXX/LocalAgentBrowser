@@ -4,6 +4,21 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.36] - 2026-10-15
+### Fixed
+- On a comparison the model's own finish check read "Available Libraries: Not covered. Written at FINISH." and
+  it finished anyway: it had used "written at FINISH" (meant for its own opinion or recommendation) to skip a
+  part it had not found. The check now says only parts asking for the agent's own answer, opinion,
+  recommendation or summary are written at FINISH, never information it was asked to find.
+- A FINISH whose own reasoning lists a part as "not covered" is sent back once to work on that part (for
+  example with a targeted SEARCH), at most twice per run, so a part that cannot be found does not block
+  finishing for good.
+
+Rerun (a different source this time): a cited comparison of performance, ease of learning and Python's
+libraries with a clear recommendation, in 16 turns and 33 minutes of model time. Rust's libraries were not
+covered, and the model summarised its finish check ("all discoveries cover these aspects") instead of
+listing each part, so the new check had nothing to act on.
+
 ## [1.35] - 2026-10-15
 ### Fixed
 - Asked a one-answer question, the agent recorded the full answer on turn 3, said in its reasoning that "the
