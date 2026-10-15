@@ -349,7 +349,7 @@ async def build_environment(page, current_url, page_state, visited_urls=frozense
         if page_state["url"] != normalize_url(current_url):
             parts, outline = await extract_page_parts(page)
             page_state.update(url=normalize_url(current_url), parts=parts, outline=outline, index=0,
-                              seen_parts={0}, visit_discoveries=0, leave_confirmed=False)
+                              seen_parts={0}, visit_discoveries=0, leave_confirmed=False, reread_confirmed=set())
         link_lines = await extract_page_links(page, shown_links)
         return f"{render_part(page_state, with_outline=True)}\n\nLinks On Page:\n{link_lines or '[None]'}"
     except Exception as e:
@@ -374,7 +374,11 @@ def render_outline(page_state):
     outline = page_state.get("outline") or []
     if len(outline) < OUTLINE_MIN_PARTS:
         return ""
-    lines = [f"  {i}. {label}" for i, label in enumerate(outline[:MAX_OUTLINE_LINES], start=1)]
+    # Read parts are marked: after a fresh prompt the model no longer sees its earlier reading and went back
+    # to re-read parts it had read half an hour before
+    seen = page_state.get("seen_parts") or set()
+    lines = [f"  {i}. {label}{' (read)' if i - 1 in seen else ''}"
+             for i, label in enumerate(outline[:MAX_OUTLINE_LINES], start=1)]
     if len(outline) > MAX_OUTLINE_LINES:
         lines.append(f"  ... ({len(outline) - MAX_OUTLINE_LINES} more parts)")
     return (f"Page Outline ({len(outline)} parts; READ_MORE with a part number jumps straight to that part):\n"
@@ -491,6 +495,13 @@ def check_decision(action, parameter, journal, tried, page_state, current_url, t
         if not 0 <= target < total:
             return "BLOCKED_READ_MORE", (f"There is no part {target + 1}. {where_you_are(page_state, current_url)} "
                                          f"This page has {total} part(s).")
+        # Re-reading a part is allowed, but confirmed once per part (the same pattern as the leave check)
+        confirmed = page_state.setdefault("reread_confirmed", set())
+        if target in page_state.get("seen_parts", set()) and target != page_state["index"] and target not in confirmed:
+            confirmed.add(target)
+            return "CONFIRM_REREAD", (f"You already read part {target + 1} of this page; anything useful from it should "
+                                      "already be in DISCOVERIES SO FAR. Choose an unread part or another action, or "
+                                      "repeat this READ_MORE if you really need to read it again.")
     elif action == "DISCOVER":
         if not discovery_lines(parameter):
             return "BLOCKED_DISCOVER", "The DISCOVER parameter was empty. Put the actual information in the parameter."
@@ -748,7 +759,7 @@ async def request_decision(client, messages, journal, tried, page_state, current
         refused.append({"action": action, "parameter": parameter, "journal_action": refusal[0], "reason": refusal[1]})
         print(f"♻️ Cheap retry {len(refused)}/{MAX_CHEAP_RETRIES}: [{action}] refused. {refusal[1]}")
         correction = refusal_correction(action, refusal[1], page_state, current_url)
-        if refusal[0] in ("CONFIRM_LEAVE", "CONFIRM_FINISH"):
+        if refusal[0] in ("CONFIRM_LEAVE", "CONFIRM_FINISH", "CONFIRM_REREAD"):
             # Not a true refusal: repeating the action is an allowed answer, so no "do not repeat" wording
             correction = f"CHECK: {refusal[1]} Reply with only the JSON object."
         elif len(refused) >= 2:

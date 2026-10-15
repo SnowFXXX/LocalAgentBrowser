@@ -4,6 +4,17 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.39] - 2026-10-15
+### Changed
+- The page outline marks parts already read with "(read)", and re-reading a part needs one confirmation (repeating
+  the READ_MORE goes through). After a fresh prompt the model no longer saw its earlier reading and went back to
+  re-read parts of a setup guide it had read half an hour before, starting with a duplicate discovery.
+
+Regression run on the original Playwright objective (1.38): the most detailed Playwright findings so far, seven
+in all, including the per-client `init-agents` setup, the seed test file and how to prompt the agents after
+setup; it attempted FINISH at about 40 minutes and was sent to the guide's unread parts. Stopped after 60
+minutes when it started re-reading.
+
 ## [1.38] - 2026-10-15
 ### Fixed
 - Asked for three Photoshop alternatives and their strengths, the final result listed four and added a

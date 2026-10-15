@@ -93,6 +93,21 @@ def test_finish_check_asks_once_then_lets_finish_through():
     assert ab.check_decision("FINISH", "my answer", [], tried, page, DOCS) is None
 
 
+def test_rereading_a_part_is_confirmed_once():
+    page = recorded_page(DOCS, parts=[f"p{i}" for i in range(11)], index=9)
+    page["seen_parts"] = {0, 1, 2, 3, 9}
+    first = decide("READ_MORE", "3", page, DOCS)
+    assert first[0] == "CONFIRM_REREAD" and "already read part 3" in first[1]
+    assert decide("READ_MORE", "3", page, DOCS) is None, "repeating it goes through"
+    assert decide("READ_MORE", "11", page, DOCS) is None, "unread parts need no confirmation"
+
+
+def test_outline_marks_parts_already_read():
+    page = {"parts": ["a"] * 6, "outline": [f"Section {i}" for i in range(6)], "index": 2, "seen_parts": {0, 2}}
+    outline = ab.render_outline(page)
+    assert "  1. Section 0 (read)" in outline and "  3. Section 2 (read)" in outline and "  2. Section 1\n" in outline
+
+
 def test_finish_check_mentions_unread_parts_of_the_current_page():
     page = recorded_page(DOCS, parts=("a", "b", "c", "d", "e", "f"), index=2)
     page["seen_parts"] = {0, 1, 2}
