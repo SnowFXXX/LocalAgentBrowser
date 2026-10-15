@@ -815,15 +815,20 @@ async def compose_final_result(client, objective, journal):
                           for i, e in enumerate(found, start=1)) or "[None]"
     # The agent's own FINISH draft is not shown: on a how-to it already contained an invented quantity, which
     # this step then copied; everything here must come from the recorded discoveries
+    # Rules a small model skipped when they came late in one long instruction (it listed four items when asked
+    # for three, and added "My view" to a request for strengths) are given as a short numbered list
     request = (f"### OBJECTIVE\n{objective}\n\n### DISCOVERIES\n{listing}\n\n"
                "Write the complete final result the OBJECTIVE asks for: do exactly what it asks (for example answer "
-               "the question, write the summary or the plan, or give the opinion). Use only the information in the "
-               "DISCOVERIES. Do not fill gaps from your own knowledge or with guesses: no amounts, numbers, steps or "
-               "advice that the discoveries do not contain. Where a detail the objective asks for is missing, say that "
-               "it was not found. Refer to the discoveries that support each point by their numbers, like [2], and only "
-               "cite a number for something that discovery actually says. Only if the objective asks for your own view, "
-               "opinion or recommendation, give it in a paragraph that starts with 'My view:'; otherwise do not add one. "
-               "Write plain text, not JSON.")
+               "the question, write the summary or the plan, or give the opinion). Rules:\n"
+               "1. Use only the information in the DISCOVERIES. Do not fill gaps from your own knowledge or with "
+               "guesses: no amounts, numbers, steps or advice that the discoveries do not contain. Where a detail the "
+               "objective asks for is missing, say that it was not found.\n"
+               "2. If the objective asks for a specific number of items, give exactly that many (the best supported).\n"
+               "3. Refer to the discoveries that support each point by their numbers, like [2], and only cite a number "
+               "for something that discovery actually says.\n"
+               "4. Do not add a 'My view:' paragraph unless the objective explicitly asks for your view, opinion or "
+               "recommendation; if it does, give it in a paragraph that starts with 'My view:'.\n"
+               "5. Write plain text, not JSON.")
     # A fresh prompt with only the discoveries, not the browsing conversation: continuing that conversation let
     # the model use page text it had read but not recorded, and cite discovery numbers that did not say it
     messages = [{"role": "system", "content": COMPOSE_SYSTEM}, {"role": "user", "content": request}]

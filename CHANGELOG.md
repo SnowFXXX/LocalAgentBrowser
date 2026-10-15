@@ -4,6 +4,19 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.38] - 2026-10-15
+### Fixed
+- Asked for three Photoshop alternatives and their strengths, the final result listed four and added a
+  "My view" paragraph nobody asked for: both rules were late in one long instruction. The final-result step
+  now gives its rules as a short numbered list, including "if the objective asks for a specific number of
+  items, give exactly that many" and "do not add a 'My view' paragraph unless the objective explicitly asks
+  for your view, opinion or recommendation".
+
+Replays on real findings: the list task gave exactly three items (GIMP, Krita, Darktable), cited, with no
+opinion; the cats task, which does ask for an opinion, still ended with one, citing all six traditions. The
+live run itself found all three items and chose FINISH right after the third (9 turns, 24 minutes of model
+time).
+
 ## [1.37] - 2026-10-15
 On a how-to (a sourdough starter with quantities for each day) the agent finished after 3 of 6 parts of a
 recipe, and the final result invented the first water amount ("45 grams (about 1/4 cup)"; 45 g was the

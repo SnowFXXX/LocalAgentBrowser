@@ -106,6 +106,7 @@ does not generalise; the [changelog](CHANGELOG.md) has the details.
 | Opinion from several sources | How spiritual traditions view cats, then form an opinion | 1.30 | Six traditions from two sources and a stated opinion, in 18 turns (37 min of model time) |
 | Factual question | Tallest mountain in Africa, height in meters and feet | 1.35 | Correct, cited answer in 4 turns (12 min of model time); before 1.35 it kept reading after finding it |
 | Comparison and recommendation | Python vs Rust for command-line tools; recommend one for a beginner | 1.36 | Cited comparison of performance, learning and Python's libraries, recommending Python, in 16 turns (33 min); Rust's libraries were not covered |
+| List of items | Three free, open-source Photoshop alternatives and the strengths of each | 1.37–1.38 | GIMP, Krita and Darktable with their strengths, all cited, in 9 turns (24 min); 1.37 listed a fourth and added an unrequested opinion, which 1.38 fixes |
 | Step-by-step how-to | Make a sourdough starter, with quantities and what to do each day | 1.36–1.37 | A clear plan in 7 turns (19 min), but it invented the first water amount; 1.37 stops guessing and flags unsupported numbers, and the agent then went looking for the missing details |
 
 ## How it works
