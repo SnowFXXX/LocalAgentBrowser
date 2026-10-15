@@ -106,6 +106,7 @@ does not generalise; the [changelog](CHANGELOG.md) has the details.
 | Opinion from several sources | How spiritual traditions view cats, then form an opinion | 1.30 | Six traditions from two sources and a stated opinion, in 18 turns (37 min of model time) |
 | Factual question | Tallest mountain in Africa, height in meters and feet | 1.35 | Correct, cited answer in 4 turns (12 min of model time); before 1.35 it kept reading after finding it |
 | Comparison and recommendation | Python vs Rust for command-line tools; recommend one for a beginner | 1.36 | Cited comparison of performance, learning and Python's libraries, recommending Python, in 16 turns (33 min); Rust's libraries were not covered |
+| Step-by-step how-to | Make a sourdough starter, with quantities and what to do each day | 1.36–1.37 | A clear plan in 7 turns (19 min), but it invented the first water amount; 1.37 stops guessing and flags unsupported numbers, and the agent then went looking for the missing details |
 
 ## How it works
 
@@ -146,7 +147,8 @@ flowchart LR
 - **Writing is a separate step.** When the agent finishes, one more model call writes the final result from
   only the objective and the recorded findings, citing them by number, with the agent's own view (if the
   objective asks for one) in a paragraph starting "My view:". A small model writes far better when that is
-  its only job, and every claim stays traceable to a recorded finding.
+  its only job, and every claim stays traceable to a recorded finding. The report flags any number in the
+  final result that appears in none of the findings, the most harmful kind of slip in a how-to.
 - **Error pages are recognised.** A page answering 404, 403 and so on counts as a failed visit, not content.
 - **Readable pages.** Navigation menus, footers and cookie banners are hidden; code blocks and tables are
   never split between parts; links already shown are not repeated. Long pages come with an outline of the

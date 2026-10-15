@@ -4,6 +4,27 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.37] - 2026-10-15
+On a how-to (a sourdough starter with quantities for each day) the agent finished after 3 of 6 parts of a
+recipe, and the final result invented the first water amount ("45 grams (about 1/4 cup)"; 45 g was the
+daily feeding), added a step not in any finding, and added an unrequested "My view" with an unsupported
+health claim.
+### Added
+- `research_report.md` flags every number in the final result that appears in none of the discoveries
+  ("Numbers not found in the recorded discoveries: 1/4 ... check them before relying on this result").
+- The finish check mentions unread parts of the current page; for a long page it points to the outline
+  instead of a bare count.
+### Changed
+- The final result step no longer sees the agent's own FINISH draft (which already contained the invented
+  amount), must not fill gaps with its own knowledge or guesses (no amounts, steps or advice the discoveries
+  do not contain), says when a requested detail was not found, and adds "My view" only when asked for one.
+
+Replaying the final-result step on that run's findings: no invented amount, no "My view", and the number
+check found nothing to flag (it flags "1/4" on the old result), though it left out the flour amounts it did
+have. A live rerun showed both new checks working: the agent went looking for the missing details instead of
+finishing, but read a long second source part by part, including parts about baking bread rather than the
+starter; the long-page wording above addresses that.
+
 ## [1.36] - 2026-10-15
 ### Fixed
 - On a comparison the model's own finish check read "Available Libraries: Not covered. Written at FINISH." and

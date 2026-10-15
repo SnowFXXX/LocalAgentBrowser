@@ -93,6 +93,20 @@ def test_finish_check_asks_once_then_lets_finish_through():
     assert ab.check_decision("FINISH", "my answer", [], tried, page, DOCS) is None
 
 
+def test_finish_check_mentions_unread_parts_of_the_current_page():
+    page = recorded_page(DOCS, parts=("a", "b", "c", "d", "e", "f"), index=2)
+    page["seen_parts"] = {0, 1, 2}
+    message = ab.check_decision("FINISH", "answer", [], {"queries": [], "urls": []}, page, DOCS)[1]
+    assert "still has 3 unread part(s)" in message
+
+
+def test_finish_check_points_long_pages_to_the_outline():
+    page = recorded_page(DOCS, parts=[f"p{i}" for i in range(8)], index=2)
+    page["seen_parts"] = {0, 1, 2}
+    message = ab.check_decision("FINISH", "answer", [], {"queries": [], "urls": []}, page, DOCS)[1]
+    assert "5 unread parts: use its outline" in message
+
+
 def test_finish_is_sent_back_when_its_own_check_lists_a_gap():
     tried = {"queries": [], "urls": [], "finish_confirmed": True}  # part-by-part check already done this turn
     page = recorded_page(DOCS)

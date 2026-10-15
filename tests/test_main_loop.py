@@ -79,7 +79,7 @@ def test_full_run(monkeypatch, tmp_path):
     assert f"Your only discovery comes from {A}" in finish_check
     compose_request = last_message(calls[12])
     assert len(calls[12]) == 2, "the final result is written from a fresh prompt, not the browsing conversation"
-    assert f"[1] (from {A})\nfact from a" in compose_request and "DRAFT FROM THE RESEARCH\nfinal answer" in compose_request
+    assert f"[1] (from {A})\nfact from a" in compose_request and "final answer" not in compose_request
     assert actions[-1] == "FINISH", "FINISH must be saved to the log"
     assert journal[-1]["finding"] == "Composed final result citing [1]." and journal[-1]["draft"] == "final answer"
 

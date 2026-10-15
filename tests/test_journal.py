@@ -38,6 +38,14 @@ def test_compact_journal_is_much_smaller_than_indented_json():
     assert len(ab.compact_journal(journal)) <= 0.65 * len(old_format)
 
 
+def test_unverified_numbers_flags_quantities_missing_from_discoveries():
+    found = [{"extracted_data": "100 grams rye flour and 200 grams bread flour. Feed 45 grams each day for 4 days. "
+                                "Height: 5,895 m (19,341 ft)."}]
+    result = ("1. Mix 100 grams of rye flour [1].\n2. Add 45 grams of water (about 1/4 cup) [1].\n"
+              "3. Feed daily for 4 days, twice a day from day 5. Height 5895 m or 19341 ft.")
+    assert ab.unverified_numbers(result, found) == ["1/4", "5"]
+
+
 def test_old_entries_are_dropped_in_batches():
     journal = [{"turn": i, "action": "READ_MORE", "part": "1 of 1"} for i in range(1, 13)]
     shown = ab.compact_journal(journal).splitlines()

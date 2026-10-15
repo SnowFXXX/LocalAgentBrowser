@@ -83,17 +83,19 @@ class TestComposeFinalResult:
     def test_sees_only_the_objective_and_discoveries(self):
         client, model = fake_client(["Plain final text."])
         journal = discoveries("fact one", "fact two")
-        text = asyncio.run(ab.compose_final_result(client, "the objective", journal, "draft"))
+        text = asyncio.run(ab.compose_final_result(client, "the objective", journal))
         assert text == "Plain final text."
         system, user = model.calls[0]
         assert system == {"role": "system", "content": ab.COMPOSE_SYSTEM} and len(model.calls[0]) == 2
         assert "### OBJECTIVE\nthe objective" in user["content"]
         assert "[1] (from an unknown page)\nfact one" in user["content"] and "[2] (from an unknown page)\nfact two" in user["content"]
         assert "Use only the information in the DISCOVERIES" in user["content"] and "'My view:'" in user["content"]
+        assert "otherwise do not add one" in user["content"] and "Do not fill gaps" in user["content"]
+        assert "DRAFT" not in user["content"], "the agent's unverified draft is not shown"
 
     def test_unwraps_a_json_reply(self):
         client, _ = fake_client([reply("FINISH", "My view: supported by [1].")])
-        assert asyncio.run(ab.compose_final_result(client, "objective", discoveries("x"), "")) == "My view: supported by [1]."
+        assert asyncio.run(ab.compose_final_result(client, "objective", discoveries("x"))) == "My view: supported by [1]."
 
 
 class TestConversation:

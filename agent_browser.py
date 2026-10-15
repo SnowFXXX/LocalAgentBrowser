@@ -497,7 +497,7 @@ def check_decision(action, parameter, journal, tried, page_state, current_url, t
         if is_known_discovery(parameter, journal):
             return "DUPLICATE_DISCOVER", "Everything in that DISCOVER is already recorded in DISCOVERIES SO FAR."
     elif action == "FINISH":
-        return finish_check(tried, journal) or gap_check(thought, tried)
+        return finish_check(tried, journal, page_state, current_url) or gap_check(thought, tried)
     else:
         return f"UNKNOWN_{action}", f"'{action}' is not a valid action."
     return None
@@ -511,14 +511,26 @@ def where_you_are(page_state, current_url):
         return f"You are on {current_url} (part {page_state['index'] + 1} of {len(page_state['parts'])})."
     return f"You are on {current_url}."
 
-def finish_check(tried, journal):
+def finish_check(tried, journal, page_state=None, current_url=None):
     # Asked to judge whether its discoveries "satisfy" the objective, a small model says yes too easily: on an
     # opinion task it finished after one source and gave a summary instead of the opinion asked for. The first
     # FINISH of each turn gets a cheap retry asking for a part-by-part check; repeating FINISH then goes through.
     if tried.get("finish_confirmed"):
         return None
     tried["finish_confirmed"] = True  # Reset at the start of every turn
-    return "CONFIRM_FINISH", f"{source_note(journal)} {FINISH_CHECK}"
+    return "CONFIRM_FINISH", f"{source_note(journal)}{unread_note(page_state or {}, current_url)} {FINISH_CHECK}"
+
+def unread_note(page_state, current_url):
+    # On a how-to the agent finished after 3 of 6 parts of the recipe, missing the amounts on the unread parts
+    parts = page_state.get("parts") or []
+    if not (current_url and page_state.get("url") == normalize_url(current_url) and parts):
+        return ""
+    unread = len(parts) - len(page_state.get("seen_parts", {0}))
+    if unread > LONG_PAGE_UNREAD:
+        # A bare count pushed the model to read every remaining part in order, including ones about other topics
+        return (f" The current page still has {unread} unread parts: use its outline to judge whether any of them "
+                "is relevant before reading them.")
+    return f" The current page still has {unread} unread part(s) (READ_MORE)." if unread > 0 else ""
 
 def source_note(journal):
     # Facts, not a rule: some objectives need one source and some need many, so the model is only shown how
@@ -748,6 +760,23 @@ def write_research_log(objective, journal):
         log.write(f"OBJECTIVE: {objective}\n")
         log.write(json.dumps(journal, indent=2))
 
+NUMBER_PATTERN = re.compile(r"\d+(?:[.,/]\d+)*")
+
+def unverified_numbers(text, discoveries):
+    """Numbers in the final result that appear in none of the discoveries.
+
+    A small model writing a how-to filled a gap with an invented quantity ("45 grams of lukewarm water (about
+    1/4 cup)"); numbers are where such errors do the most harm and the easiest place to check them.
+    """
+    text = re.sub(r"\[\d+\]", " ", str(text))           # Citation markers like [2]
+    text = re.sub(r"(?m)^\s*\d+[.)]\s", " ", text)      # Numbered list items
+    known = {n.replace(",", "") for e in discoveries for n in NUMBER_PATTERN.findall(e["extracted_data"])}
+    unverified = []
+    for number in NUMBER_PATTERN.findall(text):
+        if number.replace(",", "") not in known and number not in unverified:
+            unverified.append(number)
+    return unverified
+
 def write_report(objective, journal):
     """A readable report with the final result and every discovery, so nothing depends on the model's
     summary being complete. Written however the run ends."""
@@ -756,8 +785,12 @@ def write_report(objective, journal):
     last_turn = journal[-1].get("turn", 0) if journal else 0
     lines = ["# Research report", "", f"**Objective:** {objective}", ""]
     if finish:
-        lines += [f"**Status:** finished by the agent on turn {finish.get('turn')}", "", "## Final result", "",
-                  finish.get("finding") or "_(The agent finished without writing a final result.)_"]
+        final = finish.get("finding") or "_(The agent finished without writing a final result.)_"
+        lines += [f"**Status:** finished by the agent on turn {finish.get('turn')}", "", "## Final result", "", final]
+        unchecked = unverified_numbers(final, found)
+        if unchecked:
+            lines += ["", f"> ⚠️ Numbers not found in the recorded discoveries: {', '.join(unchecked)}. "
+                          "Check them before relying on this result."]
     else:
         lines += [f"**Status:** stopped before the agent finished (after turn {last_turn})", "", "## Final result", "",
                   "_(The agent did not finish; see the discoveries below.)_"]
@@ -770,7 +803,7 @@ def write_report(objective, journal):
 COMPOSE_SYSTEM = ("You write the final result of a web research task, using only the findings that were recorded "
                   "during it.")
 
-async def compose_final_result(client, objective, journal, draft):
+async def compose_final_result(client, objective, journal):
     """Writes the final result in a model call whose only job is writing.
 
     Deciding what to browse and writing the deliverable compete for a small model's attention: in a live run
@@ -780,14 +813,17 @@ async def compose_final_result(client, objective, journal, draft):
     found = [e for e in journal if e.get("action") == "DISCOVER"]
     listing = "\n\n".join(f"[{i}] (from {e.get('source') or 'an unknown page'})\n{e['extracted_data']}"
                           for i, e in enumerate(found, start=1)) or "[None]"
-    request = (f"### OBJECTIVE\n{objective}\n\n### DISCOVERIES\n{listing}\n\n### DRAFT FROM THE RESEARCH\n{draft or '[None]'}\n\n"
+    # The agent's own FINISH draft is not shown: on a how-to it already contained an invented quantity, which
+    # this step then copied; everything here must come from the recorded discoveries
+    request = (f"### OBJECTIVE\n{objective}\n\n### DISCOVERIES\n{listing}\n\n"
                "Write the complete final result the OBJECTIVE asks for: do exactly what it asks (for example answer "
                "the question, write the summary or the plan, or give the opinion). Use only the information in the "
-               "DISCOVERIES and do not add facts from anywhere else. Refer to the discoveries that support each point "
-               "by their numbers, like [2], and only cite a number for something that discovery actually says. If the "
-               "objective asks for your own view, opinion or recommendation, give it in a paragraph that starts with "
-               "'My view:'. If something the objective asks for is missing from the discoveries, say so. Write plain "
-               "text, not JSON.")
+               "DISCOVERIES. Do not fill gaps from your own knowledge or with guesses: no amounts, numbers, steps or "
+               "advice that the discoveries do not contain. Where a detail the objective asks for is missing, say that "
+               "it was not found. Refer to the discoveries that support each point by their numbers, like [2], and only "
+               "cite a number for something that discovery actually says. Only if the objective asks for your own view, "
+               "opinion or recommendation, give it in a paragraph that starts with 'My view:'; otherwise do not add one. "
+               "Write plain text, not JSON.")
     # A fresh prompt with only the discoveries, not the browsing conversation: continuing that conversation let
     # the model use page text it had read but not recorded, and cite discovery numbers that did not say it
     messages = [{"role": "system", "content": COMPOSE_SYSTEM}, {"role": "user", "content": request}]
@@ -890,7 +926,7 @@ async def main():
                     finish_entry = {"turn": turn_counter, "thought": thought, "action": "FINISH", "finding": parameter}
                     journal.append(finish_entry)
                     try:
-                        final = await compose_final_result(client, objective, journal, parameter)
+                        final = await compose_final_result(client, objective, journal)
                         if final:
                             finish_entry.update(draft=parameter, finding=final)
                     except Exception as err:
