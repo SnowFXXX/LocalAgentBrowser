@@ -83,7 +83,8 @@ Strictly follow these rules:
 1. If the current page contains information relevant to the objective that is not already in DISCOVERIES SO FAR, your action MUST be DISCOVER before you leave the page.
 2. Never repeat a search query, and never NAVIGATE to the page you are already on. You may return to a previously visited URL when it still has information you need, at most 3 visits per URL. These limits are enforced automatically.
 3. Prefer primary, authoritative sources over copies and summaries of them.
-4. Output ONLY raw JSON. No markdown wrappers, no backticks, no conversational filler."""
+4. Gather only what the objective asks for. As soon as your discoveries cover every part of it, FINISH; do not keep reading for extra or merely interesting details.
+5. Output ONLY raw JSON. No markdown wrappers, no backticks, no conversational filler."""
 
 RESPONSE_FORMAT = {
     "type": "json_schema",
@@ -954,9 +955,14 @@ async def main():
                     print(f"📝 Logging critical discovery element: {parameter}")
                     journal.append({"turn": turn_counter, "thought": thought, "action": "DISCOVER", "source": current_url, "extracted_data": parameter})
                     page_state["visit_discoveries"] = page_state.get("visit_discoveries", 0) + 1
+                    # A discovery is when the objective can become complete; on a one-answer question the model
+                    # recorded the full answer, said "the objective has been met", then kept reading for
+                    # "interesting" details, so completion is checked right here
                     set_note(conversation, "RESULT: Your DISCOVER was recorded and is now part of DISCOVERIES SO FAR. "
                                            f"{where_you_are(page_state, current_url)} The page is unchanged. "
-                                           "Do not record the same information again.", current_url)
+                                           "Do not record the same information again. If DISCOVERIES SO FAR now cover "
+                                           "every part of the OBJECTIVE, choose FINISH now; do not read further for extra "
+                                           "or merely interesting details.", current_url)
 
                 # A single refusal gets a short warning; repeated refusals get an explicit list of other options
                 last_entry = journal[-1]["action"] if journal else ""

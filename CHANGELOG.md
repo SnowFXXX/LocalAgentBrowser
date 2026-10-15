@@ -4,6 +4,16 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.35] - 2026-10-15
+### Fixed
+- Asked a one-answer question, the agent recorded the full answer on turn 3, said in its reasoning that "the
+  objective has been met", then kept reading the 33-part article for "interesting" details. The note after
+  every accepted DISCOVER now asks whether the discoveries cover every part of the objective and, if so, to
+  FINISH now; the system prompt also says to gather only what the objective asks for.
+
+Rerun: FINISH on turn 4 with the correct, cited answer (Kilimanjaro, 5,895 m / 19,341 ft), in 12 minutes of
+model time.
+
 ## [1.34] - 2026-10-14
 ### Changed
 - Fresh prompts show each discovery shortened to 250 characters; the log and report keep the full text, and

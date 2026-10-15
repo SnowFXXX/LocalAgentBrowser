@@ -63,6 +63,7 @@ def test_full_run(monkeypatch, tmp_path):
     assert all(calls[i][:len(calls[i - 1])] == calls[i - 1] for i in range(1, last)), "each browsing call must extend the previous"
     assert "Search Results" in last_message(calls[1])
     assert "Page Text (part 1 of" in last_message(calls[2]) and "Page B" in last_message(calls[2])
+    assert "choose FINISH now" in last_message(calls[3]), "after a discovery the model is asked whether it is done"
     assert actions.count("REFUSED_IN_TURN") == 4 and "BLOCKED_NAVIGATE" in actions
     assert not any("done (visit" in last_message(c) for c in calls[4:7]), "a refused NAVIGATE must not report 'done'"
     assert "part 2 of" in last_message(calls[7]).lower()

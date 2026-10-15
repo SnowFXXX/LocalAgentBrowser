@@ -95,6 +95,17 @@ That run (version 1.27) finished on its own on turn 13, after about 36 minutes, 
 - the project layout the agents use (`.github/` for agent definitions, `specs/` for plans, `tests/` for
   generated tests and the seed test)
 
+### Results on different kinds of tasks
+
+Live runs on the development machine (CPU only, Qwen2.5-7B). Each kind of task is used to find and fix what
+does not generalise; the [changelog](CHANGELOG.md) has the details.
+
+| Kind of task | Objective (abridged) | Version | Outcome |
+|---|---|---|---|
+| Documentation research | Setup commands and file layout for Playwright's test agents | 1.27 | Finished on its own in 13 turns (~36 min) with commands, roles and file layout |
+| Opinion from several sources | How spiritual traditions view cats, then form an opinion | 1.30 | Six traditions from two sources and a stated opinion, in 18 turns (37 min of model time) |
+| Factual question | Tallest mountain in Africa, height in meters and feet | 1.35 | Correct, cited answer in 4 turns (12 min of model time); before 1.35 it kept reading after finding it |
+
 ## How it works
 
 Each turn, the model sees the objective, what it has found so far, a journal of its recent actions and the
