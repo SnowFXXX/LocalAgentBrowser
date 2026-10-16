@@ -4,6 +4,22 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.52] - 2026-10-16
+### Changed
+- The note after each DISCOVER also says to work on parts of the objective that are not covered yet before
+  adding detail to parts that are. On the explanation task (how photosynthesis works), 1.51 recorded the
+  Calvin cycle enzyme by enzyme while the light reactions and the inputs and outputs were still missing.
+
+Rerun: after two Calvin cycle discoveries the agent left for a page on the light reactions and recorded where
+each stage happens and what the light reactions do. It still did not finish within 65 minutes: it lost about
+20 minutes reading the history and evolution sections of a long encyclopedia article twice, answering "none"
+to each read-on check, and never recorded the inputs and outputs that article's first part gives.
+
+Regression runs on 1.51 for the other kinds of task: the list task (three free, open-source alternatives to
+Microsoft Office) finished in 7 turns and 15.5 minutes of model time (49.3 on 1.46), naming LibreOffice,
+OnlyOffice and Apache OpenOffice, all open source; its final result wrongly says FreeOffice was "not
+mentioned" in the discoveries while leaving it out.
+
 ## [1.51] - 2026-10-16
 ### Fixed
 - On the repotting how-to, 1.50 sent back the model's invented steps once (part 2 still only said "follow

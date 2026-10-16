@@ -1193,13 +1193,16 @@ async def main():
                     page_state.setdefault("recorded_parts", set()).add(page_state["index"])
                     # A discovery is when the objective can become complete; on a one-answer question the model
                     # recorded the full answer, said "the objective has been met", then kept reading for
-                    # "interesting" details, so completion is checked right here
+                    # "interesting" details, so completion is checked right here. On an explanation task it recorded
+                    # the Calvin cycle step by step while the light reactions were still missing, so the note also
+                    # points to the parts not yet covered
                     number = sum(1 for e in journal if e.get("action") == "DISCOVER")
                     set_note(conversation, f"RESULT: Your DISCOVER was recorded as discovery [{number}] in DISCOVERIES SO FAR. "
                                            f"{where_you_are(page_state, current_url)} The page is unchanged. "
                                            "Do not record the same information again. If DISCOVERIES SO FAR now cover "
                                            "every part of the OBJECTIVE, choose FINISH now; do not read further for extra "
-                                           "or merely interesting details.", current_url)
+                                           "or merely interesting details. If some parts are still not covered, work on "
+                                           "those next instead of adding more detail to parts already covered.", current_url)
 
                 # A single refusal gets a short warning; repeated refusals get an explicit list of other options
                 last_entry = journal[-1]["action"] if journal else ""
