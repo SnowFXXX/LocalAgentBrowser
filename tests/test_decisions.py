@@ -250,14 +250,13 @@ class TestGroundingCheck:
         page = unrecorded_page(GUIDE, parts=(self.PAGE, "Step 1: Water the plant the day before."))
         return page
 
-    def test_a_discover_the_page_does_not_say_is_confirmed_once(self):
+    def test_a_discover_the_page_does_not_say_is_refused_even_when_repeated(self):
         page = self.page()
         invented = ("1. Gently remove the plant from its pot. 2. Loosen any tangled roots and trim dead ones. "
                     "3. Place fresh potting mix in the bottom of the new pot.")
-        first = decide("DISCOVER", invented, page, GUIDE)
-        assert first[0] == "CONFIRM_GROUNDED" and "does not match the page text" in first[1]
-        assert "DISCOVER again with only what the page actually says in part 1" in first[1]
-        assert decide("DISCOVER", invented, page, GUIDE) is None, "repeating it goes through"
+        for _ in range(2):
+            result = decide("DISCOVER", invented, page, GUIDE)
+            assert result[0] == "BLOCKED_DISCOVER" and "comes from your own knowledge" in result[1]
 
     def test_a_discover_copied_from_the_page_passes(self):
         copied = "Choose a pot one to two inches wider than the current one, with drainage holes."
@@ -266,10 +265,10 @@ class TestGroundingCheck:
     def test_short_discoveries_are_not_checked(self):
         assert decide("DISCOVER", "Use a bigger pot.", self.page(), GUIDE) is None
 
-    def test_real_advice_mixed_with_invented_steps_is_confirmed(self):
+    def test_real_advice_mixed_with_invented_steps_is_refused(self):
         mixed = ("Choose a pot one to two inches wider than the current one, with drainage holes. The steps are: "
                  "loosen and inspect the roots, prune any dead roots, then fill with fresh potting mix.")
-        assert decide("DISCOVER", mixed, self.page(), GUIDE)[0] == "CONFIRM_GROUNDED"
+        assert decide("DISCOVER", mixed, self.page(), GUIDE)[0] == "BLOCKED_DISCOVER"
 
 
 def test_recorded_parts_are_remembered_across_visits(monkeypatch):
@@ -292,15 +291,14 @@ def test_recorded_parts_are_remembered_across_visits(monkeypatch):
     assert decide("READ_MORE", "", state, GUIDE) is None, "part 1 was recorded on the earlier visit"
 
 
-def test_a_different_ungrounded_discover_is_checked_again():
+def test_a_different_ungrounded_discover_is_refused_again():
     page = TestGroundingCheck().page()
     first = ("1. Gently remove the plant from its pot. 2. Loosen any tangled roots and trim dead ones before you "
              "start. 3. Place fresh potting mix in the bottom of the new pot.")
     second = ("During the first two weeks water your plant sparingly and avoid fertilizing it until it settles in. "
               "Keep it out of direct sun and check the soil every few days.")
-    assert decide("DISCOVER", first, page, GUIDE)[0] == "CONFIRM_GROUNDED"
-    assert decide("DISCOVER", second, page, GUIDE)[0] == "CONFIRM_GROUNDED"
-    assert decide("DISCOVER", second, page, GUIDE) is None, "repeating the same one goes through"
+    assert decide("DISCOVER", first, page, GUIDE)[0] == "BLOCKED_DISCOVER"
+    assert decide("DISCOVER", second, page, GUIDE)[0] == "BLOCKED_DISCOVER"
 
 
 def test_the_objectives_wording_counts_as_grounded():
@@ -318,12 +316,14 @@ def test_the_objectives_wording_counts_as_grounded():
 def test_an_invented_sentence_behind_copied_ones_is_confirmed():
     page = unrecorded_page(GUIDE, parts=(
         "Owls have played a crucial role in Native American cultures since time immemorial, with sightings often "
-        "associated with shapeshifters, spiritual messages and supernatural signs. In Christianity owls are mentioned "
-        "in several places.",))
+        "associated with shapeshifters, spiritual messages and supernatural signs. In Christianity, owls symbolize "
+        "wisdom and appear in several places.",))
     finding = ("Owls have played a crucial role in Native American cultures since time immemorial, with sightings often "
                "associated with shapeshifters, spiritual messages and supernatural signs. In Christianity, owls symbolize "
                "wisdom and are often depicted alongside other wise figures like the prophet Samuel.")
-    assert decide("DISCOVER", finding, page, GUIDE)[0] == "CONFIRM_GROUNDED"
+    first = decide("DISCOVER", finding, page, GUIDE)
+    assert first[0] == "CONFIRM_GROUNDED" and "DISCOVER again with only what the page actually says in part 1" in first[1]
+    assert decide("DISCOVER", finding, page, GUIDE) is None, "repeating a borderline one goes through"
 
 
 def test_finish_goes_through_once_a_search_is_exhausted():

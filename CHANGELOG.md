@@ -4,6 +4,21 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.51] - 2026-10-16
+### Fixed
+- On the repotting how-to, 1.50 sent back the model's invented steps once (part 2 still only said "follow
+  these 6 easy steps"), the model sent nearly the same steps again, and they went through as a confirmed
+  repeat. A DISCOVER far below anything real is now refused outright, and repeating it does not help: below
+  40% of its word pairs on the page text shown, or with a sentence below 25%. Real discoveries in the
+  earlier runs scored at least 50% overall and 40% per sentence; these invented steps scored 32%, one of
+  them 9%. Between those levels and 70% / 35%, the one-time confirmation stays.
+
+Rerun: the invented steps were refused, the agent read on and recorded the guide's real materials and steps,
+and FINISH came on turn 7 after 28.5 minutes of model time (67.5 on 1.44). The final result has every step,
+including putting the plant in the new pot, and says that no care instructions beyond the first watering
+were found. Regression on the comparison task with 1.50: 8 turns and 24.9 minutes of model time (38.2 on
+1.42), all parts covered and cited, with a recommendation.
+
 ## [1.50] - 2026-10-16
 Three runs of the strict documentation objective (Playwright test agents, "do not FINISH until ... fully
 validated", including "parameter schemas" the documentation does not have).

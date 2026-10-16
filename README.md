@@ -156,11 +156,11 @@ does not generalise; the [changelog](https://github.com/SnowFXXX/LocalAgentBrows
 | Opinion from several sources | How spiritual traditions view cats, then form an opinion | 1.30 | Six traditions from two sources and a stated opinion, in 18 turns (37 min of model time) |
 | Opinion from several sources | How at least three cultures or religions have viewed owls, then an opinion on why | 1.47–1.48 | Greek, English and many Native American views from one detailed source in 11 turns (38 min); 1.48 adds the opinion the result had left out and catches an invented sentence in a discovery |
 | Factual question | Tallest mountain in Africa, height in meters and feet | 1.35, 1.40, 1.46 | Correct, cited answer in 4 turns (about 12 min of model time) in all three versions; before 1.35 it kept reading after finding it |
-| Comparison and recommendation | Python vs Rust for command-line tools; recommend one for a beginner. Later: SQLite vs PostgreSQL for a small web app, then a recommendation for a hobby project | 1.36, 1.42 | Python vs Rust: cited comparison recommending Python in 16 turns (33 min), Rust's libraries not covered. SQLite vs PostgreSQL: all three parts covered and cited, with a recommendation, in 13 turns (38 min) |
+| Comparison and recommendation | Python vs Rust for command-line tools; recommend one for a beginner. Later: SQLite vs PostgreSQL for a small web app, then a recommendation for a hobby project | 1.36, 1.42, 1.50 | Python vs Rust: cited comparison recommending Python in 16 turns (33 min), Rust's libraries not covered. SQLite vs PostgreSQL: all three parts covered and cited, with a recommendation, in 13 turns (38 min); on 1.50 in 8 turns (25 min) |
 | List of items | Three free, open-source Photoshop alternatives and the strengths of each | 1.37–1.38 | GIMP, Krita and Darktable with their strengths, all cited, in 9 turns (24 min); 1.37 listed a fourth and added an unrequested opinion, which 1.38 fixes |
 | List of items | Three free, open-source alternatives to Microsoft Office and what each is best at | 1.46 | LibreOffice and OnlyOffice with their strengths, cited, in 18 turns (49 min); the third, FreeOffice, is free but not open source, and LibreOffice was recorded four times in different words |
 | Step-by-step how-to | Make a sourdough starter, with quantities and what to do each day | 1.36–1.37 | A clear plan in 7 turns (19 min), but it invented the first water amount; 1.37 stops guessing and flags unsupported numbers, and the agent then went looking for the missing details |
-| Step-by-step how-to | Repot a houseplant: what you need, the steps, and care for the first two weeks | 1.43–1.44 | 1.43 recorded six steps it wrote itself before reading the part that had them; 1.44 checks findings against the page and recorded the guide's real materials, steps and aftercare, finishing in 24 turns (68 min), though the final result left out one step |
+| Step-by-step how-to | Repot a houseplant: what you need, the steps, and care for the first two weeks | 1.43–1.44, 1.51 | 1.43 recorded six steps it wrote itself before reading the part that had them; 1.44 recorded the guide's real steps but took 68 min and its result left one out. 1.51: every step from the page, in 7 turns (29 min), and it says that no care instructions beyond the first watering were found |
 | Explanation of a topic | How photosynthesis works: inputs and outputs, both stages and where each takes place | 1.41–1.42 | A complete, cited explanation in 18 turns (45 min); 1.41 read four parts of a relevant page without recording them and had not finished after 49 min |
 
 ## How it works
@@ -198,8 +198,9 @@ flowchart LR
   check: record something, or repeat the action to leave. Moving on to the next part of a page works the same
   way, and the model must first list what the part it is on says about the objective (or "none").
 - **Findings must match the page.** A finding that shares too few word pairs with the page text shown so far
-  (or has a sentence that does) is sent back once, asking for only what the page says in its own words: a small model will otherwise
-  "complete" a list from its own knowledge when a page says "follow these 6 steps" and the steps come later.
+  (or has a sentence that does) is sent back once, asking for only what the page says in its own words, and
+  one far from anything on the page is refused outright. A small model will otherwise "complete" a list from
+  its own knowledge when a page says "follow these 6 steps" and the steps come later.
 - **Numbered findings.** Findings are numbered in the prompt and listed with every check, and the model names
   the finding that covers each part of the objective ("covered by [2]") instead of just saying "covered".
 - **Knowing when it's done.** After every new finding the model is asked whether the objective is now fully

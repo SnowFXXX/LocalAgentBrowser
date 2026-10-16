@@ -51,6 +51,8 @@ GROUNDED_PAIR_SHARE = 0.7  # A DISCOVER sharing fewer of its word pairs with the
 MIN_GROUNDING_PAIRS = 20   # Shorter discoveries are not checked: a few connecting words sink their score
 GROUNDED_SENTENCE_SHARE = 0.35  # Any one sentence matching the page text shown less than this is confirmed too
 MIN_SENTENCE_PAIRS = 8     # Shorter sentences are not scored on their own
+UNGROUNDED_PAIR_SHARE = 0.4       # Below this (whole) or the next (any sentence) a DISCOVER is refused outright
+UNGROUNDED_SENTENCE_SHARE = 0.25
 TURN_PAUSE_SECONDS = 1
 STALL_TURNS = 4          # Turns without a new discovery before the model is asked to check its progress
 COMPOSE_MAX_TOKENS = 900  # Length limit for the separately written final result
@@ -423,13 +425,22 @@ def grounding_check(parameter, page_state, current_url, objective=""):
     # The objective's wording counts as well: "Mount Kilimanjaro is the tallest mountain in Africa..." echoed the
     # question's "tallest" where the page says "highest", and was sent back although it was accurate
     shown = [parts[i] for i in sorted(page_state.get("seen_parts", {0})) if i < len(parts)] + [objective]
-    whole_ok = len(word_pairs(parameter)) < MIN_GROUNDING_PAIRS or grounded_share(parameter, shown) >= GROUNDED_PAIR_SHARE
+    long_enough = len(word_pairs(parameter)) >= MIN_GROUNDING_PAIRS
+    whole = grounded_share(parameter, shown) if long_enough else 1.0
     # An invented sentence can hide behind copied ones: an opinion task's discovery was 75% copied, but its last
     # sentence ("...depicted alongside other wise figures like the prophet Samuel") was not on the page (31%).
     # Real sentences scored 40-100% against their page, invented ones 0-41%.
     sentences = [s for s in re.split(r"(?<=[.!?])\s+|\n+", parameter) if len(word_pairs(s)) >= MIN_SENTENCE_PAIRS]
-    if whole_ok and all(grounded_share(s, shown) >= GROUNDED_SENTENCE_SHARE for s in sentences):
+    lowest = min((grounded_share(s, shown) for s in sentences), default=1.0)
+    if whole >= GROUNDED_PAIR_SHARE and lowest >= GROUNDED_SENTENCE_SHARE:
         return None
+    # Far below anything real (whole discoveries 50%+, sentences 40%+), repeating does not confirm it: asked once,
+    # the model sent its invented repotting steps again (32% overall, one step 9%) and they went through
+    if whole < UNGROUNDED_PAIR_SHARE or lowest < UNGROUNDED_SENTENCE_SHARE:
+        return "BLOCKED_DISCOVER", ("That DISCOVER is mostly not in the page text you have been shown, so it comes from "
+                                    "your own knowledge. DISCOVER only what the parts shown actually say, in the page's own "
+                                    "wording. If what you need is not there, READ_MORE (a later part may have it) or look "
+                                    "elsewhere.")
     # Only repeating the same DISCOVER confirms it: asked again, the model once sent a different text that was
     # still invented ("water sparingly", which the page never said), and a per-part pass let it through
     asked = page_state.setdefault("grounding_asked", [])
