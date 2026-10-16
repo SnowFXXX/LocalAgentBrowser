@@ -4,6 +4,29 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.42] - 2026-10-16
+A new kind of task, explaining a topic (how photosynthesis works: what goes in and out, the two stages and
+where each takes place), reproduced the main weakness: on 1.41 the agent read parts 2 to 5 of a page that had
+the inputs, outputs and cell locations without recording anything until a progress check fired, marked parts
+of the objective "not covered" that its own discoveries covered (and the reverse), and had not finished after
+18 turns and 49 minutes of model time.
+### Added
+- Read-on check: moving on to a later part of a page with nothing recorded from the part shown now gets one
+  cheap retry asking the model to list each fact in that part that serves the objective (or "none"), and to
+  DISCOVER any that are new; repeating the READ_MORE then goes through. Going back to an earlier part is left
+  to the re-read check, and a duplicate DISCOVER from the part counts as having weighed it.
+- Discoveries are numbered: in fresh prompts, in the note after each DISCOVER ("recorded as discovery [3]"),
+  and in a shortened numbered list that now comes with the finish, progress and objective checks. The
+  part-by-part check asks for the number of the discovery covering each part ("covered by [2]").
+### Changed
+- READ_MORE for the part already shown is refused (with the number of the next part) instead of showing the
+  same part again and costing a turn.
+
+Rerun on the same objective: finished on turn 18 with a cited explanation covering every part (inputs and
+outputs, both stages, thylakoid membrane and stroma), in 44.8 minutes of model time. The read-on check fired
+five times at 25 to 44 s each; every "none" it got was correct, and it used the page outline to jump to the
+relevant parts of an 11-part page.
+
 ## [1.41] - 2026-10-15
 ### Added
 - Published on PyPI: `pip install localagentbrowser`, then `python -m playwright install chromium` and run

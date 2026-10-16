@@ -25,7 +25,7 @@ and tuned to work well with a **small 7B model on a CPU, no GPU required**.
 - 📝 **A readable report every time.** `research_report.md` holds the final result and every finding with its
   source, written however the run ends; `research_log.txt` keeps every action and reason.
 - ✅ **Tested.** 89 tests on Linux and Windows, Python 3.10–3.13, run in about a second with no model or browser,
-  plus live runs on six different kinds of task (see [results](#results-on-different-kinds-of-tasks)).
+  plus live runs on seven different kinds of task (see [results](#results-on-different-kinds-of-tasks)).
 
 📖 **The story behind it:** [Teaching a 7B model on a CPU to finish what it starts](https://dev.to/snowfxxx/teaching-a-7b-model-on-a-cpu-to-finish-what-it-starts-1amc),
 six lessons from 30 versions of keeping a small local model on track.
@@ -158,6 +158,7 @@ does not generalise; the [changelog](https://github.com/SnowFXXX/LocalAgentBrows
 | Comparison and recommendation | Python vs Rust for command-line tools; recommend one for a beginner | 1.36 | Cited comparison of performance, learning and Python's libraries, recommending Python, in 16 turns (33 min); Rust's libraries were not covered |
 | List of items | Three free, open-source Photoshop alternatives and the strengths of each | 1.37–1.38 | GIMP, Krita and Darktable with their strengths, all cited, in 9 turns (24 min); 1.37 listed a fourth and added an unrequested opinion, which 1.38 fixes |
 | Step-by-step how-to | Make a sourdough starter, with quantities and what to do each day | 1.36–1.37 | A clear plan in 7 turns (19 min), but it invented the first water amount; 1.37 stops guessing and flags unsupported numbers, and the agent then went looking for the missing details |
+| Explanation of a topic | How photosynthesis works: inputs and outputs, both stages and where each takes place | 1.41–1.42 | A complete, cited explanation in 18 turns (45 min); 1.41 read four parts of a relevant page without recording them and had not finished after 49 min |
 
 ## How it works
 
@@ -190,8 +191,11 @@ flowchart LR
   Duplicate findings are recognised even when reworded into different lines, punctuation or order.
 - **Cheap retries.** A refused reply is corrected inside the same turn by appending a short note to the
   conversation, instead of wasting a whole turn.
-- **Confirm before leaving.** Leaving a page without recording anything from it triggers one check: record
-  something, or repeat the action to leave.
+- **Confirm before leaving or reading on.** Leaving a page without recording anything from it triggers one
+  check: record something, or repeat the action to leave. Moving on to the next part of a page works the same
+  way, and the model must first list what the part it is on says about the objective (or "none").
+- **Numbered findings.** Findings are numbered in the prompt and listed with every check, and the model names
+  the finding that covers each part of the objective ("covered by [2]") instead of just saying "covered".
 - **Knowing when it's done.** After every new finding the model is asked whether the objective is now fully
   covered, and if so to finish instead of reading on for extra details.
 - **Progress and objective checks.** After 4 turns without a new finding, and every 8 turns regardless, the
@@ -274,11 +278,13 @@ turn that brings in a new page takes a few minutes. See [Performance](#performan
 
 ## Limitations
 
-- **Tried on six kinds of task so far** (see [results](#results-on-different-kinds-of-tasks)): documentation
-  research, an opinion from several sources, a factual question, a comparison, a how-to and a list. Each one
+- **Tried on seven kinds of task so far** (see [results](#results-on-different-kinds-of-tasks)): documentation
+  research, an opinion from several sources, a factual question, a comparison, a how-to, a list and an
+  explanation of a topic. Each one
   exposed something that did not generalise and was fixed; other kinds of tasks may expose more.
-- **Reading without recording.** The model sometimes reads a long page part by part without recording the
-  relevant parts, even with the outline in front of it. This is currently its main weakness.
+- **Reading without recording.** The model used to read long pages part by part without recording the
+  relevant parts. Since 1.42 it must say what a part contains before reading on, which fixed this on an
+  explanation task; it is still the area most likely to need more work on other pages.
 - **A small model's judgement is the ceiling.** It sometimes drifts to loosely related pages, prefers
   secondary sources or stays with one source too long, and results vary with the first pages a search turns
   up; every finding is in `research_report.md` regardless.
@@ -300,9 +306,9 @@ turn that brings in a new page takes a few minutes. See [Performance](#performan
 - [x] Include every finding in the final report, not only the model's own summary (1.29)
 - [x] Write the final result in a separate, rule-bound step and flag unsupported numbers (1.32–1.38)
 - [x] Finish as soon as the objective is covered (1.35)
-- [ ] Get the model to record relevant parts while it reads long pages
+- [x] Get the model to weigh each part of a long page before reading on (1.42)
 - [ ] Let very strict objectives end with the gaps named instead of searching indefinitely
-- [ ] Try more kinds of objectives (six so far) and adjust the rules that don't generalise
+- [ ] Try more kinds of objectives (seven so far) and adjust the rules that don't generalise
 - [ ] Make fresh prompts (the slowest kind of turn) cheaper still (31% cheaper since 1.34)
 - [ ] Interacting with pages (clicking, forms) for tasks beyond reading
 

@@ -45,7 +45,7 @@ class TestCheapRetries:
         assert second[2]["role"] == "assistant" and second[3]["content"].startswith("REFUSED:")  # ...then only appended to
 
     def test_first_correction_lists_the_alternatives(self, scrapes):
-        client, model = fake_client([reply("NAVIGATE", URL), reply("READ_MORE", "")])
+        client, model = fake_client([reply("NAVIGATE", URL), reply("DISCOVER", "a new fact")])
         turn(client)
         correction = model.calls[1][-1]["content"]
         assert "READ_MORE to see part 2 of 2" in correction and "NAVIGATE to another page" in correction
@@ -59,9 +59,9 @@ class TestCheapRetries:
         assert "Choose a different action" in model.calls[-1][-1]["content"]
 
     def test_invalid_json_gets_a_correction_not_the_identical_prompt(self, scrapes):
-        client, model = fake_client(["not json", reply("READ_MORE", "1")])
+        client, model = fake_client(["not json", reply("DISCOVER", "a new fact")])
         decision, _ = turn(client)
-        assert decision["action"] == "READ_MORE" and "not a valid JSON object" in model.calls[1][-1]["content"]
+        assert decision["action"] == "DISCOVER" and "not a valid JSON object" in model.calls[1][-1]["content"]
 
     def test_valid_first_reply_costs_one_call(self, scrapes):
         client, model = fake_client([reply("SEARCH", "fresh query")])
@@ -71,7 +71,7 @@ class TestCheapRetries:
 
 def test_fresh_prompt_shortens_long_discoveries(scrapes):
     long_fact = "A long recorded finding. " * 40
-    client, model = fake_client([reply("READ_MORE", "")])
+    client, model = fake_client([reply("DISCOVER", "a new fact")])
     journal = discoveries(long_fact)
     turn(client, journal=journal)
     prompt = model.calls[0][1]["content"]
@@ -149,3 +149,10 @@ class TestConversation:
         ab.set_note(conversation, note, URL)
         turn(client, conversation=conversation)
         assert (len(model.calls[-1]) == 4) is continues
+
+
+def test_fresh_prompt_numbers_the_discoveries(scrapes):
+    client, model = fake_client([reply("DISCOVER", "a new fact")])
+    turn(client, journal=discoveries("first fact", "second fact"))
+    prompt = model.calls[0][1]["content"]
+    assert "### DISCOVERIES SO FAR\n[1] first fact\n[2] second fact\n" in prompt

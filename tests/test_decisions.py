@@ -12,7 +12,8 @@ SEARCH_PAGE = "https://html.duckduckgo.com/html/?q=x"
 
 def recorded_page(url, parts=("x",), index=0):
     """A content page the agent has already recorded something from (so no leave check applies)."""
-    return {"url": url, "parts": list(parts), "index": index, "seen_parts": {index}, "visit_discoveries": 1}
+    return {"url": url, "parts": list(parts), "index": index, "seen_parts": {index}, "visit_discoveries": 1,
+            "recorded_parts": {index}}
 
 
 def unrecorded_page(url, parts=("p1", "p2", "p3")):
@@ -102,6 +103,15 @@ def test_finish_check_asks_once_then_lets_finish_through():
     assert ab.check_decision("FINISH", "my answer", [], tried, page, DOCS) is None
 
 
+def test_finish_check_lists_the_discoveries_numbered():
+    long_fact = "The Calvin cycle occurs in the stroma. " * 10
+    journal = discoveries("Light reactions happen in the thylakoids.", long_fact)
+    check = ab.check_decision("FINISH", "answer", journal, {"queries": [], "urls": []}, recorded_page(DOCS), DOCS)[1]
+    assert "[1] Light reactions happen in the thylakoids." in check and "[2] The Calvin cycle occurs" in check
+    assert long_fact.strip() not in check, "shortened in the check"
+    assert "'covered by [2]'" in check
+
+
 def test_rereading_a_part_is_confirmed_once():
     page = recorded_page(DOCS, parts=[f"p{i}" for i in range(11)], index=9)
     page["seen_parts"] = {0, 1, 2, 3, 9}
@@ -109,6 +119,42 @@ def test_rereading_a_part_is_confirmed_once():
     assert first[0] == "CONFIRM_REREAD" and "already read part 3" in first[1]
     assert decide("READ_MORE", "3", page, DOCS) is None, "repeating it goes through"
     assert decide("READ_MORE", "11", page, DOCS) is None, "unread parts need no confirmation"
+
+
+class TestReadOnCheck:
+    def test_reading_on_from_an_unrecorded_part_asks_once_then_proceeds(self):
+        page = unrecorded_page(DOCS)
+        first = decide("READ_MORE", "", page, DOCS)
+        assert first[0] == "CONFIRM_READ_ON" and "recorded nothing from part 1" in first[1]
+        assert "write 'none'" in first[1]
+        assert decide("READ_MORE", "", page, DOCS) is None, "repeating it goes through"
+
+    def test_no_check_after_recording_from_the_shown_part(self):
+        assert decide("READ_MORE", "", recorded_page(DOCS, parts=("a", "b")), DOCS) is None
+
+    def test_asked_again_for_the_next_unrecorded_part(self):
+        page = unrecorded_page(DOCS)
+        page["read_on_confirmed"] = {0}
+        page["index"] = 1
+        page["seen_parts"] = {0, 1}
+        assert decide("READ_MORE", "", page, DOCS)[0] == "CONFIRM_READ_ON"
+
+    def test_no_check_after_a_duplicate_from_the_shown_part(self):
+        page = unrecorded_page(DOCS)
+        journal = discoveries("already recorded fact")
+        assert decide("DISCOVER", "already recorded fact", page, DOCS, journal=journal)[0] == "DUPLICATE_DISCOVER"
+        assert decide("READ_MORE", "", page, DOCS, journal=journal) is None
+
+    def test_going_back_to_an_earlier_part_is_not_reading_on(self):
+        page = unrecorded_page(DOCS, parts=("a", "b", "c", "d", "e"))
+        page.update(index=4, seen_parts={0, 1, 2, 3, 4}, reread_confirmed={2})
+        assert decide("READ_MORE", "3", page, DOCS) is None
+
+    def test_asking_for_the_part_already_shown_is_refused(self):
+        result = decide("READ_MORE", "1", unrecorded_page(DOCS), DOCS)
+        assert result[0] == "BLOCKED_READ_MORE" and "already shown" in result[1] and "For part 2" in result[1]
+        last = recorded_page(DOCS, parts=("a", "b"), index=1)
+        assert "last part" in decide("READ_MORE", "2", last, DOCS)[1]
 
 
 def test_outline_marks_parts_already_read():

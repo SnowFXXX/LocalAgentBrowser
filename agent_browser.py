@@ -46,6 +46,7 @@ MAX_CHEAP_RETRIES = 2  # Refused replies re-asked within the same turn before th
 MAX_FOLLOWUPS = 12       # Turns that continue one conversation before a fresh full prompt (the token budget usually ends it first)
 MAX_CONVERSATION_TOKENS = int(CONTEXT_LENGTH * 0.75)  # Start fresh with room left for the next page and the reply
 MAX_DISCOVERY_PROMPT_CHARS = 250  # Discoveries are shortened to this in fresh prompts; the log keeps the full text
+MAX_CHECK_DISCOVERY_CHARS = 150   # Shorter still in the numbered list that comes with the finish and progress checks
 TURN_PAUSE_SECONDS = 1
 STALL_TURNS = 4          # Turns without a new discovery before the model is asked to check its progress
 COMPOSE_MAX_TOKENS = 900  # Length limit for the separately written final result
@@ -53,8 +54,8 @@ OBJECTIVE_CHECK_EVERY = 8 # Turns between scheduled objective checks, which happ
 READ_FIRST = ("First, if the CURRENT ENVIRONMENT (or an unread part of this page, via READ_MORE) contains information "
               "relevant to the objective that is not yet in DISCOVERIES SO FAR, DISCOVER it now.")
 CHECK_PARTS = ("split the OBJECTIVE into its separate parts and, in thought_process, write each part followed by the "
-               "discovery that covers it, or 'not covered'. Only parts that ask for your own answer, opinion, recommendation "
-               "or summary are 'written at FINISH' (write them in the FINISH parameter, never as a DISCOVER); information "
+               "number of the discovery that covers it (for example 'covered by [2]'), or 'not covered'. Only parts "
+               "that ask for your own answer, opinion, recommendation or summary are 'written at FINISH' (write them in the FINISH parameter, never as a DISCOVER); information "
                "the objective asks you to find is never 'written at FINISH': it is covered by a discovery or 'not covered'.")
 FINAL_RESULT = ("the complete final result the objective asks for (for example the answer, opinion, summary or "
                 "deliverable, not just a list of what you found)")
@@ -349,7 +350,8 @@ async def build_environment(page, current_url, page_state, visited_urls=frozense
         if page_state["url"] != normalize_url(current_url):
             parts, outline = await extract_page_parts(page)
             page_state.update(url=normalize_url(current_url), parts=parts, outline=outline, index=0,
-                              seen_parts={0}, visit_discoveries=0, leave_confirmed=False, reread_confirmed=set())
+                              seen_parts={0}, visit_discoveries=0, leave_confirmed=False, reread_confirmed=set(),
+                              recorded_parts=set(), read_on_confirmed=set())
         link_lines = await extract_page_links(page, shown_links)
         return f"{render_part(page_state, with_outline=True)}\n\nLinks On Page:\n{link_lines or '[None]'}"
     except Exception as e:
@@ -455,6 +457,25 @@ def leave_check(action, page_state, current_url, journal=()):
             f"If it has information relevant to the objective, DISCOVER it now{read_more}. "
             f"If it truly has nothing relevant, repeat your {action} to leave.")
 
+def read_on_check(page_state, current_url, target):
+    # The model read long pages part after part without recording anything, even though every prompt ends by
+    # asking it to DISCOVER relevant information first: on an explanation task it read four parts of a page that
+    # had the inputs, outputs and cell locations it needed and recorded them only when a progress check fired.
+    # Moving on from a part nothing was recorded from gets one cheap retry that makes the model name what the
+    # part says about the objective; repeating the READ_MORE then goes through.
+    index = page_state["index"]
+    # Only moving forward counts: going back to an earlier part is covered by the re-read check
+    if target <= index or index in page_state.get("recorded_parts", set()):
+        return None
+    confirmed = page_state.setdefault("read_on_confirmed", set())
+    if index in confirmed:
+        return None
+    confirmed.add(index)
+    return "CONFIRM_READ_ON", (f"Before reading on: you have recorded nothing from part {index + 1}, which is shown now. "
+                               "In thought_process, list each fact in it that serves the OBJECTIVE, or write 'none'. If any "
+                               "of them are not in DISCOVERIES SO FAR, DISCOVER them now. If there are none, repeat your "
+                               "READ_MORE.")
+
 def gap_check(thought, tried):
     # The model is asked to write 'not covered' for missing parts; on a comparison it wrote "Available Libraries:
     # Not covered" and finished anyway. A FINISH whose own reasoning says that is sent back to work on the gap,
@@ -505,6 +526,12 @@ def check_decision(action, parameter, journal, tried, page_state, current_url, t
         if not 0 <= target < total:
             return "BLOCKED_READ_MORE", (f"There is no part {target + 1}. {where_you_are(page_state, current_url)} "
                                          f"This page has {total} part(s).")
+        # On part 3 the model asked for "READ_MORE 3", which only showed the same part again and cost a turn
+        if target == page_state["index"]:
+            following = (f"For part {target + 2}, use READ_MORE with an empty parameter. "
+                         if target < total - 1 else "It is the last part of this page. ")
+            return "BLOCKED_READ_MORE", (f"Part {target + 1} is the part already shown. {following}"
+                                         "Otherwise choose DISCOVER or another action.")
         # Re-reading a part is allowed, but confirmed once per part (the same pattern as the leave check)
         confirmed = page_state.setdefault("reread_confirmed", set())
         if target in page_state.get("seen_parts", set()) and target != page_state["index"] and target not in confirmed:
@@ -512,10 +539,14 @@ def check_decision(action, parameter, journal, tried, page_state, current_url, t
             return "CONFIRM_REREAD", (f"You already read part {target + 1} of this page; anything useful from it should "
                                       "already be in DISCOVERIES SO FAR. Choose an unread part or another action, or "
                                       "repeat this READ_MORE if you really need to read it again.")
+        return read_on_check(page_state, current_url, target)
     elif action == "DISCOVER":
         if not discovery_lines(parameter):
             return "BLOCKED_DISCOVER", "The DISCOVER parameter was empty. Put the actual information in the parameter."
         if is_known_discovery(parameter, journal):
+            # The model has weighed this part: without this, the read-on check asked it to DISCOVER again
+            # right after this refusal, and it repeated the duplicate until the turn was lost
+            page_state.setdefault("read_on_confirmed", set()).add(page_state.get("index", 0))
             return "DUPLICATE_DISCOVER", "Everything in that DISCOVER is already recorded in DISCOVERIES SO FAR."
     elif action == "FINISH":
         return finish_check(tried, journal, page_state, current_url) or gap_check(thought, tried)
@@ -539,7 +570,21 @@ def finish_check(tried, journal, page_state=None, current_url=None):
     if tried.get("finish_confirmed"):
         return None
     tried["finish_confirmed"] = True  # Reset at the start of every turn
-    return "CONFIRM_FINISH", f"{source_note(journal)}{unread_note(page_state or {}, current_url)} {FINISH_CHECK}"
+    return "CONFIRM_FINISH", (f"{source_note(journal)}{unread_note(page_state or {}, current_url)}"
+                              f"{numbered_discoveries(journal)} {FINISH_CHECK}")
+
+def numbered_discoveries(journal, limit=MAX_CHECK_DISCOVERY_CHARS):
+    # Asked to name the discovery covering each part of the objective, the model marked the light reactions
+    # "not covered" although its first discovery described them: discoveries were an unnumbered list, far back
+    # in the prompt. Checks now carry the list, numbered, so each part can be matched to a number.
+    lines = numbered_lines(journal, limit)
+    if not lines:
+        return ""
+    return "\nYour discoveries, numbered:\n" + "\n".join(lines) + "\n"
+
+def numbered_lines(journal, limit):
+    found = [e for e in journal if e.get("action") == "DISCOVER"]
+    return [f"[{i}] {shorten(e['extracted_data'], limit)}" for i, e in enumerate(found, 1)]
 
 def unread_note(page_state, current_url):
     # On a how-to the agent finished after 3 of 6 parts of the recipe, missing the amounts on the unread parts
@@ -693,7 +738,7 @@ async def build_full_prompt(page, objective, journal, current_url, tried, page_s
 
     # Shortened in the prompt (the full text is in the log and the report, and duplicates are checked against
     # it in code): the growing discoveries list had become a quarter of every fresh prompt
-    discoveries = [shorten(e["extracted_data"], MAX_DISCOVERY_PROMPT_CHARS) for e in journal if e.get("action") == "DISCOVER"]
+    discoveries = "\n".join(numbered_lines(journal, MAX_DISCOVERY_PROMPT_CHARS)) or "[None yet]"
     recent_journal = compact_journal(journal)
 
     # LM Studio only reuses the part of the prompt that is identical to the previous turn's, up to the
@@ -704,7 +749,7 @@ async def build_full_prompt(page, objective, journal, current_url, tried, page_s
 {objective}
 
 ### DISCOVERIES SO FAR
-{json.dumps(discoveries, indent=2) if discoveries else "[None yet]"}
+{discoveries}
 
 ### RECENT RESEARCH JOURNAL
 {recent_journal}
@@ -769,7 +814,7 @@ async def request_decision(client, messages, journal, tried, page_state, current
         refused.append({"action": action, "parameter": parameter, "journal_action": refusal[0], "reason": refusal[1]})
         print(f"♻️ Cheap retry {len(refused)}/{MAX_CHEAP_RETRIES}: [{action}] refused. {refusal[1]}")
         correction = refusal_correction(action, refusal[1], page_state, current_url)
-        if refusal[0] in ("CONFIRM_LEAVE", "CONFIRM_FINISH", "CONFIRM_REREAD"):
+        if refusal[0].startswith("CONFIRM_"):
             # Not a true refusal: repeating the action is an allowed answer, so no "do not repeat" wording
             correction = f"CHECK: {refusal[1]} Reply with only the JSON object."
         elif len(refused) >= 2:
@@ -1030,10 +1075,12 @@ async def main():
                     print(f"📝 Logging critical discovery element: {parameter}")
                     journal.append({"turn": turn_counter, "thought": thought, "action": "DISCOVER", "source": current_url, "extracted_data": parameter})
                     page_state["visit_discoveries"] = page_state.get("visit_discoveries", 0) + 1
+                    page_state.setdefault("recorded_parts", set()).add(page_state["index"])
                     # A discovery is when the objective can become complete; on a one-answer question the model
                     # recorded the full answer, said "the objective has been met", then kept reading for
                     # "interesting" details, so completion is checked right here
-                    set_note(conversation, "RESULT: Your DISCOVER was recorded and is now part of DISCOVERIES SO FAR. "
+                    number = sum(1 for e in journal if e.get("action") == "DISCOVER")
+                    set_note(conversation, f"RESULT: Your DISCOVER was recorded as discovery [{number}] in DISCOVERIES SO FAR. "
                                            f"{where_you_are(page_state, current_url)} The page is unchanged. "
                                            "Do not record the same information again. If DISCOVERIES SO FAR now cover "
                                            "every part of the OBJECTIVE, choose FINISH now; do not read further for extra "
@@ -1059,7 +1106,8 @@ async def main():
                 # the current page and pushed the model to navigate away without reading what was in front of it
                 if turns_without_discovery and turns_without_discovery % STALL_TURNS == 0:
                     print(f"⚠️ No new discoveries in {turns_without_discovery} turns. Adding progress check.")
-                    progress = (f"PROGRESS CHECK: no new discoveries in the last {turns_without_discovery} turns. {READ_FIRST} "
+                    progress = (f"PROGRESS CHECK: no new discoveries in the last {turns_without_discovery} turns."
+                                f"{numbered_discoveries(journal)} {READ_FIRST} "
                                 f"Then {CHECK_PARTS} If every part is covered, choose FINISH with {FINAL_RESULT} in the "
                                 "parameter. If not, state in thought_process exactly what is still missing, then go and find "
                                 f"that specific thing. {GIVE_UP_RULE}")
@@ -1073,7 +1121,8 @@ async def main():
                         turns_since_objective_check = 0
                         count = sum(1 for e in journal if e.get("action") == "DISCOVER")
                         print(f"🧭 Objective check after {turn_counter} turns ({count} discoveries).")
-                        check = (f"OBJECTIVE CHECK: you have recorded {count} discoveries in {turn_counter} turns. "
+                        check = (f"OBJECTIVE CHECK: you have recorded {count} discoveries in {turn_counter} turns."
+                                 f"{numbered_discoveries(journal)} "
                              f"{source_note(journal)} {READ_FIRST} "
                                  f"Then {CHECK_PARTS} If every part is covered, choose FINISH with {FINAL_RESULT} in the "
                                  "parameter. If not, state in thought_process exactly what is still missing and go directly for it; "
