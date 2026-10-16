@@ -51,3 +51,8 @@ def test_old_entries_are_dropped_in_batches():
     shown = ab.compact_journal(journal).splitlines()
     assert shown[0].startswith("T7 ") and len(shown) == 6
     assert ab.compact_journal(journal + [{"turn": 13, "action": "READ_MORE", "part": "1 of 1"}]).splitlines()[0].startswith("T7 ")
+
+
+def test_unverified_numbers_ignores_grouped_citations():
+    found = [{"extracted_data": "LibreOffice offers good compatibility."}]
+    assert ab.unverified_numbers("LibreOffice has good compatibility [4, 5] and more [2;3].", found) == []

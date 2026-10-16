@@ -4,6 +4,16 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.47] - 2026-10-16
+A list task on 1.46 (three free, open-source alternatives to Microsoft Office and what each is best at)
+finished on its own in 18 turns and 49 minutes of model time. LibreOffice and OnlyOffice were right, but the
+third item was FreeOffice, which is free but not open source, although the agent had also recorded Apache
+OpenOffice. It recorded LibreOffice four times in different words, which the wording-based duplicate check
+does not catch. Both are left for future work.
+### Fixed
+- The report's number check flagged the citation numbers in "[4, 5]" as unverified numbers; grouped
+  citations like that are now recognised along with "[4]".
+
 ## [1.46] - 2026-10-16
 ### Fixed
 - The rerun of the factual question on 1.45 had another accurate discovery sent back ("Mount Kilimanjaro is

@@ -883,7 +883,7 @@ def unverified_numbers(text, discoveries):
     A small model writing a how-to filled a gap with an invented quantity ("45 grams of lukewarm water (about
     1/4 cup)"); numbers are where such errors do the most harm and the easiest place to check them.
     """
-    text = re.sub(r"\[\d+\]", " ", str(text))           # Citation markers like [2]
+    text = re.sub(r"\[\d+(?:\s*[,;]\s*\d+)*\]", " ", str(text))  # Citation markers like [2] or [4, 5]
     text = re.sub(r"(?m)^\s*\d+[.)]\s", " ", text)      # Numbered list items
     known = {n.replace(",", "") for e in discoveries for n in NUMBER_PATTERN.findall(e["extracted_data"])}
     unverified = []
