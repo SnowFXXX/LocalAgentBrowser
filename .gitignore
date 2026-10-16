@@ -14,3 +14,8 @@ run_output/
 
 # Local backups (every version is in the git history instead)
 old versions/
+
+# Packaging
+build/
+dist/
+*.egg-info/

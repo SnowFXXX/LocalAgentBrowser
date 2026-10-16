@@ -1,0 +1,3 @@
+# Files the source package needs beyond the defaults, so its tests can run
+include CHANGELOG.md
+recursive-include tests *.py

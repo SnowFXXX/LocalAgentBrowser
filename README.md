@@ -4,12 +4,12 @@
 decides when it's done, all on your own computer.**
 
 [![Tests](https://github.com/SnowFXXX/LocalAgentBrowser/actions/workflows/tests.yml/badge.svg)](https://github.com/SnowFXXX/LocalAgentBrowser/actions/workflows/tests.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/LICENSE)
 ![Python 3.10–3.13](https://img.shields.io/badge/python-3.10%E2%80%933.13-blue.svg)
 ![Runs locally](https://img.shields.io/badge/LLM-local%20(LM%20Studio)-green.svg)
 
 <p align="center">
-  <img src="docs/social-preview.png" alt="LocalAgentBrowser: SEARCH, NAVIGATE, READ_MORE, DISCOVER, FINISH. No cloud AI, 7B model on a CPU, LM Studio and Playwright." width="820">
+  <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/social-preview.png" alt="LocalAgentBrowser: SEARCH, NAVIGATE, READ_MORE, DISCOVER, FINISH. No cloud AI, 7B model on a CPU, LM Studio and Playwright." width="820">
 </p>
 
 A local language model served by [LM Studio](https://lmstudio.ai) decides what to do next, and
@@ -37,31 +37,32 @@ and tuned to work well with a **small 7B model on a CPU, no GPU required**.
 
 1. Install [LM Studio](https://lmstudio.ai), download a model (developed with **Qwen2.5-7B-Instruct**),
    load it and start the local server (Developer tab → Start Server).
-2. Install the agent:
+2. Install the agent from [PyPI](https://pypi.org/project/localagentbrowser/) (Python 3.10 or later, ideally
+   in a virtual environment) and the Chromium browser it drives:
 
    ```bash
-   git clone https://github.com/SnowFXXX/LocalAgentBrowser.git
-   cd LocalAgentBrowser
-   python -m venv venv
-   ```
-
-   Activate the virtual environment (`venv\Scripts\activate` on Windows, `source venv/bin/activate` on macOS
-   and Linux), then:
-
-   ```bash
-   pip install -r requirements.txt
+   pip install localagentbrowser
    python -m playwright install chromium
    ```
 
 3. Run it and type your objective:
 
    ```bash
-   python agent_browser.py
+   localagentbrowser
    ```
 
-   Or install it as a command with `pip install .` and run `localagentbrowser`. When it finishes, read
-   `research_report.md`. Press Ctrl+C at any time to stop; the report is still written with everything found
-   so far.
+   When it finishes, read `research_report.md` in the folder you ran it from. Press Ctrl+C at any time to
+   stop; the report is still written with everything found so far.
+
+To work on the code instead, clone the repository and install from it:
+
+```bash
+git clone https://github.com/SnowFXXX/LocalAgentBrowser.git
+cd LocalAgentBrowser
+pip install -r requirements.txt
+python -m playwright install chromium
+python agent_browser.py
+```
 
 ## What a run looks like
 
@@ -125,7 +126,7 @@ separate step. The `research_report.md` it produced:
 ### Results on different kinds of tasks
 
 Live runs on the development machine (CPU only, Qwen2.5-7B). Each kind of task is used to find and fix what
-does not generalise; the [changelog](CHANGELOG.md) has the details.
+does not generalise; the [changelog](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/CHANGELOG.md) has the details.
 
 | Kind of task | Objective (abridged) | Version | Outcome |
 |---|---|---|---|
@@ -270,7 +271,7 @@ turn that brings in a new page takes a few minutes. See [Performance](#performan
   itself; it moves on to other sources.
 - **Reading only.** The agent searches, opens pages and reads them. It does not click, fill in forms or sign in.
 - **Web pages go into the prompt.** A page can contain text written to manipulate the model (prompt
-  injection), so treat findings as unverified. See [SECURITY.md](SECURITY.md).
+  injection), so treat findings as unverified. See [SECURITY.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/SECURITY.md).
 - **One search provider.** DuckDuckGo's HTML search occasionally returns an error page; the agent retries once.
 
 ## Roadmap
@@ -306,12 +307,12 @@ python tools/live_test.py "Your objective here" --minutes 25
 
 ## Contributing
 
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and guidelines, and please follow
-the [Code of Conduct](CODE_OF_CONDUCT.md). Security issues: see [SECURITY.md](SECURITY.md).
+Contributions are welcome! See [CONTRIBUTING.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/CONTRIBUTING.md) for setup and guidelines, and please follow
+the [Code of Conduct](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/CODE_OF_CONDUCT.md). Security issues: see [SECURITY.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/SECURITY.md).
 
 ## Project history
 
-Every version is a tagged commit, and [CHANGELOG.md](CHANGELOG.md) describes what changed in each one and
+Every version is a tagged commit, and [CHANGELOG.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/CHANGELOG.md) describes what changed in each one and
 why, with the measurements behind the decisions.
 
 ## Acknowledgements
@@ -322,4 +323,4 @@ working in Claude Code; those commits list Claude as co-author. Built on [LM Stu
 
 ## License
 
-[MIT](LICENSE) © 2026 SnowFX
+[MIT](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/LICENSE) © 2026 SnowFX

@@ -4,6 +4,16 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.41] - 2026-10-15
+### Added
+- Published on PyPI: `pip install localagentbrowser`, then `python -m playwright install chromium` and run
+  `localagentbrowser`. A GitHub Actions workflow builds and publishes the package whenever a release is
+  published, using PyPI trusted publishing (no API token is stored).
+- The source package includes the tests and this changelog.
+### Changed
+- The README's quick start installs from PyPI, and its links and image use full URLs so they also work on
+  the PyPI project page.
+
 ## [1.40] - 2026-10-15
 ### Changed
 - Repeating a search that was already done is refused as before; from the second attempt the refusal says the
