@@ -4,6 +4,14 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.46] - 2026-10-16
+### Fixed
+- The rerun of the factual question on 1.45 had another accurate discovery sent back ("Mount Kilimanjaro is
+  the tallest mountain in Africa and its elevation is 5,895 meters", where the page says "5,895 m"); the
+  rewrite dropped the height in feet. Short discoveries have only about 15 word pairs, so a few connecting
+  words decide their score. The page-match check now skips discoveries under 20 word pairs; the invented
+  steps and care routines it is meant for had 27 to 75.
+
 ## [1.45] - 2026-10-16
 ### Fixed
 - The page-match check sent back an accurate discovery on the factual question, "Mount Kilimanjaro is the

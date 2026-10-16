@@ -292,18 +292,22 @@ def test_recorded_parts_are_remembered_across_visits(monkeypatch):
 
 def test_a_different_ungrounded_discover_is_checked_again():
     page = TestGroundingCheck().page()
-    first = "1. Gently remove the plant from its pot. 2. Loosen any tangled roots and trim dead ones before you start."
-    second = "During the first two weeks water your plant sparingly and avoid fertilizing it until it settles in."
+    first = ("1. Gently remove the plant from its pot. 2. Loosen any tangled roots and trim dead ones before you "
+             "start. 3. Place fresh potting mix in the bottom of the new pot.")
+    second = ("During the first two weeks water your plant sparingly and avoid fertilizing it until it settles in. "
+              "Keep it out of direct sun and check the soil every few days.")
     assert decide("DISCOVER", first, page, GUIDE)[0] == "CONFIRM_GROUNDED"
     assert decide("DISCOVER", second, page, GUIDE)[0] == "CONFIRM_GROUNDED"
     assert decide("DISCOVER", second, page, GUIDE) is None, "repeating the same one goes through"
 
 
 def test_the_objectives_wording_counts_as_grounded():
-    page = unrecorded_page(DOCS, parts=("Kilimanjaro is the highest mountain in Africa. Elevation 5,895 m (19,341 ft)",))
-    finding = "Kilimanjaro is the tallest mountain in Africa at 5,895 m (19,341 ft) above sea level."
+    page = unrecorded_page(DOCS, parts=("Kilimanjaro is a dormant volcano in Tanzania and the highest mountain in "
+                                        "Africa, at 5,895 m (19,341 ft) above sea level and 4,900 m above its base.",))
+    finding = ("The tallest mountain in Africa is Kilimanjaro, a dormant volcano in Tanzania. How tall is it in "
+               "meters and in feet: 5,895 m (19,341 ft) above sea level.")
     tried = {"queries": [], "urls": []}
     assert ab.check_decision("DISCOVER", finding, [], tried, page, DOCS)[0] == "CONFIRM_GROUNDED"
     page["grounding_asked"] = []
-    tried["objective"] = "What is the tallest mountain in Africa and how tall is it above sea level?"
+    tried["objective"] = "What is the tallest mountain in Africa, and how tall is it in meters and in feet?"
     assert ab.check_decision("DISCOVER", finding, [], tried, page, DOCS) is None
