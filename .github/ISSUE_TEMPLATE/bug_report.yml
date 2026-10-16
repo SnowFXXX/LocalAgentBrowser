@@ -23,14 +23,14 @@ body:
     id: output
     attributes:
       label: Console output or research log excerpt
-      description: The relevant part of the console output or research_log.txt.
+      description: The relevant part of the console output, research_report.md or research_log.txt.
       render: text
   - type: input
     id: version
     attributes:
       label: Agent version
       description: From CHANGELOG.md, or the commit you are on.
-      placeholder: "1.28"
+      placeholder: "1.40"
     validations:
       required: true
   - type: input

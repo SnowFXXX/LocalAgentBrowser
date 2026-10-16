@@ -19,5 +19,5 @@ Only the latest version is supported with fixes.
   model runs on your own LM Studio server.
 - **Keep LM Studio's server local.** The agent talks to the address in `LMSTUDIO_BASE_URL` (by default
   `localhost`). If you expose LM Studio on a network, protect it as you would any other service.
-- **The research log is plain text.** `research_log.txt` contains your objective and everything the agent
-  found. It stays on your machine; it is excluded from git by `.gitignore`.
+- **The log and report are plain text.** `research_log.txt` and `research_report.md` contain your objective
+  and everything the agent found. They stay on your machine and are excluded from git by `.gitignore`.
