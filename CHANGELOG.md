@@ -4,6 +4,25 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.49] - 2026-10-16
+A documentation task on 1.48 (create a Python virtual environment with venv, activate it on Windows and on
+macOS or Linux, and install packages) garbled commands in two places.
+### Fixed
+- Recording the Windows command `python -m venv C:\path\to\new\virtual\environment`, the model wrote single
+  backslashes in its JSON reply: `\t`, `\n` and `\r` became a tab, a newline and a carriage return, and since
+  the response format does not allow `\v`, the model turned `\virtual\environment` into `\real\name`. The
+  system prompt now asks for every backslash to be written twice, and a tab, carriage return, backspace or
+  form feed right before a letter is turned back into its backslash sequence when the text also has a
+  backslash or a drive letter (page tables keep their real tabs).
+- The final result turned the recorded `.\venv\Scripts\activate` and `source venv/bin/activate` into
+  `.venv\Scripts\activate` and `source .venv/bin/activate`, which do not match the `python -m venv venv` it
+  gave first. Rule 1 of the final result now says to copy commands, code, file paths and names exactly.
+  Replaying that step three times on 1.48 changed the commands twice; with the rule, all three were exact.
+
+Rerun with the backslash changes: FINISH on turn 6 (15.1 minutes of model time) with the create, activate
+and install commands, the Windows path intact. It used a tutorial site rather than the official
+documentation the objective named; checking conditions like that is still a weakness.
+
 ## [1.48] - 2026-10-16
 An opinion task on 1.47 (how at least three cultures or religions have viewed owls, then an opinion on why
 they attract such different meanings) showed three problems.

@@ -92,7 +92,7 @@ Strictly follow these rules:
 2. Never repeat a search query, and never NAVIGATE to the page you are already on. You may return to a previously visited URL when it still has information you need, at most 3 visits per URL. These limits are enforced automatically.
 3. Prefer primary, authoritative sources over copies and summaries of them.
 4. Gather only what the objective asks for. As soon as your discoveries cover every part of it, FINISH; do not keep reading for extra or merely interesting details.
-5. Output ONLY raw JSON. No markdown wrappers, no backticks, no conversational filler."""
+5. Output ONLY raw JSON. No markdown wrappers, no backticks, no conversational filler. Inside JSON strings, write every backslash twice (a Windows path C:\\Users\\me is written "C:\\\\Users\\\\me")."""
 
 RESPONSE_FORMAT = {
     "type": "json_schema",
@@ -826,6 +826,19 @@ Active URL: {current_url if current_url else "None (Loop Initializing)"}
         {"role": "user", "content": user_payload}
     ]
 
+PATH_ESCAPES = {"\t": "\\t", "\r": "\\r", "\b": "\\b", "\f": "\\f"}
+
+def restore_path_escapes(text):
+    """Undoes JSON escapes the model did not mean: recording the Windows command "python -m venv
+    C:\\path\\to\\new\\virtual\\environment", it wrote single backslashes, and its \\t, \\n and \\r became a tab, a
+    newline and a carriage return. A tab, carriage return, backspace or form feed right before a letter is
+    treated as such a path; a newline is only restored where it sits between word characters (as in "to\\new").
+    Only text that also has a backslash or a drive letter is touched: page tables are read with real tabs."""
+    if not re.search(r"[\t\r\b\f][A-Za-z]", text) or not re.search(r"\\|\b[A-Za-z]:[\\\"\t\r\b\f\n]", text):
+        return text
+    text = re.sub(r"(?<=\w)\n(?=[a-z])", r"\\n", text)
+    return re.sub(r"[\t\r\b\f](?=[A-Za-z])", lambda m: PATH_ESCAPES[m.group()], text)
+
 async def request_decision(client, messages, journal, tried, page_state, current_url):
     # Cheap retries: a reply that is invalid or would be refused is answered with a short correction
     # appended to the same conversation. Everything before the correction is identical to what LM Studio
@@ -851,6 +864,9 @@ async def request_decision(client, messages, journal, tried, page_state, current
             action_decision = json.loads(raw_content)
             if not isinstance(action_decision, dict):
                 raise ValueError("the reply was JSON but not an object")
+            for key in ("parameter", "thought_process"):
+                if isinstance(action_decision.get(key), str):
+                    action_decision[key] = restore_path_escapes(action_decision[key])
         except (json.JSONDecodeError, ValueError) as parse_err:
             json_failures += 1
             print(f"⚠️ Model returned invalid JSON (attempt {json_failures}/{MAX_JSON_RETRIES}): {raw_content[:200]}")
@@ -946,7 +962,8 @@ async def compose_final_result(client, objective, journal):
                "the question, write the summary or the plan, or give the opinion). Rules:\n"
                "1. Use only the information in the DISCOVERIES. Do not fill gaps from your own knowledge or with "
                "guesses: no amounts, numbers, steps or advice that the discoveries do not contain. Where a detail the "
-               "objective asks for is missing, say that it was not found.\n"
+               "objective asks for is missing, say that it was not found. Copy commands, code, file paths and "
+               "names exactly as the discoveries give them.\n"
                "2. A discovery about one source's own situation (for example a company's workload in a case study) "
                "describes that situation, not the one in the OBJECTIVE: say whose situation it is, and do not assume "
                "details of the OBJECTIVE's situation that it does not state.\n"

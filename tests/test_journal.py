@@ -56,3 +56,13 @@ def test_old_entries_are_dropped_in_batches():
 def test_unverified_numbers_ignores_grouped_citations():
     found = [{"extracted_data": "LibreOffice offers good compatibility."}]
     assert ab.unverified_numbers("LibreOffice has good compatibility [4, 5] and more [2;3] [1-4].", found) == []
+
+
+def test_restore_path_escapes():
+    # What json.loads makes of "C:\path\to\new\real" written with single backslashes
+    mangled = "python -m venv C:\\path" + "\t" + "o" + "\n" + "ew" + "\r" + "eal"
+    assert ab.restore_path_escapes(mangled) == r"python -m venv C:\path\to\new\real"
+    assert ab.restore_path_escapes("First line.\nSecond line.") == "First line.\nSecond line.", "real newlines stay"
+    row = "Medium plants\t4-5 inches\tChoose a pot just 1-2 inches wider"
+    assert ab.restore_path_escapes(row) == row, "tabs from a page table stay"
+    assert ab.restore_path_escapes("C:" + "\t" + "emp") == r"C:\temp"
