@@ -297,3 +297,13 @@ def test_a_different_ungrounded_discover_is_checked_again():
     assert decide("DISCOVER", first, page, GUIDE)[0] == "CONFIRM_GROUNDED"
     assert decide("DISCOVER", second, page, GUIDE)[0] == "CONFIRM_GROUNDED"
     assert decide("DISCOVER", second, page, GUIDE) is None, "repeating the same one goes through"
+
+
+def test_the_objectives_wording_counts_as_grounded():
+    page = unrecorded_page(DOCS, parts=("Kilimanjaro is the highest mountain in Africa. Elevation 5,895 m (19,341 ft)",))
+    finding = "Kilimanjaro is the tallest mountain in Africa at 5,895 m (19,341 ft) above sea level."
+    tried = {"queries": [], "urls": []}
+    assert ab.check_decision("DISCOVER", finding, [], tried, page, DOCS)[0] == "CONFIRM_GROUNDED"
+    page["grounding_asked"] = []
+    tried["objective"] = "What is the tallest mountain in Africa and how tall is it above sea level?"
+    assert ab.check_decision("DISCOVER", finding, [], tried, page, DOCS) is None

@@ -4,6 +4,15 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.45] - 2026-10-16
+### Fixed
+- The page-match check sent back an accurate discovery on the factual question, "Mount Kilimanjaro is the
+  tallest mountain in Africa and its height is 5,895 m (19,341 ft)", which echoed the question's "tallest"
+  where the page says "highest" (65% of word pairs matched). The model then recorded the parts separately,
+  and the run took 6 turns and 17.5 minutes of model time instead of 4 and 11.8 on 1.40. The objective's
+  own wording now counts as matched: that discovery scores 76%, while the invented repotting steps and care
+  routines still score 28-57%.
+
 ## [1.44] - 2026-10-16
 On a how-to (repotting a houseplant: what you need, the steps and care for the first two weeks), 1.43 was
 shown part 2 of a guide that ended "Just follow these 6 easy steps", and recorded six steps it wrote itself;

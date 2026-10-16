@@ -407,7 +407,7 @@ def grounded_share(text, parts):
     mine = word_pairs(str(text).lower())
     return len(mine & word_pairs(" ".join(parts).lower())) / len(mine) if mine else 1.0
 
-def grounding_check(parameter, page_state, current_url):
+def grounding_check(parameter, page_state, current_url, objective=""):
     # Shown part 2 of a guide, which ended "Just follow these 6 easy steps", the model recorded six steps it
     # wrote itself (the real ones were in part 3), then a care routine the page never gave. Real discoveries
     # from earlier runs shared 64-100% of their word pairs with the page; these shared 11-44%, and a rerun's
@@ -418,7 +418,9 @@ def grounding_check(parameter, page_state, current_url):
         return None
     if len(word_pairs(parameter)) < MIN_GROUNDING_PAIRS:
         return None
-    shown = [parts[i] for i in sorted(page_state.get("seen_parts", {0})) if i < len(parts)]
+    # The objective's wording counts as well: "Mount Kilimanjaro is the tallest mountain in Africa..." echoed the
+    # question's "tallest" where the page says "highest", and was sent back although it was accurate
+    shown = [parts[i] for i in sorted(page_state.get("seen_parts", {0})) if i < len(parts)] + [objective]
     if grounded_share(parameter, shown) >= GROUNDED_PAIR_SHARE:
         return None
     # Only repeating the same DISCOVER confirms it: asked again, the model once sent a different text that was
@@ -594,7 +596,7 @@ def check_decision(action, parameter, journal, tried, page_state, current_url, t
             # right after this refusal, and it repeated the duplicate until the turn was lost
             page_state.setdefault("read_on_confirmed", set()).add(page_state.get("index", 0))
             return "DUPLICATE_DISCOVER", "Everything in that DISCOVER is already recorded in DISCOVERIES SO FAR."
-        return grounding_check(parameter, page_state, current_url)
+        return grounding_check(parameter, page_state, current_url, tried.get("objective", ""))
     elif action == "FINISH":
         return finish_check(tried, journal, page_state, current_url) or gap_check(thought, tried)
     else:
@@ -989,7 +991,7 @@ async def main():
     current_url = None
     turn_counter = 1
     max_turns = 100
-    tried = {"queries": [], "urls": []}
+    tried = {"queries": [], "urls": [], "objective": objective}
     page_state = {"url": None, "parts": [], "index": 0}
     conversation = new_conversation()
     loop_msg = None
