@@ -54,6 +54,24 @@ six lessons from 30 versions of keeping a small local model on track.
    localagentbrowser
    ```
 
+   It asks for the objective, opens a Chromium window and starts its first turn:
+
+   ```text
+   🤖 ==================================================== 🤖
+   🚀 Initializing Autonomous Discovery Agent Setup...
+   🎯 Define the Agent's High-Level Objective: What is the tallest mountain in Africa, and how tall is it in meters and in feet?
+
+   🧠 [TURN 1/100] Active reasoning cycle executing...
+   🔍 Scraping and preparing current environment text layout...
+   💡 Agent Thoughts: I need to find out the tallest mountain in Africa and its height in meters and feet.
+      I should start by searching for this information.
+   🎬 Chosen Action: [SEARCH] -> Parameter: tallest mountain in Africa
+   🌐 Driving Playwright to cross-domain target: https://html.duckduckgo.com/html/?q=tallest+mountain+in+Africa
+   ```
+
+   Each turn takes from under a minute to a few minutes on a CPU (see [Performance](#performance)); the
+   [example run](#what-a-run-looks-like) below shows how it continues.
+
    When it finishes, read `research_report.md` in the folder you ran it from. Press Ctrl+C at any time to
    stop; the report is still written with everything found so far.
 
