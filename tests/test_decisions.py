@@ -132,7 +132,7 @@ class TestReadOnCheck:
         page = unrecorded_page(DOCS)
         first = decide("READ_MORE", "", page, DOCS)
         assert first[0] == "CONFIRM_READ_ON" and "recorded nothing from part 1" in first[1]
-        assert "write 'none'" in first[1]
+        assert "write 'none'" in first[1] and "choose FINISH instead of reading on" in first[1]
         assert decide("READ_MORE", "", page, DOCS) is None, "repeating it goes through"
 
     def test_no_check_after_recording_from_the_shown_part(self):
@@ -311,3 +311,14 @@ def test_the_objectives_wording_counts_as_grounded():
     page["grounding_asked"] = []
     tried["objective"] = "What is the tallest mountain in Africa, and how tall is it in meters and in feet?"
     assert ab.check_decision("DISCOVER", finding, [], tried, page, DOCS) is None
+
+
+def test_an_invented_sentence_behind_copied_ones_is_confirmed():
+    page = unrecorded_page(GUIDE, parts=(
+        "Owls have played a crucial role in Native American cultures since time immemorial, with sightings often "
+        "associated with shapeshifters, spiritual messages and supernatural signs. In Christianity owls are mentioned "
+        "in several places.",))
+    finding = ("Owls have played a crucial role in Native American cultures since time immemorial, with sightings often "
+               "associated with shapeshifters, spiritual messages and supernatural signs. In Christianity, owls symbolize "
+               "wisdom and are often depicted alongside other wise figures like the prophet Samuel.")
+    assert decide("DISCOVER", finding, page, GUIDE)[0] == "CONFIRM_GROUNDED"

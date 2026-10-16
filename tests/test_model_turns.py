@@ -99,6 +99,18 @@ class TestComposeFinalResult:
         client, _ = fake_client([reply("FINISH", "My view: supported by [1].")])
         assert asyncio.run(ab.compose_final_result(client, "objective", discoveries("x"))) == "My view: supported by [1]."
 
+    def test_adds_a_missing_view_when_the_objective_asks_for_one(self):
+        client, model = fake_client(["Owls mean wisdom in Greece [1].", "Their night habits invite mystery."])
+        text = asyncio.run(ab.compose_final_result(client, "Find views on owls, then give your own opinion.",
+                                                   discoveries("Greece: wisdom")))
+        assert text == "Owls mean wisdom in Greece [1].\n\nMy view: Their night habits invite mystery."
+        assert "does not give it yet" in model.calls[1][-1]["content"]
+
+    def test_no_extra_call_when_no_view_is_asked_for(self):
+        client, model = fake_client(["Three items [1]."])
+        asyncio.run(ab.compose_final_result(client, "Name three items.", discoveries("x")))
+        assert len(model.calls) == 1
+
 
 class TestConversation:
     def test_turns_continue_one_conversation(self, scrapes):

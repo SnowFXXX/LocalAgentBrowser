@@ -55,4 +55,4 @@ def test_old_entries_are_dropped_in_batches():
 
 def test_unverified_numbers_ignores_grouped_citations():
     found = [{"extracted_data": "LibreOffice offers good compatibility."}]
-    assert ab.unverified_numbers("LibreOffice has good compatibility [4, 5] and more [2;3].", found) == []
+    assert ab.unverified_numbers("LibreOffice has good compatibility [4, 5] and more [2;3] [1-4].", found) == []

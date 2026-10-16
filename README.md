@@ -24,7 +24,7 @@ and tuned to work well with a **small 7B model on a CPU, no GPU required**.
 - ⚡ **Built for slow hardware.** It reuses LM Studio's prompt cache, so most turns process only what changed.
 - 📝 **A readable report every time.** `research_report.md` holds the final result and every finding with its
   source, written however the run ends; `research_log.txt` keeps every action and reason.
-- ✅ **Tested.** 107 tests on Linux and Windows, Python 3.10–3.13, run in about a second with no model or browser,
+- ✅ **Tested.** 110 tests on Linux and Windows, Python 3.10–3.13, run in about a second with no model or browser,
   plus live runs on seven different kinds of task (see [results](#results-on-different-kinds-of-tasks)).
 
 📖 **The story behind it:** [Teaching a 7B model on a CPU to finish what it starts](https://dev.to/snowfxxx/teaching-a-7b-model-on-a-cpu-to-finish-what-it-starts-1amc),
@@ -154,6 +154,7 @@ does not generalise; the [changelog](https://github.com/SnowFXXX/LocalAgentBrows
 | Documentation research | Setup commands and file layout for Playwright's test agents | 1.27 | Finished on its own in 13 turns (~36 min) with commands, roles and file layout |
 | Documentation research, strict | The same, but "do not FINISH until fully validated", including "parameter schemas" | 1.38–1.40 | Its most detailed findings (per-client setup, seed test, agent definition files), but it keeps searching for schemas the docs do not contain and has not finished within an hour |
 | Opinion from several sources | How spiritual traditions view cats, then form an opinion | 1.30 | Six traditions from two sources and a stated opinion, in 18 turns (37 min of model time) |
+| Opinion from several sources | How at least three cultures or religions have viewed owls, then an opinion on why | 1.47–1.48 | Greek, English and many Native American views from one detailed source in 11 turns (38 min); 1.48 adds the opinion the result had left out and catches an invented sentence in a discovery |
 | Factual question | Tallest mountain in Africa, height in meters and feet | 1.35, 1.40, 1.46 | Correct, cited answer in 4 turns (about 12 min of model time) in all three versions; before 1.35 it kept reading after finding it |
 | Comparison and recommendation | Python vs Rust for command-line tools; recommend one for a beginner. Later: SQLite vs PostgreSQL for a small web app, then a recommendation for a hobby project | 1.36, 1.42 | Python vs Rust: cited comparison recommending Python in 16 turns (33 min), Rust's libraries not covered. SQLite vs PostgreSQL: all three parts covered and cited, with a recommendation, in 13 turns (38 min) |
 | List of items | Three free, open-source Photoshop alternatives and the strengths of each | 1.37–1.38 | GIMP, Krita and Darktable with their strengths, all cited, in 9 turns (24 min); 1.37 listed a fourth and added an unrequested opinion, which 1.38 fixes |
@@ -197,7 +198,7 @@ flowchart LR
   check: record something, or repeat the action to leave. Moving on to the next part of a page works the same
   way, and the model must first list what the part it is on says about the objective (or "none").
 - **Findings must match the page.** A finding that shares too few word pairs with the page text shown so far
-  is sent back once, asking for only what the page says in its own words: a small model will otherwise
+  (or has a sentence that does) is sent back once, asking for only what the page says in its own words: a small model will otherwise
   "complete" a list from its own knowledge when a page says "follow these 6 steps" and the steps come later.
 - **Numbered findings.** Findings are numbered in the prompt and listed with every check, and the model names
   the finding that covers each part of the objective ("covered by [2]") instead of just saying "covered".

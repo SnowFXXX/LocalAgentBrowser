@@ -4,6 +4,27 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.48] - 2026-10-16
+An opinion task on 1.47 (how at least three cultures or religions have viewed owls, then an opinion on why
+they attract such different meanings) showed three problems.
+### Fixed
+- A discovery copied two sentences from the page and added a third the page never said ("...depicted
+  alongside other wise figures like the prophet Samuel"); copied text lifted the whole discovery to 75%, past
+  the page-match check. Each sentence of 8 or more word pairs is now also scored, and one below 35% gets the
+  same cheap retry. Measured on the earlier runs' real discoveries, sentences scored 40-100%; invented ones
+  0-41%.
+- With three cultures recorded where three were asked for, the read-on check pushed the agent to keep
+  collecting. It now also says to choose FINISH if the discoveries already cover every part of the objective.
+- The final result listed many traditions but gave no opinion, although the objective asked for one. When the
+  objective asks for an opinion, view or recommendation and the result has no "My view:" paragraph, a short
+  second call writes only that paragraph from the result.
+- The report's number check treated citation ranges like "[1-4]" as numbers.
+
+Rerun with the sentence and finish changes: FINISH on turn 11 (37.9 minutes of model time) with the views of
+Greek, English and many Native American peoples from a detailed source, all discoveries matching the page. Its
+three page-match checks were condensed summaries of real sentences; the model repeated each and it went
+through, at 37-61 s per check. Replaying the final-result step on that run added a "My view:" paragraph.
+
 ## [1.47] - 2026-10-16
 A list task on 1.46 (three free, open-source alternatives to Microsoft Office and what each is best at)
 finished on its own in 18 turns and 49 minutes of model time. LibreOffice and OnlyOffice were right, but the

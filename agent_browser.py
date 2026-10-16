@@ -49,9 +49,13 @@ MAX_DISCOVERY_PROMPT_CHARS = 250  # Discoveries are shortened to this in fresh p
 MAX_CHECK_DISCOVERY_CHARS = 150   # Shorter still in the numbered list that comes with the finish and progress checks
 GROUNDED_PAIR_SHARE = 0.7  # A DISCOVER sharing fewer of its word pairs with the page text shown is confirmed first
 MIN_GROUNDING_PAIRS = 20   # Shorter discoveries are not checked: a few connecting words sink their score
+GROUNDED_SENTENCE_SHARE = 0.35  # Any one sentence matching the page text shown less than this is confirmed too
+MIN_SENTENCE_PAIRS = 8     # Shorter sentences are not scored on their own
 TURN_PAUSE_SECONDS = 1
 STALL_TURNS = 4          # Turns without a new discovery before the model is asked to check its progress
 COMPOSE_MAX_TOKENS = 900  # Length limit for the separately written final result
+VIEW_MAX_TOKENS = 250     # Length limit for a 'My view:' paragraph added when the result left it out
+OPINION_REQUEST = re.compile(r"\b(opinion|your (own )?view|recommend\w*|what do you think)\b", re.I)
 OBJECTIVE_CHECK_EVERY = 8 # Turns between scheduled objective checks, which happen even while discoveries continue
 READ_FIRST = ("First, if the CURRENT ENVIRONMENT (or an unread part of this page, via READ_MORE) contains information "
               "relevant to the objective that is not yet in DISCOVERIES SO FAR, DISCOVER it now.")
@@ -416,12 +420,15 @@ def grounding_check(parameter, page_state, current_url, objective=""):
     parts = page_state.get("parts") or []
     if not (current_url and page_state.get("url") == normalize_url(current_url) and parts):
         return None
-    if len(word_pairs(parameter)) < MIN_GROUNDING_PAIRS:
-        return None
     # The objective's wording counts as well: "Mount Kilimanjaro is the tallest mountain in Africa..." echoed the
     # question's "tallest" where the page says "highest", and was sent back although it was accurate
     shown = [parts[i] for i in sorted(page_state.get("seen_parts", {0})) if i < len(parts)] + [objective]
-    if grounded_share(parameter, shown) >= GROUNDED_PAIR_SHARE:
+    whole_ok = len(word_pairs(parameter)) < MIN_GROUNDING_PAIRS or grounded_share(parameter, shown) >= GROUNDED_PAIR_SHARE
+    # An invented sentence can hide behind copied ones: an opinion task's discovery was 75% copied, but its last
+    # sentence ("...depicted alongside other wise figures like the prophet Samuel") was not on the page (31%).
+    # Real sentences scored 40-100% against their page, invented ones 0-41%.
+    sentences = [s for s in re.split(r"(?<=[.!?])\s+|\n+", parameter) if len(word_pairs(s)) >= MIN_SENTENCE_PAIRS]
+    if whole_ok and all(grounded_share(s, shown) >= GROUNDED_SENTENCE_SHARE for s in sentences):
         return None
     # Only repeating the same DISCOVER confirms it: asked again, the model once sent a different text that was
     # still invented ("water sparingly", which the page never said), and a per-part pass let it through
@@ -431,7 +438,7 @@ def grounding_check(parameter, page_state, current_url, objective=""):
         return None
     asked.append(mine)
     # Pointed to READ_MORE as well, the model left a part holding the real materials list and steps unrecorded
-    return "CONFIRM_GROUNDED", (f"Much of that DISCOVER does not match the page text you have been shown, so part of it "
+    return "CONFIRM_GROUNDED", (f"Some of that DISCOVER does not match the page text you have been shown, so part of it "
                                 "seems to come from your own knowledge. DISCOVER again with only what the page actually "
                                 f"says in part {page_state['index'] + 1} (shown now) or the parts before it, using the "
                                 "page's own wording, for example its lists and steps. Do not add steps, amounts or "
@@ -505,7 +512,8 @@ def read_on_check(page_state, current_url, target):
     # asking it to DISCOVER relevant information first: on an explanation task it read four parts of a page that
     # had the inputs, outputs and cell locations it needed and recorded them only when a progress check fired.
     # Moving on from a part nothing was recorded from gets one cheap retry that makes the model name what the
-    # part says about the objective; repeating the READ_MORE then goes through.
+    # part says about the objective; repeating the READ_MORE then goes through. It also offers FINISH: with three
+    # cultures recorded where three were asked for, the check pushed an opinion task to keep collecting more.
     index = page_state["index"]
     # Only moving forward counts: going back to an earlier part is covered by the re-read check
     if target <= index or index in page_state.get("recorded_parts", set()):
@@ -517,7 +525,8 @@ def read_on_check(page_state, current_url, target):
     return "CONFIRM_READ_ON", (f"Before reading on: you have recorded nothing from part {index + 1}, which is shown now. "
                                "In thought_process, list each fact in it that serves the OBJECTIVE, or write 'none'. If any "
                                "of them are not in DISCOVERIES SO FAR, DISCOVER them now. If there are none, repeat your "
-                               "READ_MORE.")
+                               "READ_MORE. But if DISCOVERIES SO FAR already cover every part of the OBJECTIVE, choose "
+                               "FINISH instead of reading on.")
 
 def gap_check(thought, tried):
     # The model is asked to write 'not covered' for missing parts; on a comparison it wrote "Available Libraries:
@@ -883,7 +892,7 @@ def unverified_numbers(text, discoveries):
     A small model writing a how-to filled a gap with an invented quantity ("45 grams of lukewarm water (about
     1/4 cup)"); numbers are where such errors do the most harm and the easiest place to check them.
     """
-    text = re.sub(r"\[\d+(?:\s*[,;]\s*\d+)*\]", " ", str(text))  # Citation markers like [2] or [4, 5]
+    text = re.sub(r"\[\d+(?:\s*[-–,;]\s*\d+)*\]", " ", str(text))  # Citation markers: [2], [4, 5], [1-4]
     text = re.sub(r"(?m)^\s*\d+[.)]\s", " ", text)      # Numbered list items
     known = {n.replace(",", "") for e in discoveries for n in NUMBER_PATTERN.findall(e["extracted_data"])}
     unverified = []
@@ -959,7 +968,21 @@ async def compose_final_result(client, objective, journal):
             text = str(reply.get("parameter") or reply.get("thought_process") or text)
         except (json.JSONDecodeError, AttributeError):
             pass
-    return text.strip()
+    text = text.strip()
+    # Asked to "give your own opinion" about owls, the result listed the traditions and ended without one,
+    # although rule 6 asks for a 'My view:' paragraph whenever the objective wants a view. A short second call
+    # writes only that paragraph, from the result just written
+    if OPINION_REQUEST.search(objective) and "my view:" not in text.lower():
+        view = await client.chat.completions.create(model=MODEL, temperature=0.3, max_tokens=VIEW_MAX_TOKENS, messages=[
+            {"role": "system", "content": COMPOSE_SYSTEM},
+            {"role": "user", "content": f"### OBJECTIVE\n{objective}\n\n### RESULT\n{text}\n\nThe OBJECTIVE asks for your "
+                                        "own view, opinion or recommendation, and the RESULT does not give it yet. Write "
+                                        "only that, as one short paragraph that starts with 'My view:', based on the "
+                                        "RESULT. Plain text."}])
+        paragraph = extract_message_content(view).strip()
+        if paragraph:
+            text += "\n\n" + (paragraph if paragraph.lower().startswith("my view:") else f"My view: {paragraph}")
+    return text
 
 async def load_page(page, url=None):
     """Loads a URL (or reloads the page) and returns Playwright's response, which may be None."""
