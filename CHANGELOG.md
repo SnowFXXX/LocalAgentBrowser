@@ -4,6 +4,26 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.44] - 2026-10-16
+On a how-to (repotting a houseplant: what you need, the steps and care for the first two weeks), 1.43 was
+shown part 2 of a guide that ended "Just follow these 6 easy steps", and recorded six steps it wrote itself;
+the real ones were in part 3. It then recorded a care routine the page never gave.
+### Added
+- Page-match check: a DISCOVER is compared with the page text shown so far (consecutive word pairs). Real
+  discoveries from earlier runs shared 64-100% of their word pairs with their page; the invented steps
+  shared 11-44%, and a rerun's mix of real pot-size advice and invented steps 57%. Below 70%, the DISCOVER
+  gets one cheap retry asking for only what the page says in the parts shown, in its own wording. Repeating
+  the same DISCOVER goes through (a heavy paraphrase can score low); a different one is checked again.
+### Changed
+- The "page continues" line under a part says that what comes next has not been shown yet.
+- The read-on check remembers parts recorded on an earlier visit to the same page.
+
+Rerun on the same objective: at the point where 1.43 invented the steps, the agent recorded only what the
+page said and read on; its discoveries hold the guide's real materials list, steps and aftercare, copied
+from the page. It finished on its own on turn 24 (67.5 minutes of model time). The final result still has
+flaws: it leaves out the step of putting the plant in the new pot, keeps one invented line ("water
+sparingly") from a discovery made before the check was tightened mid-run, and adds an uncited line.
+
 ## [1.43] - 2026-10-16
 A comparison on 1.42 (SQLite or PostgreSQL for a small web application, then a recommendation for a hobby
 project) finished on its own in 13 turns and 38 minutes of model time, with all three parts covered and

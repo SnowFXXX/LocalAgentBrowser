@@ -47,6 +47,8 @@ MAX_FOLLOWUPS = 12       # Turns that continue one conversation before a fresh f
 MAX_CONVERSATION_TOKENS = int(CONTEXT_LENGTH * 0.75)  # Start fresh with room left for the next page and the reply
 MAX_DISCOVERY_PROMPT_CHARS = 250  # Discoveries are shortened to this in fresh prompts; the log keeps the full text
 MAX_CHECK_DISCOVERY_CHARS = 150   # Shorter still in the numbered list that comes with the finish and progress checks
+GROUNDED_PAIR_SHARE = 0.7  # A DISCOVER sharing fewer of its word pairs with the page text shown is confirmed first
+MIN_GROUNDING_PAIRS = 8    # Shorter discoveries are not checked: too few word pairs to judge
 TURN_PAUSE_SECONDS = 1
 STALL_TURNS = 4          # Turns without a new discovery before the model is asked to check its progress
 COMPOSE_MAX_TOKENS = 900  # Length limit for the separately written final result
@@ -351,7 +353,10 @@ async def build_environment(page, current_url, page_state, visited_urls=frozense
             parts, outline = await extract_page_parts(page)
             page_state.update(url=normalize_url(current_url), parts=parts, outline=outline, index=0,
                               seen_parts={0}, visit_discoveries=0, leave_confirmed=False, reread_confirmed=set(),
-                              recorded_parts=set(), read_on_confirmed=set())
+                              read_on_confirmed=set(), grounding_asked=[],
+                              # Kept per URL: on a return visit the read-on check asked about a part already recorded
+                              recorded_parts=page_state.setdefault("recorded_by_url", {}).setdefault(
+                                  normalize_url(current_url), set()))
         link_lines = await extract_page_links(page, shown_links)
         return f"{render_part(page_state, with_outline=True)}\n\nLinks On Page:\n{link_lines or '[None]'}"
     except Exception as e:
@@ -362,7 +367,9 @@ def render_part(page_state, with_outline=False):
     if not parts:
         return "Page Text:\n[No readable text]"
     if index < len(parts) - 1:
-        footer = f"[Page continues: READ_MORE shows part {index + 2} of {len(parts)}]"
+        # A part ending "Just follow these 6 easy steps" led the model to write the steps itself
+        footer = (f"[Page continues: READ_MORE shows part {index + 2} of {len(parts)}. "
+                  "What comes next on the page has not been shown to you yet.]")
     else:
         footer = "[End of page]"
     text = f"Page Text (part {index + 1} of {len(parts)}):\n{parts[index]}\n{footer}"
@@ -394,6 +401,40 @@ def discovery_lines(text):
     # Case, spacing and quote style (curly, straight, single, double) do not make a line new
     text = unicodedata.normalize("NFKC", str(text)).translate(QUOTE_STYLES)
     return {" ".join(line.lower().split()) for line in text.splitlines() if line.strip()}
+
+def grounded_share(text, parts):
+    """The share of a discovery's consecutive word pairs that also appear in the given page parts."""
+    mine = word_pairs(str(text).lower())
+    return len(mine & word_pairs(" ".join(parts).lower())) / len(mine) if mine else 1.0
+
+def grounding_check(parameter, page_state, current_url):
+    # Shown part 2 of a guide, which ended "Just follow these 6 easy steps", the model recorded six steps it
+    # wrote itself (the real ones were in part 3), then a care routine the page never gave. Real discoveries
+    # from earlier runs shared 64-100% of their word pairs with the page; these shared 11-44%, and a rerun's
+    # mix of real pot-size advice with invented steps shared 57%. A DISCOVER that matches the parts shown less
+    # than that gets one cheap retry; repeating it then goes through, since a heavy paraphrase can score low too.
+    parts = page_state.get("parts") or []
+    if not (current_url and page_state.get("url") == normalize_url(current_url) and parts):
+        return None
+    if len(word_pairs(parameter)) < MIN_GROUNDING_PAIRS:
+        return None
+    shown = [parts[i] for i in sorted(page_state.get("seen_parts", {0})) if i < len(parts)]
+    if grounded_share(parameter, shown) >= GROUNDED_PAIR_SHARE:
+        return None
+    # Only repeating the same DISCOVER confirms it: asked again, the model once sent a different text that was
+    # still invented ("water sparingly", which the page never said), and a per-part pass let it through
+    asked = page_state.setdefault("grounding_asked", [])
+    mine = word_pairs(parameter.lower())
+    if any(len(mine & earlier) >= 0.8 * len(mine) for earlier in asked):
+        return None
+    asked.append(mine)
+    # Pointed to READ_MORE as well, the model left a part holding the real materials list and steps unrecorded
+    return "CONFIRM_GROUNDED", (f"Much of that DISCOVER does not match the page text you have been shown, so part of it "
+                                "seems to come from your own knowledge. DISCOVER again with only what the page actually "
+                                f"says in part {page_state['index'] + 1} (shown now) or the parts before it, using the "
+                                "page's own wording, for example its lists and steps. Do not add steps, amounts or "
+                                "advice that the page does not give. If your DISCOVER really is what the page says, "
+                                "repeat it.")
 
 def word_pairs(text):
     words = re.findall(r"\w+", text)
@@ -553,6 +594,7 @@ def check_decision(action, parameter, journal, tried, page_state, current_url, t
             # right after this refusal, and it repeated the duplicate until the turn was lost
             page_state.setdefault("read_on_confirmed", set()).add(page_state.get("index", 0))
             return "DUPLICATE_DISCOVER", "Everything in that DISCOVER is already recorded in DISCOVERIES SO FAR."
+        return grounding_check(parameter, page_state, current_url)
     elif action == "FINISH":
         return finish_check(tried, journal, page_state, current_url) or gap_check(thought, tried)
     else:

@@ -24,7 +24,7 @@ and tuned to work well with a **small 7B model on a CPU, no GPU required**.
 - ⚡ **Built for slow hardware.** It reuses LM Studio's prompt cache, so most turns process only what changed.
 - 📝 **A readable report every time.** `research_report.md` holds the final result and every finding with its
   source, written however the run ends; `research_log.txt` keeps every action and reason.
-- ✅ **Tested.** 99 tests on Linux and Windows, Python 3.10–3.13, run in about a second with no model or browser,
+- ✅ **Tested.** 105 tests on Linux and Windows, Python 3.10–3.13, run in about a second with no model or browser,
   plus live runs on seven different kinds of task (see [results](#results-on-different-kinds-of-tasks)).
 
 📖 **The story behind it:** [Teaching a 7B model on a CPU to finish what it starts](https://dev.to/snowfxxx/teaching-a-7b-model-on-a-cpu-to-finish-what-it-starts-1amc),
@@ -158,6 +158,7 @@ does not generalise; the [changelog](https://github.com/SnowFXXX/LocalAgentBrows
 | Comparison and recommendation | Python vs Rust for command-line tools; recommend one for a beginner. Later: SQLite vs PostgreSQL for a small web app, then a recommendation for a hobby project | 1.36, 1.42 | Python vs Rust: cited comparison recommending Python in 16 turns (33 min), Rust's libraries not covered. SQLite vs PostgreSQL: all three parts covered and cited, with a recommendation, in 13 turns (38 min) |
 | List of items | Three free, open-source Photoshop alternatives and the strengths of each | 1.37–1.38 | GIMP, Krita and Darktable with their strengths, all cited, in 9 turns (24 min); 1.37 listed a fourth and added an unrequested opinion, which 1.38 fixes |
 | Step-by-step how-to | Make a sourdough starter, with quantities and what to do each day | 1.36–1.37 | A clear plan in 7 turns (19 min), but it invented the first water amount; 1.37 stops guessing and flags unsupported numbers, and the agent then went looking for the missing details |
+| Step-by-step how-to | Repot a houseplant: what you need, the steps, and care for the first two weeks | 1.43–1.44 | 1.43 recorded six steps it wrote itself before reading the part that had them; 1.44 checks findings against the page and recorded the guide's real materials, steps and aftercare, finishing in 24 turns (68 min), though the final result left out one step |
 | Explanation of a topic | How photosynthesis works: inputs and outputs, both stages and where each takes place | 1.41–1.42 | A complete, cited explanation in 18 turns (45 min); 1.41 read four parts of a relevant page without recording them and had not finished after 49 min |
 
 ## How it works
@@ -194,6 +195,9 @@ flowchart LR
 - **Confirm before leaving or reading on.** Leaving a page without recording anything from it triggers one
   check: record something, or repeat the action to leave. Moving on to the next part of a page works the same
   way, and the model must first list what the part it is on says about the objective (or "none").
+- **Findings must match the page.** A finding that shares too few word pairs with the page text shown so far
+  is sent back once, asking for only what the page says in its own words: a small model will otherwise
+  "complete" a list from its own knowledge when a page says "follow these 6 steps" and the steps come later.
 - **Numbered findings.** Findings are numbered in the prompt and listed with every check, and the model names
   the finding that covers each part of the objective ("covered by [2]") instead of just saying "covered".
 - **Knowing when it's done.** After every new finding the model is asked whether the objective is now fully
@@ -292,8 +296,9 @@ turn that brings in a new page takes a few minutes. See [Performance](#performan
   "fully validated" can keep the agent looking for something the web may not contain. It is told to finish
   and name what it could not find after looking in several places, but a 7B model does not always judge
   when that point has come; the turn limit (100) and Ctrl+C still apply, and the report is always current.
-- **Check the citations.** The final result only uses recorded findings, but a 7B model sometimes puts the
-  wrong number on a citation, so verify a claim against the listed findings before relying on it.
+- **Check the citations.** The final result is told to use only recorded findings, but a 7B model sometimes
+  puts the wrong number on a citation, adds a line no finding supports or leaves out a step, so verify a
+  claim against the listed findings before relying on it.
 - **Some sites refuse automated browsers** (HTTP 403). The agent respects that and does not try to disguise
   itself; it moves on to other sources.
 - **Reading only.** The agent searches, opens pages and reads them. It does not click, fill in forms or sign in.

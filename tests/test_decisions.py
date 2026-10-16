@@ -238,3 +238,62 @@ class TestLeaveCheck:
         page["seen_parts"] = {0, 1, 2}
         message = decide("SEARCH", "q9", page, GUIDE)[1]
         assert "unread" not in message and "repeat your SEARCH" in message
+
+
+class TestGroundingCheck:
+    PAGE = ("Repotting guide. Choose a pot one to two inches wider than the current one, with drainage holes. "
+            "Now it is time to repot. Just follow these six easy steps.")
+
+    def page(self):
+        page = unrecorded_page(GUIDE, parts=(self.PAGE, "Step 1: Water the plant the day before."))
+        return page
+
+    def test_a_discover_the_page_does_not_say_is_confirmed_once(self):
+        page = self.page()
+        invented = ("1. Gently remove the plant from its pot. 2. Loosen any tangled roots and trim dead ones. "
+                    "3. Place fresh potting mix in the bottom of the new pot.")
+        first = decide("DISCOVER", invented, page, GUIDE)
+        assert first[0] == "CONFIRM_GROUNDED" and "does not match the page text" in first[1]
+        assert "DISCOVER again with only what the page actually says in part 1" in first[1]
+        assert decide("DISCOVER", invented, page, GUIDE) is None, "repeating it goes through"
+
+    def test_a_discover_copied_from_the_page_passes(self):
+        copied = "Choose a pot one to two inches wider than the current one, with drainage holes."
+        assert decide("DISCOVER", copied, self.page(), GUIDE) is None
+
+    def test_short_discoveries_are_not_checked(self):
+        assert decide("DISCOVER", "Use a bigger pot.", self.page(), GUIDE) is None
+
+    def test_real_advice_mixed_with_invented_steps_is_confirmed(self):
+        mixed = ("Choose a pot one to two inches wider than the current one, with drainage holes. The steps are: "
+                 "loosen and inspect the roots, prune any dead roots, then fill with fresh potting mix.")
+        assert decide("DISCOVER", mixed, self.page(), GUIDE)[0] == "CONFIRM_GROUNDED"
+
+
+def test_recorded_parts_are_remembered_across_visits(monkeypatch):
+    import asyncio
+
+    async def parts(page):
+        return ["part one", "part two"], [["One"], ["Two"]]
+
+    async def links(page, shown_links=None):
+        return ""
+
+    monkeypatch.setattr(ab, "extract_page_parts", parts)
+    monkeypatch.setattr(ab, "extract_page_links", links)
+    state = {"url": None, "parts": [], "index": 0}
+    asyncio.run(ab.build_environment(None, GUIDE, state))
+    state["recorded_parts"].add(0)  # what the main loop does on DISCOVER
+    asyncio.run(ab.build_environment(None, DOCS, state))
+    assert decide("READ_MORE", "", state, DOCS)[0] == "CONFIRM_READ_ON"
+    asyncio.run(ab.build_environment(None, GUIDE, state))
+    assert decide("READ_MORE", "", state, GUIDE) is None, "part 1 was recorded on the earlier visit"
+
+
+def test_a_different_ungrounded_discover_is_checked_again():
+    page = TestGroundingCheck().page()
+    first = "1. Gently remove the plant from its pot. 2. Loosen any tangled roots and trim dead ones before you start."
+    second = "During the first two weeks water your plant sparingly and avoid fertilizing it until it settles in."
+    assert decide("DISCOVER", first, page, GUIDE)[0] == "CONFIRM_GROUNDED"
+    assert decide("DISCOVER", second, page, GUIDE)[0] == "CONFIRM_GROUNDED"
+    assert decide("DISCOVER", second, page, GUIDE) is None, "repeating the same one goes through"
