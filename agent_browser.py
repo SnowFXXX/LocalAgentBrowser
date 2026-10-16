@@ -510,8 +510,13 @@ def check_decision(action, parameter, journal, tried, page_state, current_url, t
         if not parameter.strip():
             return "BLOCKED_NAVIGATE", "NAVIGATE needs a full URL in the parameter."
         target = normalize_url(determine_url(action, parameter))
-        if current_url and target == normalize_url(current_url):
-            return "BLOCKED_NAVIGATE", (f"{where_you_are(page_state, current_url)} You are already on this page. "
+        # Shown a long page's outline, the model kept trying to jump to a section with a made-up anchor
+        # ("NAVIGATE ...#sqlite-vs-postgresql", then "NAVIGATE #sqlite-vs-postgresql")
+        section = "#" in parameter and (parameter.strip().startswith("#") or target == normalize_url(current_url or ""))
+        if current_url and (target == normalize_url(current_url) or section):
+            jump = (" To go to a section of this page, use READ_MORE with that section's part number from the outline."
+                    if section else "")
+            return "BLOCKED_NAVIGATE", (f"{where_you_are(page_state, current_url)} You are already on this page.{jump} "
                                         "Use READ_MORE to see its other parts, DISCOVER from it, or go somewhere else.")
         # Going back to an earlier page is allowed; the cap stops back-and-forth loops between pages
         if [normalize_url(u) for u in tried["urls"]].count(target) >= MAX_VISITS_PER_URL:
@@ -889,12 +894,15 @@ async def compose_final_result(client, objective, journal):
                "1. Use only the information in the DISCOVERIES. Do not fill gaps from your own knowledge or with "
                "guesses: no amounts, numbers, steps or advice that the discoveries do not contain. Where a detail the "
                "objective asks for is missing, say that it was not found.\n"
-               "2. If the objective asks for a specific number of items, give exactly that many (the best supported).\n"
-               "3. Refer to the discoveries that support each point by their numbers, like [2], and only cite a number "
+               "2. A discovery about one source's own situation (for example a company's workload in a case study) "
+               "describes that situation, not the one in the OBJECTIVE: say whose situation it is, and do not assume "
+               "details of the OBJECTIVE's situation that it does not state.\n"
+               "3. If the objective asks for a specific number of items, give exactly that many (the best supported).\n"
+               "4. Refer to the discoveries that support each point by their numbers, like [2], and only cite a number "
                "for something that discovery actually says.\n"
-               "4. Do not add a 'My view:' paragraph unless the objective explicitly asks for your view, opinion or "
+               "5. Do not add a 'My view:' paragraph unless the objective explicitly asks for your view, opinion or "
                "recommendation; if it does, give it in a paragraph that starts with 'My view:'.\n"
-               "5. Write plain text, not JSON.")
+               "6. Write plain text, not JSON.")
     # A fresh prompt with only the discoveries, not the browsing conversation: continuing that conversation let
     # the model use page text it had read but not recorded, and cite discovery numbers that did not say it
     messages = [{"role": "system", "content": COMPOSE_SYSTEM}, {"role": "user", "content": request}]

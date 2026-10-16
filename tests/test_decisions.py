@@ -92,6 +92,12 @@ def test_read_more_target(parameter, expected_part):
     assert ab.read_more_target(parameter, page) + 1 == expected_part
 
 
+@pytest.mark.parametrize("parameter", [DOCS + "#comparison", "#comparison"])
+def test_jumping_to_a_section_of_the_current_page_points_to_read_more(parameter):
+    result = decide("NAVIGATE", parameter, recorded_page(DOCS, parts=("a", "b")), DOCS)
+    assert result[0] == "BLOCKED_NAVIGATE" and "READ_MORE with that section's part number" in result[1]
+
+
 def test_finish_check_asks_once_then_lets_finish_through():
     tried = {"queries": [], "urls": []}
     page = recorded_page(DOCS)

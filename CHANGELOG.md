@@ -4,6 +4,24 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.43] - 2026-10-16
+A comparison on 1.42 (SQLite or PostgreSQL for a small web application, then a recommendation for a hobby
+project) finished on its own in 13 turns and 38 minutes of model time, with all three parts covered and
+cited. Two problems showed up:
+### Fixed
+- Shown a long page's outline, the model tried to jump to a section with a made-up anchor
+  (`NAVIGATE ...#sqlite-vs-postgresql`, then `NAVIGATE #sqlite-vs-postgresql`), using up a turn's retries.
+  NAVIGATE to a section of the current page is refused with a pointer to READ_MORE and the outline's part
+  number.
+- The final result treated a case study's own workload ("sequential writes, never concurrently") as the
+  hobby project's, and based the recommendation on it. The final-result rules now say that a discovery about
+  one source's own situation describes that situation, not the objective's, and that details of the
+  objective's situation it does not state must not be assumed.
+
+Replaying the final-result step on that run's discoveries: the case study is attributed to its own workload
+and the recommendation is conditional on the project's write pattern. On the earlier list task the result
+still gives exactly three cited items and no opinion.
+
 ## [1.42] - 2026-10-16
 A new kind of task, explaining a topic (how photosynthesis works: what goes in and out, the two stages and
 where each takes place), reproduced the main weakness: on 1.41 the agent read parts 2 to 5 of a page that had

@@ -92,6 +92,7 @@ class TestComposeFinalResult:
         assert "Use only the information in the DISCOVERIES" in user["content"] and "'My view:'" in user["content"]
         assert "unless the objective explicitly asks for your view" in user["content"] and "Do not fill gaps" in user["content"]
         assert "give exactly that many" in user["content"]
+        assert "describes that situation, not the one in the OBJECTIVE" in user["content"]
         assert "DRAFT" not in user["content"], "the agent's unverified draft is not shown"
 
     def test_unwraps_a_json_reply(self):

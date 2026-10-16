@@ -24,7 +24,7 @@ and tuned to work well with a **small 7B model on a CPU, no GPU required**.
 - ⚡ **Built for slow hardware.** It reuses LM Studio's prompt cache, so most turns process only what changed.
 - 📝 **A readable report every time.** `research_report.md` holds the final result and every finding with its
   source, written however the run ends; `research_log.txt` keeps every action and reason.
-- ✅ **Tested.** 97 tests on Linux and Windows, Python 3.10–3.13, run in about a second with no model or browser,
+- ✅ **Tested.** 99 tests on Linux and Windows, Python 3.10–3.13, run in about a second with no model or browser,
   plus live runs on seven different kinds of task (see [results](#results-on-different-kinds-of-tasks)).
 
 📖 **The story behind it:** [Teaching a 7B model on a CPU to finish what it starts](https://dev.to/snowfxxx/teaching-a-7b-model-on-a-cpu-to-finish-what-it-starts-1amc),
@@ -155,7 +155,7 @@ does not generalise; the [changelog](https://github.com/SnowFXXX/LocalAgentBrows
 | Documentation research, strict | The same, but "do not FINISH until fully validated", including "parameter schemas" | 1.38–1.40 | Its most detailed findings (per-client setup, seed test, agent definition files), but it keeps searching for schemas the docs do not contain and has not finished within an hour |
 | Opinion from several sources | How spiritual traditions view cats, then form an opinion | 1.30 | Six traditions from two sources and a stated opinion, in 18 turns (37 min of model time) |
 | Factual question | Tallest mountain in Africa, height in meters and feet | 1.35, 1.40 | Correct, cited answer in 4 turns (about 12 min of model time) in both versions; before 1.35 it kept reading after finding it |
-| Comparison and recommendation | Python vs Rust for command-line tools; recommend one for a beginner | 1.36 | Cited comparison of performance, learning and Python's libraries, recommending Python, in 16 turns (33 min); Rust's libraries were not covered |
+| Comparison and recommendation | Python vs Rust for command-line tools; recommend one for a beginner. Later: SQLite vs PostgreSQL for a small web app, then a recommendation for a hobby project | 1.36, 1.42 | Python vs Rust: cited comparison recommending Python in 16 turns (33 min), Rust's libraries not covered. SQLite vs PostgreSQL: all three parts covered and cited, with a recommendation, in 13 turns (38 min) |
 | List of items | Three free, open-source Photoshop alternatives and the strengths of each | 1.37–1.38 | GIMP, Krita and Darktable with their strengths, all cited, in 9 turns (24 min); 1.37 listed a fourth and added an unrequested opinion, which 1.38 fixes |
 | Step-by-step how-to | Make a sourdough starter, with quantities and what to do each day | 1.36–1.37 | A clear plan in 7 turns (19 min), but it invented the first water amount; 1.37 stops guessing and flags unsupported numbers, and the agent then went looking for the missing details |
 | Explanation of a topic | How photosynthesis works: inputs and outputs, both stages and where each takes place | 1.41–1.42 | A complete, cited explanation in 18 turns (45 min); 1.41 read four parts of a relevant page without recording them and had not finished after 49 min |
