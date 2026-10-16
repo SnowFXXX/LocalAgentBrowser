@@ -133,6 +133,7 @@ class TestReadOnCheck:
         first = decide("READ_MORE", "", page, DOCS)
         assert first[0] == "CONFIRM_READ_ON" and "recorded nothing from part 1" in first[1]
         assert "write 'none'" in first[1] and "choose FINISH instead of reading on" in first[1]
+        assert "not about the OBJECTIVE at all, leave it" in first[1]
         assert decide("READ_MORE", "", page, DOCS) is None, "repeating it goes through"
 
     def test_no_check_after_recording_from_the_shown_part(self):
@@ -156,10 +157,11 @@ class TestReadOnCheck:
         page.update(index=4, seen_parts={0, 1, 2, 3, 4}, reread_confirmed={2})
         assert decide("READ_MORE", "3", page, DOCS) is None
 
-    def test_asking_for_the_part_already_shown_is_refused(self):
-        result = decide("READ_MORE", "1", unrecorded_page(DOCS), DOCS)
-        assert result[0] == "BLOCKED_READ_MORE" and "already shown" in result[1] and "For part 2" in result[1]
+    def test_asking_for_the_part_already_shown_means_the_next_one(self):
+        assert ab.read_more_target("1", unrecorded_page(DOCS)) == 1
+        assert decide("READ_MORE", "1", recorded_page(DOCS, parts=("a", "b")), DOCS) is None
         last = recorded_page(DOCS, parts=("a", "b"), index=1)
+        assert ab.read_more_target("2", last) == 1, "on the last part it stays a request for that part"
         assert "last part" in decide("READ_MORE", "2", last, DOCS)[1]
 
 
@@ -322,3 +324,11 @@ def test_an_invented_sentence_behind_copied_ones_is_confirmed():
                "associated with shapeshifters, spiritual messages and supernatural signs. In Christianity, owls symbolize "
                "wisdom and are often depicted alongside other wise figures like the prophet Samuel.")
     assert decide("DISCOVER", finding, page, GUIDE)[0] == "CONFIRM_GROUNDED"
+
+
+def test_finish_goes_through_once_a_search_is_exhausted():
+    tried = {"queries": ["schemas"], "urls": []}
+    page = recorded_page(DOCS)
+    for _ in range(2):
+        assert ab.check_decision("SEARCH", "schemas", [], tried, page, DOCS)[0] == "BLOCKED_SEARCH"
+    assert ab.check_decision("FINISH", "result", [], tried, page, DOCS, "Schemas: not covered") is None

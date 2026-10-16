@@ -4,6 +4,26 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.50] - 2026-10-16
+Three runs of the strict documentation objective (Playwright test agents, "do not FINISH until ... fully
+validated", including "parameter schemas" the documentation does not have).
+### Changed
+- `READ_MORE` with the number of the part already shown reads the next part. The model did this in most
+  long-page runs, meaning the next part, and refusing it cost a retry each time. On the last part it is still
+  refused.
+- The read-on check also says to leave a page that is not about the objective: shown an unrelated "agent"
+  project's command reference, the model read on part after part.
+### Fixed
+- After being told twice that a search was exhausted and that it could finish with the gap named, the model
+  tried FINISH, the finish check sent it to work on the uncovered part, and it repeated the search again (five
+  times in one run). Once a search is exhausted, FINISH goes through without the finish and gap checks.
+
+Third run: FINISH on turn 10 (25.2 minutes of model time), the first time this objective has finished; earlier
+versions searched for over an hour. The result has the official `npx playwright init-agents --loop=vscode`
+command and the file layout from the official docs, but it is thin: the finish check was answered with
+"covered by [1] covered by [2] covered by [3]" without naming the parts, one discovery was off topic, and the
+result does not say that no parameter schemas were found.
+
 ## [1.49] - 2026-10-16
 A documentation task on 1.48 (create a Python virtual environment with venv, activate it on Windows and on
 macOS or Linux, and install packages) garbled commands in two places.

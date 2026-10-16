@@ -24,7 +24,7 @@ and tuned to work well with a **small 7B model on a CPU, no GPU required**.
 - ⚡ **Built for slow hardware.** It reuses LM Studio's prompt cache, so most turns process only what changed.
 - 📝 **A readable report every time.** `research_report.md` holds the final result and every finding with its
   source, written however the run ends; `research_log.txt` keeps every action and reason.
-- ✅ **Tested.** 111 tests on Linux and Windows, Python 3.10–3.13, run in about a second with no model or browser,
+- ✅ **Tested.** 112 tests on Linux and Windows, Python 3.10–3.13, run in about a second with no model or browser,
   plus live runs on seven different kinds of task (see [results](#results-on-different-kinds-of-tasks)).
 
 📖 **The story behind it:** [Teaching a 7B model on a CPU to finish what it starts](https://dev.to/snowfxxx/teaching-a-7b-model-on-a-cpu-to-finish-what-it-starts-1amc),
@@ -152,7 +152,7 @@ does not generalise; the [changelog](https://github.com/SnowFXXX/LocalAgentBrows
 | Kind of task | Objective (abridged) | Version | Outcome |
 |---|---|---|---|
 | Documentation research | Setup commands and file layout for Playwright's test agents | 1.27 | Finished on its own in 13 turns (~36 min) with commands, roles and file layout |
-| Documentation research, strict | The same, but "do not FINISH until fully validated", including "parameter schemas" | 1.38–1.40 | Its most detailed findings (per-client setup, seed test, agent definition files), but it keeps searching for schemas the docs do not contain and has not finished within an hour |
+| Documentation research, strict | The same, but "do not FINISH until fully validated", including "parameter schemas" | 1.38–1.40, 1.50 | 1.38–1.40: its most detailed findings (per-client setup, seed test, agent definition files), but it kept searching for schemas the docs do not contain and did not finish within an hour. 1.50: finished in 10 turns (25 min) with the official init command and file layout, but with thin findings and without saying the schemas were not found |
 | Opinion from several sources | How spiritual traditions view cats, then form an opinion | 1.30 | Six traditions from two sources and a stated opinion, in 18 turns (37 min of model time) |
 | Opinion from several sources | How at least three cultures or religions have viewed owls, then an opinion on why | 1.47–1.48 | Greek, English and many Native American views from one detailed source in 11 turns (38 min); 1.48 adds the opinion the result had left out and catches an invented sentence in a discovery |
 | Factual question | Tallest mountain in Africa, height in meters and feet | 1.35, 1.40, 1.46 | Correct, cited answer in 4 turns (about 12 min of model time) in all three versions; before 1.35 it kept reading after finding it |
@@ -294,10 +294,10 @@ turn that brings in a new page takes a few minutes. See [Performance](#performan
 - **A small model's judgement is the ceiling.** It sometimes drifts to loosely related pages, prefers
   secondary sources or stays with one source too long, and results vary with the first pages a search turns
   up; every finding is in `research_report.md` regardless.
-- **Very strict objectives can keep it searching.** An objective that forbids finishing until everything is
-  "fully validated" can keep the agent looking for something the web may not contain. It is told to finish
-  and name what it could not find after looking in several places, but a 7B model does not always judge
-  when that point has come; the turn limit (100) and Ctrl+C still apply, and the report is always current.
+- **Very strict objectives.** An objective that forbids finishing until everything is "fully validated" used
+  to keep the agent looking for something the web may not contain. On 1.50 it finished such an objective in 25
+  minutes, but with thin findings and without naming what it could not find, so check the result against the
+  objective.
 - **Check the citations.** The final result is told to use only recorded findings, but a 7B model sometimes
   puts the wrong number on a citation, adds a line no finding supports or leaves out a step, so verify a
   claim against the listed findings before relying on it.
@@ -314,7 +314,7 @@ turn that brings in a new page takes a few minutes. See [Performance](#performan
 - [x] Write the final result in a separate, rule-bound step and flag unsupported numbers (1.32–1.38)
 - [x] Finish as soon as the objective is covered (1.35)
 - [x] Get the model to weigh each part of a long page before reading on (1.42)
-- [ ] Let very strict objectives end with the gaps named instead of searching indefinitely
+- [ ] Let very strict objectives end with the gaps named instead of searching indefinitely (they finish since 1.50; naming the gaps is still open)
 - [ ] Try more kinds of objectives (seven so far) and adjust the rules that don't generalise
 - [ ] Make fresh prompts (the slowest kind of turn) cheaper still (31% cheaper since 1.34)
 - [ ] Interacting with pages (clicking, forms) for tasks beyond reading

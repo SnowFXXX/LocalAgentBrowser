@@ -477,7 +477,12 @@ def is_known_discovery(parameter, journal):
 def read_more_target(parameter, page_state):
     # The model sometimes writes "2 of 2" or "part 3"; the first number is the part it means
     number = re.search(r'\d+', parameter)
-    return int(number.group()) - 1 if number else page_state["index"] + 1
+    target = int(number.group()) - 1 if number else page_state["index"] + 1
+    # Asking for the part already shown nearly always meant the next one ("READ_MORE 9" while on part 9 came up
+    # in most long-page runs, and refusing it cost a retry each time), so it is read as that, except on the last part
+    if target == page_state["index"] and target < len(page_state["parts"]) - 1:
+        target += 1
+    return target
 
 def leave_check(action, page_state, current_url, journal=()):
     # The model often left content pages without recording what it needed from them. The first attempt to
@@ -513,7 +518,8 @@ def read_on_check(page_state, current_url, target):
     # had the inputs, outputs and cell locations it needed and recorded them only when a progress check fired.
     # Moving on from a part nothing was recorded from gets one cheap retry that makes the model name what the
     # part says about the objective; repeating the READ_MORE then goes through. It also offers FINISH: with three
-    # cultures recorded where three were asked for, the check pushed an opinion task to keep collecting more.
+    # cultures recorded where three were asked for, the check pushed an opinion task to keep collecting more, and
+    # it offers leaving: shown an unrelated "agent" project page, the model read on part after part.
     index = page_state["index"]
     # Only moving forward counts: going back to an earlier part is covered by the re-read check
     if target <= index or index in page_state.get("recorded_parts", set()):
@@ -526,13 +532,15 @@ def read_on_check(page_state, current_url, target):
                                "In thought_process, list each fact in it that serves the OBJECTIVE, or write 'none'. If any "
                                "of them are not in DISCOVERIES SO FAR, DISCOVER them now. If there are none, repeat your "
                                "READ_MORE. But if DISCOVERIES SO FAR already cover every part of the OBJECTIVE, choose "
-                               "FINISH instead of reading on.")
+                               "FINISH instead of reading on, and if this page is not about the OBJECTIVE at all, leave "
+                               "it with SEARCH or NAVIGATE.")
 
 def gap_check(thought, tried):
     # The model is asked to write 'not covered' for missing parts; on a comparison it wrote "Available Libraries:
     # Not covered" and finished anyway. A FINISH whose own reasoning says that is sent back to work on the gap,
     # at most GAP_REFUSAL_LIMIT times per run so a part that cannot be found does not block finishing for good
-    if "not covered" not in str(thought).lower() or tried.get("gap_refusals", 0) >= GAP_REFUSAL_LIMIT:
+    if ("not covered" not in str(thought).lower() or tried.get("gap_refusals", 0) >= GAP_REFUSAL_LIMIT
+            or tried.get("search_exhausted")):
         return None
     tried["gap_refusals"] = tried.get("gap_refusals", 0) + 1
     return ("BLOCKED_FINISH", "Your own check marks a part of the objective as 'not covered'. Do not finish yet: work on "
@@ -552,6 +560,10 @@ def check_decision(action, parameter, journal, tried, page_state, current_url, t
             repeats = tried.setdefault("repeated_searches", {})
             repeats[normalize_query(query)] = repeats.get(normalize_query(query), 0) + 1
             if repeats[normalize_query(query)] >= 2:
+                # Told to finish with the gap, the model tried FINISH, was asked by the finish check to work on the
+                # uncovered part, and repeated the search again (five times on a strict objective); from here a
+                # FINISH goes straight through
+                tried["search_exhausted"] = True
                 return "BLOCKED_SEARCH", (f"You have now tried to repeat the search '{query}' "
                                           f"{repeats[normalize_query(query)]} times. It was already done and did not find "
                                           "what you need. Either SEARCH with clearly different words, or accept that it "
@@ -625,7 +637,7 @@ def finish_check(tried, journal, page_state=None, current_url=None):
     # Asked to judge whether its discoveries "satisfy" the objective, a small model says yes too easily: on an
     # opinion task it finished after one source and gave a summary instead of the opinion asked for. The first
     # FINISH of each turn gets a cheap retry asking for a part-by-part check; repeating FINISH then goes through.
-    if tried.get("finish_confirmed"):
+    if tried.get("finish_confirmed") or tried.get("search_exhausted"):
         return None
     tried["finish_confirmed"] = True  # Reset at the start of every turn
     return "CONFIRM_FINISH", (f"{source_note(journal)}{unread_note(page_state or {}, current_url)}"
