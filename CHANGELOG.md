@@ -12,6 +12,8 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
   words decide their score. The page-match check now skips discoveries under 20 word pairs; the invented
   steps and care routines it is meant for had 27 to 75.
 
+Rerun: FINISH on turn 4 with the correct, cited answer in 12.0 minutes of model time (11.8 on 1.40).
+
 ## [1.45] - 2026-10-16
 ### Fixed
 - The page-match check sent back an accurate discovery on the factual question, "Mount Kilimanjaro is the
