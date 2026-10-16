@@ -48,6 +48,15 @@ def test_check_decision(action, parameter, expected):
     assert (result[0] if result else None) == expected
 
 
+def test_repeated_blocked_search_suggests_finishing_with_the_gap():
+    tried = {"queries": ["parameter schemas"], "urls": []}
+    page = recorded_page(DOCS)
+    first = ab.check_decision("SEARCH", "Parameter  Schemas", [], tried, page, DOCS)
+    assert first[0] == "BLOCKED_SEARCH" and "already searched" in first[1]
+    second = ab.check_decision("SEARCH", "parameter schemas", [], tried, page, DOCS)
+    assert "2 times" in second[1] and "FINISH and say in the final result that it could not be found" in second[1]
+
+
 def test_going_back_to_an_earlier_page_is_allowed():
     assert decide("NAVIGATE", DOCS, recorded_page(GUIDE), GUIDE, urls=[DOCS, GUIDE]) is None
 

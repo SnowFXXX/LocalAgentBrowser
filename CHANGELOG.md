@@ -4,6 +4,20 @@ Every version of `agent_browser.py`, newest first. Each version is also a tagged
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.40] - 2026-10-15
+### Changed
+- Repeating a search that was already done is refused as before; from the second attempt the refusal says the
+  search did not find what was needed and to either search with clearly different words or FINISH and say in
+  the final result that it could not be found. On the strict Playwright objective the model had resubmitted
+  "Playwright Test Agents parameter schemas" three times in one turn.
+
+Verification run on the same objective: four searches, all with different wording (so the new message was
+not needed), five findings from the official docs source on GitHub and BrowserStack, including the generator
+agent's definition file. It still had not finished after 54 minutes of model time: with an objective that
+forbids finishing until everything is "fully validated", it keeps looking for parameter schemas these docs do
+not contain. It also read a long guide part by part without recording the parts on the three agents, despite
+the outline; recording while reading remains the main weakness.
+
 ## [1.39] - 2026-10-15
 ### Changed
 - The page outline marks parts already read with "(read)", and re-reading a part needs one confirmation (repeating

@@ -474,6 +474,16 @@ def check_decision(action, parameter, journal, tried, page_state, current_url, t
             return "BLOCKED_SEARCH", "The SEARCH query was empty."
         # Repeats are blocked outright; a warning alone does not stop small models from looping
         if normalize_query(query) in [normalize_query(q) for q in tried["queries"]]:
+            # A model looking for something the web does not have kept resubmitting the same search (three times
+            # in one turn); from the second repeat it is told plainly that finishing with the gap is an option
+            repeats = tried.setdefault("repeated_searches", {})
+            repeats[normalize_query(query)] = repeats.get(normalize_query(query), 0) + 1
+            if repeats[normalize_query(query)] >= 2:
+                return "BLOCKED_SEARCH", (f"You have now tried to repeat the search '{query}' "
+                                          f"{repeats[normalize_query(query)]} times. It was already done and did not find "
+                                          "what you need. Either SEARCH with clearly different words, or accept that it "
+                                          "may not be available: FINISH and say in the final result that it could not be "
+                                          "found.")
             return "BLOCKED_SEARCH", "This exact query was already searched. Use a new query, or DISCOVER from the current page."
     elif action == "NAVIGATE":
         if not parameter.strip():
