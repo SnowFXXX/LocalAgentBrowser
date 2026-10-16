@@ -27,6 +27,9 @@ and tuned to work well with a **small 7B model on a CPU, no GPU required**.
 - ✅ **Tested.** 89 tests on Linux and Windows, Python 3.10–3.13, run in about a second with no model or browser,
   plus live runs on six different kinds of task (see [results](#results-on-different-kinds-of-tasks)).
 
+📖 **The story behind it:** [Teaching a 7B model on a CPU to finish what it starts](https://dev.to/snowfxxx/teaching-a-7b-model-on-a-cpu-to-finish-what-it-starts-1amc),
+six lessons from 30 versions of keeping a small local model on track.
+
 ## Contents
 
 [Quick start](#quick-start) · [What a run looks like](#what-a-run-looks-like) · [How it works](#how-it-works) ·
