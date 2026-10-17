@@ -29,8 +29,8 @@ body:
     id: version
     attributes:
       label: Agent version
-      description: From CHANGELOG.md, or the commit you are on.
-      placeholder: "1.40"
+      description: Shown by `pip show localagentbrowser`, or the commit you are on if you run from a clone.
+      placeholder: "1.52"
     validations:
       required: true
   - type: input
