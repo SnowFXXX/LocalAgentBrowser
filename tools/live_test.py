@@ -6,7 +6,7 @@ Usage:
 
 Writes into the output folder (created if needed):
     research_log.txt   the agent's journal, as in a normal run
-    prompt_trace.txt   the last message of every model request, for checking what the model saw
+    prompt_trace.txt   the last message of every model request and the full reply, for checking what the model saw and said
 Progress and per-call timings are printed to the console.
 """
 import argparse
@@ -31,28 +31,29 @@ def main():
     os.chdir(args.out)
     builtins.input = lambda prompt="": (print(prompt + "<objective from command line>"), args.objective)[1]
 
-    wrapped = set()
-    original_turn = ab.run_agent_turn
+    original_client = ab.AsyncOpenAI
 
-    async def traced_turn(client, page, objective, journal, *turn_args, **turn_kwargs):
-        # Wrap the client once so every model call logs its timing, token counts and newest message
-        if id(client) not in wrapped:
-            wrapped.add(id(client))
-            create = client.chat.completions.create
+    def traced_client(**kwargs):
+        # Every model call, including the objective split before turn 1, logs its timing, token counts and newest message
+        client = original_client(**kwargs)
+        create = client.chat.completions.create
 
-            async def timed_create(*a, **kw):
-                with open("prompt_trace.txt", "a", encoding="utf-8") as f:
-                    f.write(f"\n\n######## PROMPT (journal entries: {len(journal)}) ########\n{kw['messages'][-1]['content']}")
-                started = time.time()
-                response = await create(*a, **kw)
-                print(f"   (model call {time.time() - started:.1f}s, prompt={response.usage.prompt_tokens} tok, "
-                      f"completion={response.usage.completion_tokens} tok)")
-                return response
+        async def timed_create(*a, **kw):
+            with open("prompt_trace.txt", "a", encoding="utf-8") as f:
+                f.write(f"\n\n######## PROMPT ########\n{kw['messages'][-1]['content']}")
+            started = time.time()
+            response = await create(*a, **kw)
+            # The full reply as well: the journal keeps only the start of a refused action
+            with open("prompt_trace.txt", "a", encoding="utf-8") as f:
+                f.write(f"\n\n######## REPLY ########\n{response.choices[0].message.content}")
+            print(f"   (model call {time.time() - started:.1f}s, prompt={response.usage.prompt_tokens} tok, "
+                  f"completion={response.usage.completion_tokens} tok)")
+            return response
 
-            client.chat.completions.create = timed_create
-        return await original_turn(client, page, objective, journal, *turn_args, **turn_kwargs)
+        client.chat.completions.create = timed_create
+        return client
 
-    ab.run_agent_turn = traced_turn
+    ab.AsyncOpenAI = traced_client
 
     async def run():
         try:

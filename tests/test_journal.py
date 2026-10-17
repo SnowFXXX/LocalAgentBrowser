@@ -58,6 +58,12 @@ def test_unverified_numbers_ignores_grouped_citations():
     assert ab.unverified_numbers("LibreOffice has good compatibility [4, 5] and more [2;3] [1-4].", found) == []
 
 
+def test_unverified_numbers_ignores_numbered_headings():
+    # A comparison result headed its sections "#### 1. Setup and Administration", and the report flagged 1 and 3
+    found = [{"extracted_data": "SQLite needs no server."}]
+    assert ab.unverified_numbers("#### 1. Setup\nSQLite needs no server.\n### 3) Features\n2 users", found) == ["2"]
+
+
 def test_restore_path_escapes():
     # What json.loads makes of "C:\path\to\new\real" written with single backslashes
     mangled = "python -m venv C:\\path" + "\t" + "o" + "\n" + "ew" + "\r" + "eal"

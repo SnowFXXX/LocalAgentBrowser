@@ -19,3 +19,6 @@ old versions/
 build/
 dist/
 *.egg-info/
+
+# Regression runs (tools/regression.py)
+regression_runs/

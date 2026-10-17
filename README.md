@@ -24,8 +24,8 @@ and tuned to work well with a **small 7B model on a CPU, no GPU required**.
 - ⚡ **Built for slow hardware.** It reuses LM Studio's prompt cache, so most turns process only what changed.
 - 📝 **A readable report every time.** `research_report.md` holds the final result and every finding with its
   source, written however the run ends; `research_log.txt` keeps every action and reason.
-- ✅ **Tested.** 112 tests on Linux and Windows, Python 3.10–3.13, run in about a second with no model or browser,
-  plus live runs on seven different kinds of task (see [results](#results-on-different-kinds-of-tasks)).
+- ✅ **Tested.** 136 tests on Linux and Windows, Python 3.10–3.13, run in about a second with no model or browser,
+  plus a [regression suite](#regression-suite) of live runs on seven different kinds of task.
 
 📖 **The story behind it:** [Teaching a 7B model on a CPU to finish what it starts](https://dev.to/snowfxxx/teaching-a-7b-model-on-a-cpu-to-finish-what-it-starts-1amc),
 six lessons from 30 versions of keeping a small local model on track.
@@ -163,6 +163,22 @@ does not generalise; the [changelog](https://github.com/SnowFXXX/LocalAgentBrows
 | Step-by-step how-to | Repot a houseplant: what you need, the steps, and care for the first two weeks | 1.43–1.44, 1.51 | 1.43 recorded six steps it wrote itself before reading the part that had them; 1.44 recorded the guide's real steps but took 68 min and its result left one out. 1.51: every step from the page, in 7 turns (29 min), and it says that no care instructions beyond the first watering were found |
 | Explanation of a topic | How photosynthesis works: inputs and outputs, both stages and where each takes place | 1.41–1.42, 1.52 | A complete, cited explanation in 18 turns (45 min); 1.41 read four parts of a relevant page without recording them and had not finished after 49 min. 1.52 recorded both stages and where each takes place, but did not finish within 65 min: it read the history sections of a long encyclopedia article twice and never recorded the inputs and outputs |
 
+### Regression suite
+
+Since 1.53, every change is measured on the same seven objectives, one of each kind above, run one after the other
+with a time limit each (`tools/regression.py`, see [Testing](#testing)). Single runs vary with the pages a search
+turns up, so the suite compares versions on all seven at once:
+
+| Task | 1.52 | 1.53 (objective checklist) |
+|---|---|---|
+| Factual question | Finished, 12 min | Finished, 14 min |
+| List of three office suites | Time limit (45 min) | Finished, 30 min; but one of the three (WPS Office) is not open source |
+| Comparison and recommendation | Time limit (45 min) | Finished, 39 min, every part covered |
+| How-to (repotting) | Time limit (45 min) | Time limit (45 min); materials and steps found, aftercare not |
+| Explanation (photosynthesis) | Time limit (60 min) | Finished, 13 min, but thin: one finding, no oxygen or water |
+| Opinion (owls) | Time limit (45 min) | Finished, 38 min, four cultures and an opinion |
+| Documentation (venv, official docs) | Finished, 15 min, from a tutorial site | Time limit (30 min); create and activate found, from python.org |
+
 ## How it works
 
 Each turn, the model sees the objective, what it has found so far, a journal of its recent actions and the
@@ -201,6 +217,11 @@ flowchart LR
   (or has a sentence that does) is sent back once, asking for only what the page says in its own words, and
   one far from anything on the page is refused outright. A small model will otherwise "complete" a list from
   its own knowledge when a page says "follow these 6 steps" and the steps come later.
+- **An objective checklist.** At the start, one short model call splits the objective into a fixed checklist of
+  what the result must contain, keeping conditions like "free, open-source" or "three". Each finding names the
+  items it serves, the checklist with its findings is in every prompt, and every check goes through these items
+  instead of asking the model to split the objective again from memory, which drifted: it once blocked its own
+  finish over "migration strategies", which the objective never asked for.
 - **Numbered findings.** Findings are numbered in the prompt and listed with every check, and the model names
   the finding that covers each part of the objective ("covered by [2]") instead of just saying "covered".
 - **Knowing when it's done.** After every new finding the model is asked whether the objective is now fully
@@ -290,14 +311,18 @@ turn that brings in a new page takes a few minutes. See [Performance](#performan
   research, an opinion from several sources, a factual question, a comparison, a how-to, a list and an
   explanation of a topic. Each one
   exposed something that did not generalise and was fixed; other kinds of tasks may expose more.
-- **Reading long pages.** The model used to read long pages part by part without recording the relevant
-  parts. Since 1.42 it must say what a part contains before reading on, and the explanation task finished on
-  1.42; on 1.52 the same task lost about 20 minutes reading unrelated sections of a long article twice and did
-  not finish. Choosing which parts of a long page to read is still the weakest area.
+- **Reading long pages and knowing when it has enough.** The model used to read long pages part by part
+  without recording the relevant parts; since 1.42 it must say what a part contains before reading on. On 1.52
+  the explanation task still lost about 20 minutes reading unrelated sections of a long article and did not
+  finish. On 1.53, with the objective checklist, it finished in 13 minutes, but from a single overview paragraph
+  that left out oxygen and water: the model can now claim one finding covers every item. Judging whether a
+  finding really covers an item is the weakest area.
 - **Conditions in the objective.** A small model tends to drop conditions such as "open source" or "using the
   official documentation": a list of open-source office suites once included FreeOffice (free but not open
-  source), and a task that asked for the official Python documentation used a tutorial site. Check the result
-  against any conditions you set.
+  source), and a task that asked for the official Python documentation used a tutorial site. The objective
+  checklist keeps the conditions in view (the documentation task went to python.org on 1.53), but on the same
+  run the list task still named WPS Office, which is not open source. Check the result against any conditions
+  you set.
 - **A small model's judgement is the ceiling.** It sometimes drifts to loosely related pages, prefers
   secondary sources or stays with one source too long, and results vary with the first pages a search turns
   up; every finding is in `research_report.md` regardless.
@@ -322,6 +347,9 @@ turn that brings in a new page takes a few minutes. See [Performance](#performan
 - [x] Finish as soon as the objective is covered (1.35)
 - [x] Get the model to weigh each part of a long page before reading on (1.42)
 - [ ] Let very strict objectives end with the gaps named instead of searching indefinitely (they finish since 1.50; naming the gaps is still open)
+- [x] Measure every change on a regression suite of seven kinds of task (1.53)
+- [x] Keep a fixed checklist of the objective's parts instead of re-splitting it at every check (1.53)
+- [ ] Check that a finding really covers its checklist item, including conditions like "open source"
 - [ ] Try more kinds of objectives (seven so far) and adjust the rules that don't generalise
 - [ ] Make fresh prompts (the slowest kind of turn) cheaper still (31% cheaper since 1.34)
 - [ ] Interacting with pages (clicking, forms) for tasks beyond reading
@@ -345,6 +373,19 @@ call:
 ```bash
 python tools/live_test.py "Your objective here" --minutes 25
 ```
+
+To measure a change on all seven kinds of task (about four hours on a CPU), compared with an earlier run:
+
+```bash
+python tools/regression.py --baseline regression_runs/<earlier run>/summary.json
+```
+
+Each run gets a folder in `regression_runs/` with every task's report, journal, console output and prompt
+trace, and a `summary.md` that is updated after each task: whether it finished, turns, model time, how many
+checklist items got findings, which checks fired, and problems found by simple word checks (missing answers,
+missed conditions such as a non-open-source item, uncited paragraphs, numbers missing from the findings, a
+missing opinion). `--suite all` adds five more tasks, `--only` runs some of them, and `--rescore` scores an
+earlier run again without the model.
 
 ## Contributing
 

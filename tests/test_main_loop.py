@@ -34,8 +34,11 @@ SCRIPT = [
 ]
 
 
+CHECKLIST_REPLY = json.dumps({"parts": ["the setup", "the fact"]})  # the objective split, before turn 1
+
+
 def run_agent(monkeypatch, tmp_path, objective_check_every=None, script=SCRIPT):
-    client, model = fake_client(script, prompt_tokens=None)
+    client, model = fake_client([CHECKLIST_REPLY] + script, prompt_tokens=None)
     real_sleep = asyncio.sleep
     monkeypatch.setattr(ab, "async_playwright", SITE.playwright)
     monkeypatch.setattr(ab, "AsyncOpenAI", lambda **kwargs: client)
@@ -45,8 +48,8 @@ def run_agent(monkeypatch, tmp_path, objective_check_every=None, script=SCRIPT):
     if objective_check_every:
         monkeypatch.setattr(ab, "OBJECTIVE_CHECK_EVERY", objective_check_every)
     asyncio.run(ab.main())
-    journal = json.loads((tmp_path / "research_log.txt").read_text(encoding="utf-8").split("\n", 1)[1])
-    return model.calls, journal
+    journal = ab.read_research_log(tmp_path / "research_log.txt")[2]
+    return model.calls[1:], journal  # Without the checklist call, so call numbers match the script
 
 
 def last_message(call):
@@ -64,6 +67,9 @@ def test_full_run(monkeypatch, tmp_path):
     assert "Search Results" in last_message(calls[1])
     assert "Page Text (part 1 of" in last_message(calls[2]) and "Page B" in last_message(calls[2])
     assert "choose FINISH now" in last_message(calls[3]), "after a discovery the model is asked whether it is done"
+    assert "1. the setup (discoveries for it: none yet)" in calls[0][1]["content"], "the checklist is in the fresh prompt"
+    assert "recorded as discovery [1] (linked to no checklist item)" in last_message(calls[3])
+    assert "OBJECTIVE CHECKLIST now:\n1. the setup" in last_message(calls[3])
     assert actions.count("REFUSED_IN_TURN") == 4 and "BLOCKED_NAVIGATE" in actions
     assert not any("done (visit" in last_message(c) for c in calls[4:7]), "a refused NAVIGATE must not report 'done'"
     assert "part 2 of" in last_message(calls[7]).lower()
@@ -73,7 +79,7 @@ def test_full_run(monkeypatch, tmp_path):
     assert "visit 2 of 3" in last_message(calls[10])
     assert "PROGRESS CHECK" in last_message(calls[10])
     assert not any("PROGRESS CHECK" in last_message(c) for c in calls[:10])
-    assert not any("OBJECTIVE CHECK" in last_message(c) for c in calls), "default schedule should not fire in 8 turns"
+    assert not any("OBJECTIVE CHECK:" in last_message(c) for c in calls), "default schedule should not fire in 8 turns"
     finish_check = last_message(calls[11])
     assert "Before finishing" in finish_check and "Do NOT" not in finish_check
     assert f"Your only discovery comes from {A}" in finish_check
@@ -115,7 +121,16 @@ def test_report_is_written_when_the_run_stops_early(monkeypatch, tmp_path):
 
 def test_objective_check_schedule(monkeypatch, tmp_path):
     calls, _ = run_agent(monkeypatch, tmp_path, objective_check_every=3)
-    fired = [i for i, c in enumerate(calls) if "OBJECTIVE CHECK" in last_message(c)]
+    fired = [i for i, c in enumerate(calls) if "OBJECTIVE CHECK:" in last_message(c)]
     assert fired == [3, 8], "after turns 3 and 6"
     assert "recorded 1 discoveries in 3 turns" in last_message(calls[3])
-    assert "PROGRESS CHECK" in last_message(calls[10]) and "OBJECTIVE CHECK" not in last_message(calls[10])
+    assert "PROGRESS CHECK" in last_message(calls[10]) and "OBJECTIVE CHECK:" not in last_message(calls[10])
+
+
+def test_discoveries_are_linked_to_checklist_items(monkeypatch, tmp_path):
+    linked = json.dumps({"thought_process": "t", "action": "DISCOVER", "parameter": "fact from a", "checklist_items": [2, 9]})
+    script = [reply("SEARCH", "docs a"), reply("NAVIGATE", A), linked]
+    calls, journal = run_agent(monkeypatch, tmp_path, script=script)
+    assert journal[-1]["checklist_items"] == [2], "item numbers outside the checklist are dropped"
+    report = (tmp_path / ab.REPORT_FILE).read_text(encoding="utf-8")
+    assert "fact from a" in report

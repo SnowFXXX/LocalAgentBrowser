@@ -1,8 +1,40 @@
 # Changelog
 
-Every version of `agent_browser.py`, newest first. Each version is also a tagged commit (`v1.11` … `v1.52`).
+Every version of `agent_browser.py`, newest first. Each version is also a tagged commit (`v1.11` … `v1.53`).
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
+
+## [1.53] - 2026-10-17
+### Added
+- Regression suite (`tools/regression.py`): seven objectives, one of each kind of task tested so far, run one
+  after the other with a time limit each and scored the same way (finished or not, turns, model time, checklist
+  progress, checks fired, and word checks for missing answers, missed conditions, uncited paragraphs, numbers
+  missing from the findings and a missing opinion), with a comparison to an earlier run. Single runs had been
+  flattering: on 1.52 the suite finished only 2 of 7 tasks within their limits, including tasks earlier single
+  runs had finished. Refused actions in the journal now name the check that refused them, so the suite can count
+  each check, and the live test runner times every model call and saves the model's full replies.
+- Objective checklist. The 1.52 suite showed the main failure: every check asked the model to split the
+  objective into parts again, from memory, and the split drifted. On the list task it blocked its own FINISH
+  over "migration strategies", which the objective never asked for (an idea from a page it had read), and never
+  looked for a third suite; on the comparison it added "data types" and never covered "many simultaneous users".
+  Now one short call at the start splits the objective into a fixed checklist; asked on its own, the model split
+  all seven test objectives cleanly and kept their conditions. Each DISCOVER names the items it serves
+  (`checklist_items` in the reply), the checklist with its discoveries is in fresh prompts and in the note after
+  each discovery, the finish, progress and objective checks go through its items ("do not add other parts"),
+  the read-on check names the items still open, the final result covers every item or says it was not found,
+  and the report lists the checklist. The split call uses the same system prompt as turn 1, so LM Studio's cache
+  of it still applies there (without that, turn 1 took 128 s instead of about 40).
+### Fixed
+- The report flagged the numbers of numbered headings ("#### 1. Setup") as numbers missing from the findings.
+
+Regression run against 1.52 (model minutes in brackets): 5 of 7 tasks finished instead of 2, and the total model
+time fell from 254 to 200 minutes. The list (30.1, was a 45-minute time limit), comparison (39.0, every part
+covered), explanation (12.9, was 60 without finishing) and opinion (38.1) tasks now finish; the factual question
+still does (13.6, was 11.9). What is not better: the list names WPS Office, which is not open source; the
+explanation finished from a single overview paragraph that the model claimed covered all four items, without
+oxygen or water; the how-to found the materials and steps but not the aftercare before its time limit; and the
+documentation task now went to python.org, as asked, but worked through the items one search at a time and hit
+its 30-minute limit before the last one (it had finished in 15 minutes on 1.52, from a tutorial site).
 
 ## [1.52] - 2026-10-16
 ### Changed

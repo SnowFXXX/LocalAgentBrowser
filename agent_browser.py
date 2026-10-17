@@ -69,9 +69,15 @@ FINAL_RESULT = ("the complete final result the objective asks for (for example t
                 "deliverable, not just a list of what you found)")
 GIVE_UP_RULE = ("If you have already looked for a part in several places without finding it, it may not be available: "
                 "finish anyway and say in the final result what could not be found.")
-FINISH_CHECK = (f"Before finishing, {CHECK_PARTS} If any part is 'not covered', do not finish: choose the action that "
-                f"works on that part ({GIVE_UP_RULE}) If every other part is covered, repeat FINISH with {FINAL_RESULT} "
-                "in the parameter.")
+MAX_CHECKLIST_ITEMS = 8   # Most parts an objective is split into; a longer split is cut, a failed one is the whole objective
+MAX_CHECKLIST_ITEM_CHARS = 200
+SPLIT_MAX_TOKENS = 300
+CHECKLIST_SPLIT = ("Split the OBJECTIVE into the separate things the final result must contain, as a short checklist. "
+                   "One item per thing to find or to write; keep the objective's own wording; include every condition it "
+                   "sets (for example 'free', 'open-source', 'official documentation', a number of items) in the item it "
+                   "applies to; do not add anything the objective does not ask for. Reply with JSON: {\"parts\": [\"...\", ...]}")
+CHECKLIST_FORMAT = {"type": "json_schema", "json_schema": {"name": "checklist", "strict": True, "schema": {
+    "type": "object", "properties": {"parts": {"type": "array", "items": {"type": "string"}}}, "required": ["parts"]}}}
 
 SYSTEM_PROMPT = """You are an autonomous web discovery agent. Your job is to achieve the high-level OBJECTIVE by executing sequential actions.
 On every turn, evaluate the CURRENT ENVIRONMENT and your RESEARCH JOURNAL. You must output exactly ONE valid JSON block matching this structure:
@@ -79,14 +85,15 @@ On every turn, evaluate the CURRENT ENVIRONMENT and your RESEARCH JOURNAL. You m
 {
   "thought_process": "Your active reasoning about what to discover next and why.",
   "action": "SEARCH" | "NAVIGATE" | "READ_MORE" | "DISCOVER" | "FINISH",
-  "parameter": "The search query string, the full target URL, a page part number, the extracted summary data, or an empty string"
+  "parameter": "The search query string, the full target URL, a page part number, the extracted summary data, or an empty string",
+  "checklist_items": [numbers of the OBJECTIVE CHECKLIST items a DISCOVER gives information for; [] for other actions]
 }
 
 Action guide:
 - SEARCH: parameter is a plain-text query (not a URL). Results appear as a numbered list with URLs.
 - NAVIGATE: parameter is a full URL copied exactly from the search results or page links you were shown.
 - READ_MORE: long pages are shown in parts. Use an empty parameter to see the next part, or a part number to jump to that part.
-- DISCOVER: parameter is the information you found on the current page that serves the objective. DISCOVER does not extract anything for you: you must write the information itself into the parameter. An empty DISCOVER is refused. Copy exact text where precision matters. You may group several related details from the same page into one DISCOVER. Only information found on the page belongs in a DISCOVER; your own conclusions and opinions go in the FINISH parameter.
+- DISCOVER: parameter is the information you found on the current page that serves the objective. DISCOVER does not extract anything for you: you must write the information itself into the parameter. An empty DISCOVER is refused. Copy exact text where precision matters. You may group several related details from the same page into one DISCOVER. Only information found on the page belongs in a DISCOVER; your own conclusions and opinions go in the FINISH parameter. In checklist_items, give the numbers of the OBJECTIVE CHECKLIST items it gives information for.
 - FINISH: only when your discoveries cover every part of the objective. The parameter must contain the complete final result the objective asks for (for example the answer, opinion, summary or deliverable), not just a list of what you found.
 
 Strictly follow these rules:
@@ -106,9 +113,10 @@ RESPONSE_FORMAT = {
             "properties": {
                 "thought_process": {"type": "string"},
                 "action": {"type": "string", "enum": ["SEARCH", "NAVIGATE", "READ_MORE", "DISCOVER", "FINISH"]},
-                "parameter": {"type": "string"}
+                "parameter": {"type": "string"},
+                "checklist_items": {"type": "array", "items": {"type": "integer"}}
             },
-            "required": ["thought_process", "action", "parameter"]
+            "required": ["thought_process", "action", "parameter", "checklist_items"]
         }
     }
 }
@@ -523,7 +531,7 @@ def leave_check(action, page_state, current_url, journal=()):
             f"If it has information relevant to the objective, DISCOVER it now{read_more}. "
             f"If it truly has nothing relevant, repeat your {action} to leave.")
 
-def read_on_check(page_state, current_url, target):
+def read_on_check(page_state, current_url, target, checklist=None):
     # The model read long pages part after part without recording anything, even though every prompt ends by
     # asking it to DISCOVER relevant information first: on an explanation task it read four parts of a page that
     # had the inputs, outputs and cell locations it needed and recorded them only when a progress check fired.
@@ -539,10 +547,14 @@ def read_on_check(page_state, current_url, target):
     if index in confirmed:
         return None
     confirmed.add(index)
+    # Naming the items still open: on an explanation task the model answered 'none' for every part of an overview
+    # that gave the inputs and outputs it still needed, while it was thinking about the Calvin cycle
+    still_open = open_items(checklist)
+    serves = f"the OBJECTIVE (above all the checklist items with nothing recorded yet: {still_open})" if still_open else "the OBJECTIVE"
     return "CONFIRM_READ_ON", (f"Before reading on: you have recorded nothing from part {index + 1}, which is shown now. "
-                               "In thought_process, list each fact in it that serves the OBJECTIVE, or write 'none'. If any "
+                               f"In thought_process, list each fact in it that serves {serves}, or write 'none'. If any "
                                "of them are not in DISCOVERIES SO FAR, DISCOVER them now. If there are none, repeat your "
-                               "READ_MORE. But if DISCOVERIES SO FAR already cover every part of the OBJECTIVE, choose "
+                               "READ_MORE. But if DISCOVERIES SO FAR already cover every item of the OBJECTIVE CHECKLIST, choose "
                                "FINISH instead of reading on, and if this page is not about the OBJECTIVE at all, leave "
                                "it with SEARCH or NAVIGATE.")
 
@@ -619,7 +631,7 @@ def check_decision(action, parameter, journal, tried, page_state, current_url, t
             return "CONFIRM_REREAD", (f"You already read part {target + 1} of this page; anything useful from it should "
                                       "already be in DISCOVERIES SO FAR. Choose an unread part or another action, or "
                                       "repeat this READ_MORE if you really need to read it again.")
-        return read_on_check(page_state, current_url, target)
+        return read_on_check(page_state, current_url, target, tried.get("checklist"))
     elif action == "DISCOVER":
         if not discovery_lines(parameter):
             return "BLOCKED_DISCOVER", "The DISCOVER parameter was empty. Put the actual information in the parameter."
@@ -652,7 +664,7 @@ def finish_check(tried, journal, page_state=None, current_url=None):
         return None
     tried["finish_confirmed"] = True  # Reset at the start of every turn
     return "CONFIRM_FINISH", (f"{source_note(journal)}{unread_note(page_state or {}, current_url)}"
-                              f"{numbered_discoveries(journal)} {FINISH_CHECK}")
+                              f"{numbered_discoveries(journal)} {finish_check_text(tried)}")
 
 def numbered_discoveries(journal, limit=MAX_CHECK_DISCOVERY_CHARS):
     # Asked to name the discovery covering each part of the objective, the model marked the light reactions
@@ -666,6 +678,69 @@ def numbered_discoveries(journal, limit=MAX_CHECK_DISCOVERY_CHARS):
 def numbered_lines(journal, limit):
     found = [e for e in journal if e.get("action") == "DISCOVER"]
     return [f"[{i}] {shorten(e['extracted_data'], limit)}" for i, e in enumerate(found, 1)]
+
+async def split_objective(client, objective):
+    """The objective as a fixed checklist of the things the final result must contain, made once per run.
+
+    Every check used to ask the model to split the objective again, from memory, and a 7B model's split drifted:
+    on a list task it added "migration strategies" from a page it had read and blocked its own FINISH over it, and
+    on a comparison it added "data types" while never covering "many simultaneous users". Asked once, on its own,
+    it split all seven test objectives cleanly, keeping their conditions ("free, open-source", "official
+    documentation", "three"). If the split fails, the whole objective is the only item.
+    """
+    try:
+        response = await client.chat.completions.create(
+            model=MODEL, temperature=0.2, max_tokens=SPLIT_MAX_TOKENS, response_format=CHECKLIST_FORMAT,
+            # Same system prompt as turn 1, so LM Studio's cache of it is still valid there: without it turn 1
+            # took 128 s instead of about 40
+            messages=[{"role": "system", "content": SYSTEM_PROMPT},
+                      {"role": "user", "content": f"### OBJECTIVE\n{objective}\n\n{CHECKLIST_SPLIT}"}])
+        parts = json.loads(extract_message_content(response)).get("parts")
+        items = [shorten(p, MAX_CHECKLIST_ITEM_CHARS) for p in parts if isinstance(p, str) and p.strip()] if isinstance(parts, list) else []
+    except Exception as err:  # A malformed reply or a server problem: the run still works with one item
+        print(f"⚠️ Could not split the objective into a checklist ({err}); using the whole objective.")
+        items = []
+    return [{"text": text, "discoveries": []} for text in items[:MAX_CHECKLIST_ITEMS]] or [{"text": objective, "discoveries": []}]
+
+def checklist_lines(checklist):
+    lines = []
+    for number, item in enumerate(checklist or [], 1):
+        found = ", ".join(f"[{n}]" for n in item["discoveries"])
+        lines.append(f"{number}. {item['text']} (discoveries for it: {found or 'none yet'})")
+    return "\n".join(lines)
+
+def open_items(checklist):
+    """The checklist items nothing has been recorded for yet, as one line for prompts."""
+    return "; ".join(f"{n}. {item['text']}" for n, item in enumerate(checklist or [], 1) if not item["discoveries"])
+
+def link_discovery(checklist, items, number):
+    """Records which checklist items a new discovery serves, as the model named them; returns the valid ones."""
+    linked = []
+    for item in items if isinstance(items, list) else []:
+        if isinstance(item, int) and not isinstance(item, bool) and 1 <= item <= len(checklist or []) and item not in linked:
+            linked.append(item)
+            checklist[item - 1]["discoveries"].append(number)
+    return linked
+
+def check_parts(tried):
+    # The part-by-part check goes through the fixed checklist instead of a fresh split of the objective; "do not
+    # add other parts" because the model's own additions blocked finishing. Recorded discoveries per item are
+    # facts, not a verdict: LibreOffice recorded three times is three discoveries for "three alternatives"
+    checklist = tried.get("checklist")
+    if not checklist:
+        return CHECK_PARTS
+    return ("go through the OBJECTIVE CHECKLIST below, which lists every part of the OBJECTIVE (do not add other parts), "
+            "and in thought_process write each item's number followed by the number of the discovery that covers it (for "
+            "example '2: covered by [3]'), or 'not covered'. An item asking for a number of things is covered only when "
+            "that many different ones are recorded. Only items that ask for your own answer, opinion, recommendation or "
+            "summary are 'written at FINISH' (write them in the FINISH parameter, never as a DISCOVER); information an "
+            "item asks you to find is never 'written at FINISH': it is covered by a discovery or 'not covered'.\n"
+            f"OBJECTIVE CHECKLIST:\n{checklist_lines(checklist)}\n")
+
+def finish_check_text(tried):
+    return (f"Before finishing, {check_parts(tried)} If any part is 'not covered', do not finish: choose the action that "
+            f"works on that part ({GIVE_UP_RULE}) If every other part is covered, repeat FINISH with {FINAL_RESULT} "
+            "in the parameter.")
 
 def unread_note(page_state, current_url):
     # On a how-to the agent finished after 3 of 6 parts of the recipe, missing the amounts on the unread parts
@@ -832,6 +907,9 @@ async def build_full_prompt(page, objective, journal, current_url, tried, page_s
 ### DISCOVERIES SO FAR
 {discoveries}
 
+### OBJECTIVE CHECKLIST (every part of the objective, with the discoveries recorded for each)
+{checklist_lines(tried.get("checklist")) or "[None]"}
+
 ### RECENT RESEARCH JOURNAL
 {recent_journal}
 
@@ -918,10 +996,22 @@ async def request_decision(client, messages, journal, tried, page_state, current
             correction = escalation_message(len(refused), action, refusal[1], page_state, current_url) + "\nReply with only the JSON object."
         messages += [{"role": "assistant", "content": original_content}, {"role": "user", "content": correction}]
 
-def write_research_log(objective, journal):
+def write_research_log(objective, journal, checklist=None):
     with open("research_log.txt", "w", encoding="utf-8") as log:
         log.write(f"OBJECTIVE: {objective}\n")
+        if checklist:
+            log.write(f"CHECKLIST: {json.dumps(checklist, ensure_ascii=False)}\n")
         log.write(json.dumps(journal, indent=2))
+
+def read_research_log(path="research_log.txt"):
+    """The objective, checklist (None in logs from before 1.53) and journal from a research log."""
+    with open(path, encoding="utf-8") as log:
+        objective, _, rest = log.read().partition("\n")
+    checklist = None
+    if rest.startswith("CHECKLIST: "):
+        line, _, rest = rest.partition("\n")
+        checklist = json.loads(line.removeprefix("CHECKLIST: "))
+    return objective.removeprefix("OBJECTIVE: "), checklist, json.loads(rest) if rest.strip() else []
 
 NUMBER_PATTERN = re.compile(r"\d+(?:[.,/]\d+)*")
 
@@ -932,7 +1022,7 @@ def unverified_numbers(text, discoveries):
     1/4 cup)"); numbers are where such errors do the most harm and the easiest place to check them.
     """
     text = re.sub(r"\[\d+(?:\s*[-–,;]\s*\d+)*\]", " ", str(text))  # Citation markers: [2], [4, 5], [1-4]
-    text = re.sub(r"(?m)^\s*\d+[.)]\s", " ", text)      # Numbered list items
+    text = re.sub(r"(?m)^\s*(?:#+\s*)?\d+[.)]\s", " ", text)  # Numbered list items and headings ("#### 1. Setup")
     known = {n.replace(",", "") for e in discoveries for n in NUMBER_PATTERN.findall(e["extracted_data"])}
     unverified = []
     for number in NUMBER_PATTERN.findall(text):
@@ -940,7 +1030,7 @@ def unverified_numbers(text, discoveries):
             unverified.append(number)
     return unverified
 
-def write_report(objective, journal):
+def write_report(objective, journal, checklist=None):
     """A readable report with the final result and every discovery, so nothing depends on the model's
     summary being complete. Written however the run ends."""
     finish = next((e for e in reversed(journal) if e.get("action") == "FINISH"), None)
@@ -957,6 +1047,9 @@ def write_report(objective, journal):
     else:
         lines += [f"**Status:** stopped before the agent finished (after turn {last_turn})", "", "## Final result", "",
                   "_(The agent did not finish; see the discoveries below.)_"]
+    if checklist and len(checklist) > 1:
+        lines += ["", "## Checklist", "", "The parts of the objective, with the discoveries recorded for each:", "",
+                  checklist_lines(checklist)]
     lines += ["", f"## Discoveries ({len(found)})"]
     for i, e in enumerate(found, start=1):
         lines += ["", f"### {i}. Turn {e.get('turn')}, from {e.get('source') or 'unknown page'}", "", e["extracted_data"]]
@@ -966,7 +1059,7 @@ def write_report(objective, journal):
 COMPOSE_SYSTEM = ("You write the final result of a web research task, using only the findings that were recorded "
                   "during it.")
 
-async def compose_final_result(client, objective, journal):
+async def compose_final_result(client, objective, journal, checklist=None):
     """Writes the final result in a model call whose only job is writing.
 
     Deciding what to browse and writing the deliverable compete for a small model's attention: in a live run
@@ -980,7 +1073,11 @@ async def compose_final_result(client, objective, journal):
     # this step then copied; everything here must come from the recorded discoveries
     # Rules a small model skipped when they came late in one long instruction (it listed four items when asked
     # for three, and added "My view" to a request for strengths) are given as a short numbered list
-    request = (f"### OBJECTIVE\n{objective}\n\n### DISCOVERIES\n{listing}\n\n"
+    # The checklist gives the parts in order: the strict documentation result did not say that the parameter
+    # schemas it was asked for were never found
+    parts = ("### CHECKLIST (the parts of the OBJECTIVE)\n" + "\n".join(f"{n}. {item['text']}" for n, item in enumerate(checklist, 1))
+             + "\n\n") if checklist and len(checklist) > 1 else ""
+    request = (f"### OBJECTIVE\n{objective}\n\n{parts}### DISCOVERIES\n{listing}\n\n"
                "Write the complete final result the OBJECTIVE asks for: do exactly what it asks (for example answer "
                "the question, write the summary or the plan, or give the opinion). Rules:\n"
                "1. Use only the information in the DISCOVERIES. Do not fill gaps from your own knowledge or with "
@@ -995,7 +1092,8 @@ async def compose_final_result(client, objective, journal):
                "for something that discovery actually says.\n"
                "5. Do not add a 'My view:' paragraph unless the objective explicitly asks for your view, opinion or "
                "recommendation; if it does, give it in a paragraph that starts with 'My view:'.\n"
-               "6. Write plain text, not JSON.")
+               + ("6. Cover every CHECKLIST item; for an item no discovery supports, say plainly that it was not found.\n"
+                  "7. Write plain text, not JSON." if parts else "6. Write plain text, not JSON."))
     # A fresh prompt with only the discoveries, not the browsing conversation: continuing that conversation let
     # the model use page text it had read but not recorded, and cite discovery numbers that did not say it
     messages = [{"role": "system", "content": COMPOSE_SYSTEM}, {"role": "user", "content": request}]
@@ -1055,6 +1153,9 @@ async def main():
     turn_counter = 1
     max_turns = 100
     tried = {"queries": [], "urls": [], "objective": objective}
+    print("📋 Splitting the objective into a checklist...")
+    tried["checklist"] = await split_objective(client, objective)
+    print("📋 Objective checklist:\n" + checklist_lines(tried["checklist"]))
     page_state = {"url": None, "parts": [], "index": 0}
     conversation = new_conversation()
     loop_msg = None
@@ -1092,9 +1193,11 @@ async def main():
                     print(f"💡 Check that LM Studio is running at {BASE_URL} and model '{MODEL}' is loaded.")
                     break
 
-                # Replies refused and retried within this turn stay in the journal so the model sees what failed
+                # Replies refused and retried within this turn stay in the journal so the model sees what failed;
+                # "check" names the check that refused them, for counting in the regression runs (not shown to the model)
                 for r in refused:
-                    journal.append({"turn": turn_counter, "action": "REFUSED_IN_TURN", "requested": f"{r['action']} {r['parameter'][:120]}", "reason": r["reason"]})
+                    journal.append({"turn": turn_counter, "action": "REFUSED_IN_TURN", "requested": f"{r['action']} {r['parameter'][:120]}", "reason": r["reason"],
+                                    "check": r["journal_action"]})
 
                 print(f"💡 Agent Thoughts: {thought}")
                 print(f"🎬 Chosen Action: [{action}] -> Parameter: {parameter}")
@@ -1112,7 +1215,7 @@ async def main():
                     finish_entry = {"turn": turn_counter, "thought": thought, "action": "FINISH", "finding": parameter}
                     journal.append(finish_entry)
                     try:
-                        final = await compose_final_result(client, objective, journal)
+                        final = await compose_final_result(client, objective, journal, tried.get("checklist"))
                         if final:
                             finish_entry.update(draft=parameter, finding=final)
                     except Exception as err:
@@ -1188,21 +1291,27 @@ async def main():
 
                 elif action == "DISCOVER":
                     print(f"📝 Logging critical discovery element: {parameter}")
-                    journal.append({"turn": turn_counter, "thought": thought, "action": "DISCOVER", "source": current_url, "extracted_data": parameter})
+                    number = sum(1 for e in journal if e.get("action") == "DISCOVER") + 1
+                    linked = link_discovery(tried["checklist"], decision.get("checklist_items"), number)
+                    journal.append({"turn": turn_counter, "thought": thought, "action": "DISCOVER", "source": current_url,
+                                    "extracted_data": parameter, "checklist_items": linked})
                     page_state["visit_discoveries"] = page_state.get("visit_discoveries", 0) + 1
                     page_state.setdefault("recorded_parts", set()).add(page_state["index"])
                     # A discovery is when the objective can become complete; on a one-answer question the model
                     # recorded the full answer, said "the objective has been met", then kept reading for
                     # "interesting" details, so completion is checked right here. On an explanation task it recorded
                     # the Calvin cycle step by step while the light reactions were still missing, so the note also
-                    # points to the parts not yet covered
-                    number = sum(1 for e in journal if e.get("action") == "DISCOVER")
-                    set_note(conversation, f"RESULT: Your DISCOVER was recorded as discovery [{number}] in DISCOVERIES SO FAR. "
-                                           f"{where_you_are(page_state, current_url)} The page is unchanged. "
+                    # points to the parts not yet covered, and the checklist with its discoveries shows which ones are open
+                    linked_note = (f" for checklist item {', '.join(map(str, linked))}" if linked else
+                                   " (linked to no checklist item)")
+                    set_note(conversation, f"RESULT: Your DISCOVER was recorded as discovery [{number}]{linked_note}. "
+                                           f"{where_you_are(page_state, current_url)} The page is unchanged.\n"
+                                           f"OBJECTIVE CHECKLIST now:\n{checklist_lines(tried['checklist'])}\n"
                                            "Do not record the same information again. If DISCOVERIES SO FAR now cover "
-                                           "every part of the OBJECTIVE, choose FINISH now; do not read further for extra "
-                                           "or merely interesting details. If some parts are still not covered, work on "
-                                           "those next instead of adding more detail to parts already covered.", current_url)
+                                           "every item of the OBJECTIVE CHECKLIST, choose FINISH now; do not read further "
+                                           "for extra or merely interesting details. If some items are still not covered, "
+                                           "work on those next instead of adding more detail to items already covered.",
+                             current_url)
 
                 # A single refusal gets a short warning; repeated refusals get an explicit list of other options
                 last_entry = journal[-1]["action"] if journal else ""
@@ -1226,7 +1335,7 @@ async def main():
                     print(f"⚠️ No new discoveries in {turns_without_discovery} turns. Adding progress check.")
                     progress = (f"PROGRESS CHECK: no new discoveries in the last {turns_without_discovery} turns."
                                 f"{numbered_discoveries(journal)} {READ_FIRST} "
-                                f"Then {CHECK_PARTS} If every part is covered, choose FINISH with {FINAL_RESULT} in the "
+                                f"Then {check_parts(tried)} If every part is covered, choose FINISH with {FINAL_RESULT} in the "
                                 "parameter. If not, state in thought_process exactly what is still missing, then go and find "
                                 f"that specific thing. {GIVE_UP_RULE}")
                     loop_msg = f"{loop_msg}\n{progress}" if loop_msg else progress
@@ -1242,22 +1351,22 @@ async def main():
                         check = (f"OBJECTIVE CHECK: you have recorded {count} discoveries in {turn_counter} turns."
                                  f"{numbered_discoveries(journal)} "
                              f"{source_note(journal)} {READ_FIRST} "
-                                 f"Then {CHECK_PARTS} If every part is covered, choose FINISH with {FINAL_RESULT} in the "
+                                 f"Then {check_parts(tried)} If every part is covered, choose FINISH with {FINAL_RESULT} in the "
                                  "parameter. If not, state in thought_process exactly what is still missing and go directly for it; "
                                  f"do not spend turns on topics outside the objective. {GIVE_UP_RULE}")
                         loop_msg = f"{loop_msg}\n{check}" if loop_msg else check
 
                 # Saved every turn as well, so a crash or a killed process still leaves a current report
-                write_research_log(objective, journal)
-                write_report(objective, journal)
+                write_research_log(objective, journal, tried.get("checklist"))
+                write_report(objective, journal, tried.get("checklist"))
 
                 turn_counter += 1
                 print("\n⏱️ Cycle pacing check complete. Refreshing navigation loop pipeline...")
                 await asyncio.sleep(TURN_PAUSE_SECONDS)
         finally:
             # Always saved, however the run ends: FINISH, the turn limit, Ctrl+C or an outside time limit
-            write_research_log(objective, journal)
-            write_report(objective, journal)
+            write_research_log(objective, journal, tried.get("checklist"))
+            write_report(objective, journal, tried.get("checklist"))
 
         print(f"\n🔒 Shutting down browser instance. Report: {REPORT_FILE}; full journal: research_log.txt.")
         await browser.close()
