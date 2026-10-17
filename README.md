@@ -161,7 +161,7 @@ does not generalise; the [changelog](https://github.com/SnowFXXX/LocalAgentBrows
 | List of items | Three free, open-source alternatives to Microsoft Office and what each is best at | 1.46, 1.51 | LibreOffice and OnlyOffice with their strengths, cited, in 18 turns (49 min); the third, FreeOffice, is free but not open source, and LibreOffice was recorded four times in different words; on 1.51: LibreOffice, OnlyOffice and Apache OpenOffice, all open source, in 7 turns (16 min) |
 | Step-by-step how-to | Make a sourdough starter, with quantities and what to do each day | 1.36–1.37 | A clear plan in 7 turns (19 min), but it invented the first water amount; 1.37 stops guessing and flags unsupported numbers, and the agent then went looking for the missing details |
 | Step-by-step how-to | Repot a houseplant: what you need, the steps, and care for the first two weeks | 1.43–1.44, 1.51 | 1.43 recorded six steps it wrote itself before reading the part that had them; 1.44 recorded the guide's real steps but took 68 min and its result left one out. 1.51: every step from the page, in 7 turns (29 min), and it says that no care instructions beyond the first watering were found |
-| Explanation of a topic | How photosynthesis works: inputs and outputs, both stages and where each takes place | 1.41–1.42 | A complete, cited explanation in 18 turns (45 min); 1.41 read four parts of a relevant page without recording them and had not finished after 49 min |
+| Explanation of a topic | How photosynthesis works: inputs and outputs, both stages and where each takes place | 1.41–1.42, 1.52 | A complete, cited explanation in 18 turns (45 min); 1.41 read four parts of a relevant page without recording them and had not finished after 49 min. 1.52 recorded both stages and where each takes place, but did not finish within 65 min: it read the history sections of a long encyclopedia article twice and never recorded the inputs and outputs |
 
 ## How it works
 
@@ -253,8 +253,9 @@ Measured on an Intel i5-9500 (6 cores, no GPU) with Qwen2.5-7B-Instruct Q4_K_M a
 | Fresh prompt after the context budget is reached | 160–380 s (longest with long pages) |
 | Writing the final result (once, at the end) | 50–190 s, depending on how much was found |
 
-Whole runs from the results table: a factual question in about 12 minutes of model time, a list of three items
-in 24, a comparison in 33. A GPU or a smaller model will be much faster.
+Whole runs vary with the pages a search turns up. In the results table, a factual question takes about 12
+minutes of model time, a list of three items 16 to 49, a comparison 25 to 38 and an explanation 45 or more. A
+GPU or a smaller model will be much faster.
 
 ## FAQ
 
@@ -289,9 +290,14 @@ turn that brings in a new page takes a few minutes. See [Performance](#performan
   research, an opinion from several sources, a factual question, a comparison, a how-to, a list and an
   explanation of a topic. Each one
   exposed something that did not generalise and was fixed; other kinds of tasks may expose more.
-- **Reading without recording.** The model used to read long pages part by part without recording the
-  relevant parts. Since 1.42 it must say what a part contains before reading on, which fixed this on an
-  explanation task; it is still the area most likely to need more work on other pages.
+- **Reading long pages.** The model used to read long pages part by part without recording the relevant
+  parts. Since 1.42 it must say what a part contains before reading on, and the explanation task finished on
+  1.42; on 1.52 the same task lost about 20 minutes reading unrelated sections of a long article twice and did
+  not finish. Choosing which parts of a long page to read is still the weakest area.
+- **Conditions in the objective.** A small model tends to drop conditions such as "open source" or "using the
+  official documentation": a list of open-source office suites once included FreeOffice (free but not open
+  source), and a task that asked for the official Python documentation used a tutorial site. Check the result
+  against any conditions you set.
 - **A small model's judgement is the ceiling.** It sometimes drifts to loosely related pages, prefers
   secondary sources or stays with one source too long, and results vary with the first pages a search turns
   up; every finding is in `research_report.md` regardless.

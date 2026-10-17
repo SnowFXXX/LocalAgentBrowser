@@ -1,6 +1,6 @@
 # Changelog
 
-Every version of `agent_browser.py`, newest first. Each version is also a tagged commit (`v1.11` … `v1.28`).
+Every version of `agent_browser.py`, newest first. Each version is also a tagged commit (`v1.11` … `v1.52`).
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
