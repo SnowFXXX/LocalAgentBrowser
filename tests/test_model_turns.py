@@ -91,7 +91,7 @@ class TestComposeFinalResult:
         assert "[1] (from an unknown page)\nfact one" in user["content"] and "[2] (from an unknown page)\nfact two" in user["content"]
         assert "Use only the information in the DISCOVERIES" in user["content"] and "'My view:'" in user["content"]
         assert "unless the objective explicitly asks for your view" in user["content"] and "Do not fill gaps" in user["content"]
-        assert "give exactly that many" in user["content"]
+        assert "Never list the same item twice" in user["content"]
         assert "describes that situation, not the one in the OBJECTIVE" in user["content"]
         assert "Copy commands, code, file paths and names exactly" in user["content"]
         assert "DRAFT" not in user["content"], "the agent's unverified draft is not shown"
@@ -170,3 +170,11 @@ def test_fresh_prompt_numbers_the_discoveries(scrapes):
     turn(client, journal=discoveries("first fact", "second fact"))
     prompt = model.calls[0][1]["content"]
     assert "### DISCOVERIES SO FAR\n[1] first fact\n[2] second fact\n" in prompt
+
+
+def test_only_the_first_turn_asks_for_one_search_for_the_whole_objective(scrapes):
+    client, model = fake_client([reply("SEARCH", "q"), reply("SEARCH", "q2")])
+    turn(client, journal=[], current_url=None)
+    turn(client, journal=[{"turn": 1, "action": "SEARCH", "requested": "q"}], current_url=None)
+    assert ab.FIRST_TURN_INSTRUCTION in model.calls[0][-1]["content"]
+    assert ab.FIRST_TURN_INSTRUCTION not in model.calls[1][-1]["content"]

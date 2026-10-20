@@ -17,6 +17,7 @@ SITE = FakeSite(
     },
     results=[{"title": "Doc A", "href": "//duckduckgo.com/l/?uddg=" + urllib.parse.quote(A), "snippet": "about a"}],
 )
+COVERED = json.dumps({"evidence": "[1] fact from a", "missing": "", "conditions": [], "things": []})
 SCRIPT = [
     reply("SEARCH", "docs a"),         # turn 1: fresh prompt
     reply("NAVIGATE", A),              # turn 2: search results arrive as a follow-up note
@@ -30,6 +31,8 @@ SCRIPT = [
     reply("NAVIGATE", A),              #         repeated -> goes through (going back to A is allowed)
     reply("FINISH", "done"),           # turn 8: finish check
     reply("FINISH", "final answer"),   #         repeated with the final result -> finished
+    COVERED, COVERED,                  # the coverage check of each checklist item finds no gaps
+    COVERED, COVERED,                  # no item has a linked discovery, so both are checked once more before writing
     "Composed final result citing [1].",  # the separate call that writes the final result (plain text)
 ]
 
@@ -62,9 +65,11 @@ def test_full_run(monkeypatch, tmp_path):
 
     assert len(calls) == len(SCRIPT)
     last = len(calls) - 1  # the final result is written from its own fresh prompt
-    assert [i for i, c in enumerate(calls) if len(c) == 2] == [0, last], "only the first call (and the final result) are fresh"
-    assert all(calls[i][:len(calls[i - 1])] == calls[i - 1] for i in range(1, last)), "each browsing call must extend the previous"
+    assert [i for i, c in enumerate(calls) if len(c) == 2] == [0, 12, 13, 14, 15, last], \
+        "only the first call, the coverage checks (and their recheck) and the final result are fresh"
+    assert all(calls[i][:len(calls[i - 1])] == calls[i - 1] for i in range(1, 12)), "each browsing call must extend the previous"
     assert "Search Results" in last_message(calls[1])
+    assert "This is the first turn: SEARCH for the whole OBJECTIVE" in calls[0][1]["content"]
     assert "Page Text (part 1 of" in last_message(calls[2]) and "Page B" in last_message(calls[2])
     assert "choose FINISH now" in last_message(calls[3]), "after a discovery the model is asked whether it is done"
     assert "1. the setup (discoveries for it: none yet)" in calls[0][1]["content"], "the checklist is in the fresh prompt"
@@ -83,8 +88,9 @@ def test_full_run(monkeypatch, tmp_path):
     finish_check = last_message(calls[11])
     assert "Before finishing" in finish_check and "Do NOT" not in finish_check
     assert f"Your only discovery comes from {A}" in finish_check
-    compose_request = last_message(calls[12])
-    assert len(calls[12]) == 2, "the final result is written from a fresh prompt, not the browsing conversation"
+    assert "The item to check: ITEM 2" in last_message(calls[13])
+    compose_request = last_message(calls[last])
+    assert len(calls[last]) == 2, "the final result is written from a fresh prompt, not the browsing conversation"
     assert f"[1] (from {A})\nfact from a" in compose_request and "final answer" not in compose_request
     assert actions[-1] == "FINISH", "FINISH must be saved to the log"
     assert journal[-1]["finding"] == "Composed final result citing [1]." and journal[-1]["draft"] == "final answer"
@@ -101,6 +107,7 @@ def test_error_pages_are_failed_navigations(monkeypatch, tmp_path):
         reply("SEARCH", "docs a"),
         reply("NAVIGATE", missing),        # 404 -> recorded as a failed navigation
         reply("NAVIGATE", A),              # leaving the error page needs no confirmation
+        reply("FINISH", "a"), reply("FINISH", "a"),  # nothing recorded: sent back once by the coverage check
         reply("FINISH", "a"), reply("FINISH", "a"), "Final.",
     ]
     calls, journal = run_agent(monkeypatch, tmp_path, script=script)
@@ -134,3 +141,18 @@ def test_discoveries_are_linked_to_checklist_items(monkeypatch, tmp_path):
     assert journal[-1]["checklist_items"] == [2], "item numbers outside the checklist are dropped"
     report = (tmp_path / ab.REPORT_FILE).read_text(encoding="utf-8")
     assert "fact from a" in report
+
+
+def test_a_coverage_send_back_starts_the_next_turn_fresh(monkeypatch, tmp_path):
+    gap = json.dumps({"evidence": "[1] fact from a", "missing": "the second fact", "conditions": [], "things": []})
+    script = [reply("SEARCH", "docs a"), reply("NAVIGATE", A), reply("DISCOVER", "fact from a"),
+              reply("FINISH", "done"), reply("FINISH", "done"),  # finish check, then repeated
+              gap, COVERED,                                       # coverage check: a gap in item 1 -> sent back
+              reply("FINISH", "done"), reply("FINISH", "done"),   # next turn, fresh prompt
+              COVERED, COVERED,                                   # nothing linked: both items checked once more
+              "Final [1]."]
+    calls, journal = run_agent(monkeypatch, tmp_path, script=script)
+    assert any(e["action"] == "BLOCKED_COVERAGE" for e in journal)
+    next_turn = calls[7]
+    assert len(next_turn) == 2 and "Your FINISH was refused. Before finishing, each checklist item" in next_turn[1]["content"]
+    assert journal[-1]["action"] == "FINISH"

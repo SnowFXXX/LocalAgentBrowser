@@ -98,6 +98,14 @@ def test_load_run_and_summary(tmp_path):
     assert "- list: finished now; gone: did not finish" in text
 
 
+def test_repeated_failure_on_the_same_site_is_flagged():
+    meta = {"name": "b", "version": "1", "commit": "c", "started": "now"}
+    now = rg.score_run(TASK, journal(None, "LibreOffice ..."))
+    before = dict(now)
+    text = rg.summary_markdown(meta, [now], {"meta": {"name": "a", "version": "0"}, "scores": [before]})
+    assert "- list: failed again on the same site as before (libreoffice.org)" in text
+
+
 def test_task_ids_are_unique_and_every_kind_has_a_core_task():
     ids = [t["id"] for t in rg.TASKS]
     assert len(ids) == len(set(ids))

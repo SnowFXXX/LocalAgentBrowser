@@ -1,9 +1,11 @@
 """Rules the agent enforces before acting on a decision: repeats, impossible actions, revisits and the
 confirm-before-leaving check."""
+import asyncio
+
 import pytest
 
 import agent_browser as ab
-from fakes import discoveries
+from fakes import discoveries, fake_client, reply
 
 DOCS = "https://docs.example/agents"
 GUIDE = "https://guide.example/agents"
@@ -256,7 +258,7 @@ class TestGroundingCheck:
                     "3. Place fresh potting mix in the bottom of the new pot.")
         for _ in range(2):
             result = decide("DISCOVER", invented, page, GUIDE)
-            assert result[0] == "BLOCKED_DISCOVER" and "comes from your own knowledge" in result[1]
+            assert result[0] == "BLOCKED_NOT_ON_PAGE" and "comes from your own knowledge" in result[1]
 
     def test_a_discover_copied_from_the_page_passes(self):
         copied = "Choose a pot one to two inches wider than the current one, with drainage holes."
@@ -268,7 +270,7 @@ class TestGroundingCheck:
     def test_real_advice_mixed_with_invented_steps_is_refused(self):
         mixed = ("Choose a pot one to two inches wider than the current one, with drainage holes. The steps are: "
                  "loosen and inspect the roots, prune any dead roots, then fill with fresh potting mix.")
-        assert decide("DISCOVER", mixed, self.page(), GUIDE)[0] == "BLOCKED_DISCOVER"
+        assert decide("DISCOVER", mixed, self.page(), GUIDE)[0] == "BLOCKED_NOT_ON_PAGE"
 
 
 def test_recorded_parts_are_remembered_across_visits(monkeypatch):
@@ -297,8 +299,8 @@ def test_a_different_ungrounded_discover_is_refused_again():
              "start. 3. Place fresh potting mix in the bottom of the new pot.")
     second = ("During the first two weeks water your plant sparingly and avoid fertilizing it until it settles in. "
               "Keep it out of direct sun and check the soil every few days.")
-    assert decide("DISCOVER", first, page, GUIDE)[0] == "BLOCKED_DISCOVER"
-    assert decide("DISCOVER", second, page, GUIDE)[0] == "BLOCKED_DISCOVER"
+    assert decide("DISCOVER", first, page, GUIDE)[0] == "BLOCKED_NOT_ON_PAGE"
+    assert decide("DISCOVER", second, page, GUIDE)[0] == "BLOCKED_NOT_ON_PAGE"
 
 
 def test_the_objectives_wording_counts_as_grounded():
@@ -332,3 +334,34 @@ def test_finish_goes_through_once_a_search_is_exhausted():
     for _ in range(2):
         assert ab.check_decision("SEARCH", "schemas", [], tried, page, DOCS)[0] == "BLOCKED_SEARCH"
     assert ab.check_decision("FINISH", "result", [], tried, page, DOCS, "Schemas: not covered") is None
+
+
+class TestPageHint:
+    PARTS = ["Lightly water a few hours before repotting to help remove the plant from its pot. "
+             "After repotting, water again to help settle the potting mix.",
+             "This symbolism is particularly prevalent in some Native American and African cultures."]
+
+    def test_quotes_the_one_closest_sentence(self):
+        hint = ab.page_hint("Do not water the repotted plant again for weeks after repotting.", self.PARTS,
+                            "How do I care for a plant after repotting?")
+        assert 'What the page does say about it: "After repotting, water again to help settle the potting mix."' in hint
+        assert "DISCOVER exactly that now" in hint
+
+    def test_names_the_page_never_mentions_instead_of_quoting(self):
+        hint = ab.page_hint("In Japan, owls bring good fortune. Among the Navajo, owls are sacred in some cultures.",
+                            self.PARTS)
+        assert hint == " The parts shown never mention Japan, Navajo."
+
+    def test_nothing_close_gives_no_hint(self):
+        assert ab.page_hint("Completely unrelated words here.", self.PARTS) == ""
+
+
+def test_a_refusal_for_text_not_on_the_page_is_not_wrapped_in_do_not_repeat():
+    page = {"url": GUIDE, "parts": ["Water the plant lightly before repotting it into a bigger pot."], "index": 0,
+            "seen_parts": {0}, "visit_discoveries": 1}
+    invented = ("Repotting steps: first remove the old soil completely, then soak the roots in a fungicide bath for "
+                "an hour, then trim every brown root with sterile scissors before planting it again.")
+    client, model = fake_client([reply("DISCOVER", invented), reply("SEARCH", "repotting steps")])
+    asyncio.run(ab.request_decision(client, [{"role": "user", "content": "x"}], [], {"queries": [], "urls": []}, page, GUIDE))
+    correction = model.calls[1][-1]["content"]
+    assert correction.startswith("REFUSED: That DISCOVER is mostly not in the page text") and "Do NOT choose" not in correction

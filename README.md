@@ -24,7 +24,7 @@ and tuned to work well with a **small 7B model on a CPU, no GPU required**.
 - ⚡ **Built for slow hardware.** It reuses LM Studio's prompt cache, so most turns process only what changed.
 - 📝 **A readable report every time.** `research_report.md` holds the final result and every finding with its
   source, written however the run ends; `research_log.txt` keeps every action and reason.
-- ✅ **Tested.** 136 tests on Linux and Windows, Python 3.10–3.13, run in about a second with no model or browser,
+- ✅ **Tested.** 165 tests on Linux and Windows, Python 3.10–3.13, run in a few seconds with no model or browser,
   plus a [regression suite](#regression-suite) of live runs on seven different kinds of task.
 
 📖 **The story behind it:** [Teaching a 7B model on a CPU to finish what it starts](https://dev.to/snowfxxx/teaching-a-7b-model-on-a-cpu-to-finish-what-it-starts-1amc),
@@ -167,17 +167,19 @@ does not generalise; the [changelog](https://github.com/SnowFXXX/LocalAgentBrows
 
 Since 1.53, every change is measured on the same seven objectives, one of each kind above, run one after the other
 with a time limit each (`tools/regression.py`, see [Testing](#testing)). Single runs vary with the pages a search
-turns up, so the suite compares versions on all seven at once:
+turns up, so the suite compares versions on all seven at once. 1.54 to 1.56 were internal steps measured this way
+and released together as 1.57; [docs/regression-history.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md)
+has every step's results and what each one showed.
 
-| Task | 1.52 | 1.53 (objective checklist) |
-|---|---|---|
-| Factual question | Finished, 12 min | Finished, 14 min |
-| List of three office suites | Time limit (45 min) | Finished, 30 min; but one of the three (WPS Office) is not open source |
-| Comparison and recommendation | Time limit (45 min) | Finished, 39 min, every part covered |
-| How-to (repotting) | Time limit (45 min) | Time limit (45 min); materials and steps found, aftercare not |
-| Explanation (photosynthesis) | Time limit (60 min) | Finished, 13 min, but thin: one finding, no oxygen or water |
-| Opinion (owls) | Time limit (45 min) | Finished, 38 min, four cultures and an opinion |
-| Documentation (venv, official docs) | Finished, 15 min, from a tutorial site | Time limit (30 min); create and activate found, from python.org |
+| Task | 1.52 | 1.53 (objective checklist) | 1.57 (coverage check) |
+|---|---|---|---|
+| Factual question | Finished, 12 min | Finished, 14 min | Finished, 13 min |
+| List of three office suites | Time limit | Finished, 30 min; but WPS Office is not open source | Time limit: three correct open-source suites by turn 7, sent back because no words showed them to be "free" |
+| Comparison and recommendation | Time limit | Finished, 39 min | Time limit, after a send-back for "official documentation", which the objective does not ask for |
+| How-to (cold brew from 1.55; repotting before) | Time limit | Time limit | Finished, 36 min; but "how long it keeps" answered with the steeping time |
+| Explanation (photosynthesis) | Time limit | Finished, 13 min, but thin: no oxygen or water | Finished, 59 min: inputs, outputs and both stages, cited |
+| Opinion (owls) | Time limit | Finished, 38 min | Time limit: its first page covered two of the three cultures asked for |
+| Documentation (venv, official docs) | Finished, 15 min, from a tutorial site | Time limit (30 min) | Finished, 37 min, all from python.org; but the Windows line repeats the create command instead of the activate one |
 
 ## How it works
 
@@ -216,12 +218,22 @@ flowchart LR
 - **Findings must match the page.** A finding that shares too few word pairs with the page text shown so far
   (or has a sentence that does) is sent back once, asking for only what the page says in its own words, and
   one far from anything on the page is refused outright. A small model will otherwise "complete" a list from
-  its own knowledge when a page says "follow these 6 steps" and the steps come later.
+  its own knowledge when a page says "follow these 6 steps" and the steps come later. The refusal points the way:
+  it quotes the one page sentence closest to what the model wrote, to record instead, or names what the parts
+  shown never mention ("Japan, Navajo"), so the model reads on.
 - **An objective checklist.** At the start, one short model call splits the objective into a fixed checklist of
   what the result must contain, keeping conditions like "free, open-source" or "three". Each finding names the
   items it serves, the checklist with its findings is in every prompt, and every check goes through these items
   instead of asking the model to split the objective again from memory, which drifted: it once blocked its own
-  finish over "migration strategies", which the objective never asked for.
+  finish over "migration strategies", which the objective never asked for. Opinion items are shown as written
+  at FINISH, not as gaps to fill, and the first search covers the whole objective in one short query, keeping
+  its conditions ("official python documentation venv").
+- **A coverage check before finishing.** Each checklist item is checked against the findings in a short call of
+  its own, and the code checks the verdict instead of taking it on trust: an item nothing was copied for, fewer
+  things than asked for ("only 1 of 3 found"), and things not shown, in words copied from a finding about them,
+  to meet a condition such as "open-source". A claim that something is missing is dropped when every word of it is
+  already in the findings. With gaps, the FINISH is sent back once, with the next step named ("SEARCH for
+  'OnlyOffice free and open-source' to check it, or replace it"), and the next turn starts from a fresh prompt.
 - **Numbered findings.** Findings are numbered in the prompt and listed with every check, and the model names
   the finding that covers each part of the objective ("covered by [2]") instead of just saying "covered".
 - **Knowing when it's done.** After every new finding the model is asked whether the objective is now fully
@@ -233,12 +245,16 @@ flowchart LR
   A part that cannot be found after several tries can be reported as missing instead of blocking for good.
 - **Writing is a separate step.** When the agent finishes, one more model call writes the final result from
   only the objective and the recorded findings, under a short list of rules: no guessing or outside knowledge,
-  cite findings by number, give exactly as many items as asked for, and add a "My view:" paragraph only when
-  the objective asks for an opinion. A small model writes far better when that is its only job, and every
-  claim stays traceable to a recorded finding. The report flags any number in the final result that appears
-  in none of the findings, the most harmful kind of slip in a how-to.
+  cite findings by number, give as many items as asked for (never repeating one, and saying how many were not
+  found), and add a "My view:" paragraph only when the objective asks for an opinion. A small model writes far
+  better when that is its only job, and every claim stays traceable to a recorded finding. What no finding
+  answers is not left to the model: those checklist items, and things not shown to meet a condition, are left out
+  of what it is asked to write, and the code adds them after the result as "Not found in the pages read" and
+  "Left out, not shown to meet the conditions". The report flags any number in the final result that appears in
+  none of the findings, the most harmful kind of slip in a how-to.
 - **Error pages are recognised.** A page answering 404, 403 and so on counts as a failed visit, not content.
-- **Readable pages.** Navigation menus, footers and cookie banners are hidden; code blocks and tables are
+- **Readable pages.** Navigation menus, footers, cookie banners and site notices such as fundraising banners are
+  hidden; code blocks and tables are
   never split between parts; links already shown are not repeated. Long pages come with an outline of the
   headings in each part, marking the parts already read, so the agent can jump to the part it needs instead of
   reading in order.
@@ -271,12 +287,13 @@ Measured on an Intel i5-9500 (6 cores, no GPU) with Qwen2.5-7B-Instruct Q4_K_M a
 | Follow-up on the same page (finding recorded, cheap retry) | 35–60 s |
 | Next part of a page, or a new page appended | 100–280 s |
 | First turn of a run | 45–110 s |
-| Fresh prompt after the context budget is reached | 160–380 s (longest with long pages) |
+| Fresh prompt (context budget reached, or after a coverage send-back) | 160–540 s (longest with long pages) |
+| Coverage check before finishing (all checklist items) | about 1–3 min |
 | Writing the final result (once, at the end) | 50–190 s, depending on how much was found |
 
-Whole runs vary with the pages a search turns up. In the results table, a factual question takes about 12
-minutes of model time, a list of three items 16 to 49, a comparison 25 to 38 and an explanation 45 or more. A
-GPU or a smaller model will be much faster.
+Whole runs vary with the pages a search turns up. In the regression runs since 1.53, a factual question took 13 to
+19 minutes of model time; the list, comparison, how-to, opinion and documentation tasks 21 to 44 when they finished;
+and the explanation 13 to 59. A GPU or a smaller model will be much faster.
 
 ## FAQ
 
@@ -311,18 +328,19 @@ turn that brings in a new page takes a few minutes. See [Performance](#performan
   research, an opinion from several sources, a factual question, a comparison, a how-to, a list and an
   explanation of a topic. Each one
   exposed something that did not generalise and was fixed; other kinds of tasks may expose more.
-- **Reading long pages and knowing when it has enough.** The model used to read long pages part by part
-  without recording the relevant parts; since 1.42 it must say what a part contains before reading on. On 1.52
-  the explanation task still lost about 20 minutes reading unrelated sections of a long article and did not
-  finish. On 1.53, with the objective checklist, it finished in 13 minutes, but from a single overview paragraph
-  that left out oxygen and water: the model can now claim one finding covers every item. Judging whether a
-  finding really covers an item is the weakest area.
+- **Judging whether a finding covers an item is the weakest area.** The model's verdict is unreliable both ways:
+  on 1.53 the explanation finished from one overview paragraph without oxygen or water, and in the regression runs
+  since 1.54 about half of the coverage check's send-backs were for gaps that were not real ("missing official
+  documentation" on a comparison that did not ask for it, "H2O, O2" already recorded). The code now verifies what
+  it can (an item nothing answers, a count, word-for-word proof of a condition), but each wrong send-back still
+  costs a finish on this hardware, since a send-back costs 8–10 minutes.
 - **Conditions in the objective.** A small model tends to drop conditions such as "open source" or "using the
   official documentation": a list of open-source office suites once included FreeOffice (free but not open
   source), and a task that asked for the official Python documentation used a tutorial site. The objective
-  checklist keeps the conditions in view (the documentation task went to python.org on 1.53), but on the same
-  run the list task still named WPS Office, which is not open source. Check the result against any conditions
-  you set.
+  checklist keeps the conditions in view (the documentation task uses python.org since 1.55), and a thing not
+  shown in the findings to meet a condition is left out of the result and listed after it. The check is strict:
+  on 1.57 it sent back three correct open-source suites because no words showed them to be "free". Check the
+  result against any conditions you set.
 - **A small model's judgement is the ceiling.** It sometimes drifts to loosely related pages, prefers
   secondary sources or stays with one source too long, and results vary with the first pages a search turns
   up; every finding is in `research_report.md` regardless.
@@ -331,8 +349,9 @@ turn that brings in a new page takes a few minutes. See [Performance](#performan
   minutes, but with thin findings and without naming what it could not find, so check the result against the
   objective.
 - **Check the citations.** The final result is told to use only recorded findings, but a 7B model sometimes
-  puts the wrong number on a citation, adds a line no finding supports or leaves out a step, so verify a
-  claim against the listed findings before relying on it.
+  puts the wrong number on a citation, adds a line no finding supports, leaves out a step or misreads a part of
+  the question (on 1.57 it answered "how long it keeps in the fridge" with the steeping time), so verify a claim
+  against the listed findings before relying on it.
 - **Some sites refuse automated browsers** (HTTP 403). The agent respects that and does not try to disguise
   itself; it moves on to other sources.
 - **Reading only.** The agent searches, opens pages and reads them. It does not click, fill in forms or sign in.
@@ -349,7 +368,13 @@ turn that brings in a new page takes a few minutes. See [Performance](#performan
 - [ ] Let very strict objectives end with the gaps named instead of searching indefinitely (they finish since 1.50; naming the gaps is still open)
 - [x] Measure every change on a regression suite of seven kinds of task (1.53)
 - [x] Keep a fixed checklist of the objective's parts instead of re-splitting it at every check (1.53)
-- [ ] Check that a finding really covers its checklist item, including conditions like "open source"
+- [ ] Check that a finding really covers its checklist item, including conditions like "open source" (partly, since
+  1.57: a coverage check before finishing, with what the code can verify)
+- [ ] Send the agent back only for gaps the code verifies, and let the model's other verdicts only shape the final
+  result (the next step after 1.57)
+- [ ] Rewind dead ends: save the conversation before an expensive step such as reading a long page, and if it
+  leads nowhere, return to that point with a short note instead of carrying the unused page text in every later
+  prompt (LM Studio reuses its cache up to the saved point)
 - [ ] Try more kinds of objectives (seven so far) and adjust the rules that don't generalise
 - [ ] Make fresh prompts (the slowest kind of turn) cheaper still (31% cheaper since 1.34)
 - [ ] Interacting with pages (clicking, forms) for tasks beyond reading
@@ -358,7 +383,7 @@ Ideas and requests are welcome in [issues](https://github.com/SnowFXXX/LocalAgen
 
 ## Testing
 
-The test suite runs in about a second and needs neither LM Studio nor a browser: the model and the website
+The test suite runs in a few seconds and needs neither LM Studio nor a browser: the model and the website
 are replaced by scripted fakes, including an end-to-end run of the main loop.
 
 ```bash
@@ -384,8 +409,12 @@ Each run gets a folder in `regression_runs/` with every task's report, journal, 
 trace, and a `summary.md` that is updated after each task: whether it finished, turns, model time, how many
 checklist items got findings, which checks fired, and problems found by simple word checks (missing answers,
 missed conditions such as a non-open-source item, uncited paragraphs, numbers missing from the findings, a
-missing opinion). `--suite all` adds five more tasks, `--only` runs some of them, and `--rescore` scores an
-earlier run again without the model.
+missing opinion). It also flags a task that fails again on the same site as in the earlier run: one site that
+cannot answer part of an objective can decide a task whatever the agent does (the repotting how-to went to the same
+guide in three runs, which is why the core how-to is now the cold brew one). `--suite all` adds six more tasks,
+including the earlier how-to, `--only` runs some of them, and `--rescore` scores an earlier run again without the
+model. Every step since 1.53 and its results are in
+[docs/regression-history.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md).
 
 ## Contributing
 
@@ -394,8 +423,10 @@ the [Code of Conduct](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/CO
 
 ## Project history
 
-Every version is a tagged commit, and [CHANGELOG.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/CHANGELOG.md) describes what changed in each one and
-why, with the measurements behind the decisions.
+Every released version is a tagged commit, and [CHANGELOG.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/CHANGELOG.md) describes what changed in each one and
+why, with the measurements behind the decisions. Versions 1.54 to 1.56 were internal steps, each measured on the
+regression suite and released together as 1.57; their results are in
+[docs/regression-history.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md).
 
 ## Acknowledgements
 

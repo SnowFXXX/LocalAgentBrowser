@@ -1,8 +1,65 @@
 # Changelog
 
-Every version of `agent_browser.py`, newest first. Each version is also a tagged commit (`v1.11` … `v1.53`).
+Every version of `agent_browser.py`, newest first. Each released version is also a tagged commit (`v1.11` … `v1.57`); 1.54 to 1.56 were internal steps
+measured on the regression suite and released as part of 1.57 (see
+[docs/regression-history.md](docs/regression-history.md)).
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
+
+## [1.57] - 2026-10-19
+Released together with the internal steps 1.54, 1.55 and 1.56, each of which was measured on the regression suite
+but not released on its own. [docs/regression-history.md](docs/regression-history.md) has every step's results,
+task by task, and what each one showed.
+### Added
+- Coverage check before finishing. The 1.53 suite left two problems open: an explanation finished from one overview
+  paragraph that the model said covered every item (no oxygen or water), and a list named WPS Office as
+  "free, open-source". Before a FINISH goes through, each checklist item is now checked against the full findings
+  in a short call of its own, with the item last so the instructions are read once (about 1-3 minutes for a
+  checklist). The code checks the verdict rather than taking it on trust: an item nothing was copied for counts as
+  unanswered; an item asking for a number of things gets "only 1 of 3 found" when fewer are named; for such items,
+  each thing named must be shown to meet the item's conditions in words copied from a finding about that thing; and
+  a claim that something is missing is dropped when every word of it is already in the findings. With gaps, the
+  FINISH is sent back once, naming the next step for a condition ("SEARCH for 'OnlyOffice free and open-source' to
+  check it, or replace it"), and the next turn starts from a fresh prompt. Finishing with nothing recorded is sent
+  back too.
+- What no finding answers is reported by the code. Checked once more just before the final result, checklist items
+  nothing answers and things not shown to meet a condition are left out of what the final result is asked to write
+  and added after it ("Not found in the pages read", "Left out, not shown to meet the conditions in the pages read").
+  The final result had filled a gap from the model's own knowledge (a care routine for repotted plants).
+- The first turn asks for one short search for the whole objective, keeping its conditions: with the checklist, the
+  first search had gone after the first item only, and the documentation task had dropped "official". Two system
+  prompt rules say the same for later searches.
+### Changed
+- A DISCOVER refused as not on the page now quotes the page sentence closest to it (chosen by the refused text and
+  the objective), to record instead, or names what the parts shown never mention ("Japan, Navajo"); it is no longer
+  wrapped in "Do NOT choose DISCOVER again ... choose a different action", which outweighed the quoted sentence.
+  Replayed on the saved runs: the page's real aftercare line was recorded 6 times out of 6 (0 of 3 before), a refusal
+  where the real steps came on the next part still led to READ_MORE 6 of 6, and an owl case read on 5 of 6.
+- The final result gives as many items as asked for without ever repeating one, and says how many were not found:
+  a list run had listed LibreOffice three times.
+- Opinion items are shown in the checklist as "written by you at FINISH, not found on a page": shown as having no
+  discoveries yet, an owl task kept collecting cultures after it had the three asked for.
+- Fundraising banners and other site notices are hidden like cookie banners: Wikipedia's filled the whole first part
+  of an article.
+- Regression suite: the core how-to is now "make cold brew coffee at home" (`howto-coldbrew`), since the repotting
+  task went to the same guide in three runs and that guide has no section on care in the first two weeks; repotting
+  stays as an extra task under its old id. The summary flags a task that fails again on the same site as before. The
+  documentation task has 45 minutes, like the others.
+### Fixed
+- The not-on-page check refused the real Kilimanjaro answer as unseen because the banner hid the article (above).
+- Numbered headings ("#### 1. Setup") were flagged as numbers missing from the findings (1.53).
+
+Regression runs, finished out of 7 (model minutes): 1.53 5 (200), 1.54 4 (239), 1.54 with fixes 5 (225), 1.55 5
+(233), 1.56 4 (272), 1.57 4 (270). Across these runs the result quality rose where the checks fired: the
+explanation went from thin to complete and cited, the comparison stopped inventing features, the list stopped naming
+WPS Office as open source, and every documentation finding since 1.55 is from python.org. What is not better: about
+half of the coverage check's send-backs were for gaps that were not real, and each costs 8-10 minutes on this
+hardware (a fresh prompt reads 3,000-4,000 tokens), so finishes were lost: on 1.57, a list of three correct
+open-source suites sent back because no words showed them to be "free", and a comparison sent back for "official
+documentation" it was not asked for. The next step is to send the agent back only for gaps the code verifies.
+Also still open: on the documentation task the Windows line repeats the create command instead of the activate
+one (1.56 and 1.57), and on 1.57 the opinion task ran out of time on a page that covered two of the three
+cultures asked for.
 
 ## [1.53] - 2026-10-17
 ### Added

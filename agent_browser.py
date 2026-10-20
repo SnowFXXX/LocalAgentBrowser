@@ -53,6 +53,7 @@ GROUNDED_SENTENCE_SHARE = 0.35  # Any one sentence matching the page text shown 
 MIN_SENTENCE_PAIRS = 8     # Shorter sentences are not scored on their own
 UNGROUNDED_PAIR_SHARE = 0.4       # Below this (whole) or the next (any sentence) a DISCOVER is refused outright
 UNGROUNDED_SENTENCE_SHARE = 0.25
+MAX_CLOSEST_CHARS = 200   # Longest page sentence quoted when a DISCOVER is refused as not on the page
 TURN_PAUSE_SECONDS = 1
 STALL_TURNS = 4          # Turns without a new discovery before the model is asked to check its progress
 COMPOSE_MAX_TOKENS = 900  # Length limit for the separately written final result
@@ -72,6 +73,29 @@ GIVE_UP_RULE = ("If you have already looked for a part in several places without
 MAX_CHECKLIST_ITEMS = 8   # Most parts an objective is split into; a longer split is cut, a failed one is the whole objective
 MAX_CHECKLIST_ITEM_CHARS = 200
 SPLIT_MAX_TOKENS = 300
+COVERAGE_MAX_TOKENS = 400  # Length limit for the check of one checklist item before finishing
+MAX_CONDITION_WORDS = 2    # Longer "conditions" are descriptions of the item, not properties a thing must have
+MAX_MISSING_CLAIM_WORDS = 4  # Short "missing" claims are checked against the discoveries' words; longer ones are kept
+COVERAGE_ITEM_CHECK = (
+    "Check the one CHECKLIST item named at the end against the DISCOVERIES. Give:\n"
+    "- evidence: the words from the DISCOVERIES that answer that item itself, copied exactly, with their numbers like "
+    "[2]. Words that answer a different CHECKLIST item do not count. '' if none;\n"
+    "- missing: what a complete answer to the item needs that the evidence does NOT say (for example an input or output "
+    "not named, a step, a place, a command, an amount, a second or third thing asked for). Name only what the item "
+    "itself asks for, not extra detail it does not mention (such as exact numbers or origins it does not ask about). "
+    "Do not repeat what the evidence already says; '' if the evidence fully answers it;\n"
+    "- conditions: the conditions the item sets on the things it asks for, in its own words (for example \"free\", "
+    "\"open-source\", \"official\"); [] if it sets none;\n"
+    "- things: if the item has conditions, one entry for each thing the evidence names for it, with \"proof\": the exact "
+    "words from the DISCOVERIES that show that thing meets the conditions ('' if the DISCOVERIES do not say it); [] if "
+    "the item has no conditions.")
+COVERAGE_FORMAT = {"type": "json_schema", "json_schema": {"name": "coverage", "strict": True, "schema": {
+    "type": "object", "properties": {
+        "evidence": {"type": "string"}, "missing": {"type": "string"},
+        "conditions": {"type": "array", "items": {"type": "string"}},
+        "things": {"type": "array", "items": {"type": "object", "properties": {
+            "name": {"type": "string"}, "proof": {"type": "string"}}, "required": ["name", "proof"]}}},
+    "required": ["evidence", "missing", "conditions", "things"]}}}
 CHECKLIST_SPLIT = ("Split the OBJECTIVE into the separate things the final result must contain, as a short checklist. "
                    "One item per thing to find or to write; keep the objective's own wording; include every condition it "
                    "sets (for example 'free', 'open-source', 'official documentation', a number of items) in the item it "
@@ -101,7 +125,9 @@ Strictly follow these rules:
 2. Never repeat a search query, and never NAVIGATE to the page you are already on. You may return to a previously visited URL when it still has information you need, at most 3 visits per URL. These limits are enforced automatically.
 3. Prefer primary, authoritative sources over copies and summaries of them.
 4. Gather only what the objective asks for. As soon as your discoveries cover every part of it, FINISH; do not keep reading for extra or merely interesting details.
-5. Output ONLY raw JSON. No markdown wrappers, no backticks, no conversational filler. Inside JSON strings, write every backslash twice (a Windows path C:\\Users\\me is written "C:\\\\Users\\\\me")."""
+5. Look for sources that cover several open OBJECTIVE CHECKLIST items at once (for example an overview, a comparison or a complete guide) before searching for one item at a time.
+6. Keep any condition the objective sets on sources (for example official documentation) in your searches.
+7. Output ONLY raw JSON. No markdown wrappers, no backticks, no conversational filler. Inside JSON strings, write every backslash twice (a Windows path C:\\Users\\me is written "C:\\\\Users\\\\me")."""
 
 RESPONSE_FORMAT = {
     "type": "json_schema",
@@ -133,6 +159,8 @@ PAGE_TEXT_JS = r"""([blockStart, blockEnd, headingMark]) => {
     const clutter = new Set();
     document.querySelectorAll('nav, footer, [role=navigation], [role=contentinfo]').forEach(el => clutter.add(el));
     document.querySelectorAll('#onetrust-banner-sdk, #onetrust-consent-sdk, #CybotCookiebotDialog, #usercentrics-root, .qc-cmp2-container, .fc-consent-root, #truste-consent-track').forEach(el => clutter.add(el));
+    // Site notices and fundraising banners: Wikipedia's filled the whole first part of an article
+    document.querySelectorAll('#siteNotice, #centralNotice, .cn-fundraising, .frb').forEach(el => clutter.add(el));
     const consentName = /cookie|consent|gdpr/i;
     document.querySelectorAll('body *').forEach(el => {
         const name = (el.id || '') + ' ' + (typeof el.className === 'string' ? el.className : '');
@@ -445,10 +473,10 @@ def grounding_check(parameter, page_state, current_url, objective=""):
     # Far below anything real (whole discoveries 50%+, sentences 40%+), repeating does not confirm it: asked once,
     # the model sent its invented repotting steps again (32% overall, one step 9%) and they went through
     if whole < UNGROUNDED_PAIR_SHARE or lowest < UNGROUNDED_SENTENCE_SHARE:
-        return "BLOCKED_DISCOVER", ("That DISCOVER is mostly not in the page text you have been shown, so it comes from "
-                                    "your own knowledge. DISCOVER only what the parts shown actually say, in the page's own "
-                                    "wording. If what you need is not there, READ_MORE (a later part may have it) or look "
-                                    "elsewhere.")
+        return "BLOCKED_NOT_ON_PAGE", ("That DISCOVER is mostly not in the page text you have been shown, so it comes "
+                                       "from your own knowledge. DISCOVER only what the parts shown actually say, in the "
+                                       f"page's own wording.{page_hint(parameter, shown[:-1], objective)} If what you need "
+                                       "is not there, READ_MORE (a later part may have it) or look elsewhere.")
     # Only repeating the same DISCOVER confirms it: asked again, the model once sent a different text that was
     # still invented ("water sparingly", which the page never said), and a per-part pass let it through
     asked = page_state.setdefault("grounding_asked", [])
@@ -463,6 +491,40 @@ def grounding_check(parameter, page_state, current_url, objective=""):
                                 "page's own wording, for example its lists and steps. Do not add steps, amounts or "
                                 "advice that the page does not give. If your DISCOVER really is what the page says, "
                                 "repeat it.")
+
+def closest_sentence(text, parts):
+    """The page sentence sharing the most content words (4+ letters) with a text, or None below two."""
+    mine = {w for w in plain_words(text) if len(w) > 3}
+    # In page order, so equal scores always pick the same sentence (max keeps the first)
+    sentences = list(dict.fromkeys(s.strip() for part in parts for s in re.split(r"(?<=[.!?])\s+|\n+", part)
+                                   if len(s.split()) >= 4))
+    score, best = max(((len(mine & {w for w in plain_words(s) if len(w) > 3}), s) for s in sentences),
+                      key=lambda pair: pair[0], default=(0, None))
+    return best if score >= 2 else None
+
+def unseen_names(text, parts):
+    """Names in a text (capitalised words not starting a sentence) that no part shown mentions."""
+    seen = set(plain_words(" ".join(parts)))
+    names = re.findall(r"(?<![.!?:]\s)(?<!^)\b([A-Z][a-z]{2,})", text.strip())
+    return list(dict.fromkeys(n for n in names if n.lower() not in seen))
+
+def page_hint(text, parts, objective=""):
+    # Refused for an aftercare routine it wrote itself, the model read on past the page's one real line about it;
+    # told to record the part the page gives, it still read on, and with two close sentences quoted it recorded one
+    # half the time. One sentence, picked for the objective as well, was recorded 6 times out of 6, while a refusal
+    # for steps that a later part held still led to READ_MORE 6 times out of 6. But on an opinion task the model had
+    # written about Japan before the page said anything about it, and a quoted fragment ("This symbolism is
+    # particularly prevalent...") was recorded instead of reading on: names the page never mentions mean the page
+    # has not got there, so they are named instead
+    missing = unseen_names(text, parts)
+    if missing:
+        return f" The parts shown never mention {', '.join(missing[:4])}."
+    best = closest_sentence(f"{text} {objective}", parts)
+    if not best:
+        return ""
+    return (f' What the page does say about it: "{shorten(best, MAX_CLOSEST_CHARS)}". If that gives part of what the '
+            "OBJECTIVE asks for, DISCOVER exactly that now; what the page does not say is reported as not found at "
+            "FINISH, never filled in.")
 
 def word_pairs(text):
     words = re.findall(r"\w+", text)
@@ -705,13 +767,19 @@ async def split_objective(client, objective):
 def checklist_lines(checklist):
     lines = []
     for number, item in enumerate(checklist or [], 1):
+        # An opinion is written at FINISH, not found on a page: shown as "discoveries for it: none yet", it kept an
+        # owl task collecting cultures after it had the three asked for, and the model tried to DISCOVER its own view
+        if OPINION_REQUEST.search(item["text"]):
+            lines.append(f"{number}. {item['text']} (written by you at FINISH, not found on a page)")
+            continue
         found = ", ".join(f"[{n}]" for n in item["discoveries"])
         lines.append(f"{number}. {item['text']} (discoveries for it: {found or 'none yet'})")
     return "\n".join(lines)
 
 def open_items(checklist):
-    """The checklist items nothing has been recorded for yet, as one line for prompts."""
-    return "; ".join(f"{n}. {item['text']}" for n, item in enumerate(checklist or [], 1) if not item["discoveries"])
+    """The checklist items nothing has been recorded for yet (opinions are written at FINISH), as one line for prompts."""
+    return "; ".join(f"{n}. {item['text']}" for n, item in enumerate(checklist or [], 1)
+                     if not item["discoveries"] and not OPINION_REQUEST.search(item["text"]))
 
 def link_discovery(checklist, items, number):
     """Records which checklist items a new discovery serves, as the model named them; returns the valid ones."""
@@ -736,6 +804,177 @@ def check_parts(tried):
             "summary are 'written at FINISH' (write them in the FINISH parameter, never as a DISCOVER); information an "
             "item asks you to find is never 'written at FINISH': it is covered by a discovery or 'not covered'.\n"
             f"OBJECTIVE CHECKLIST:\n{checklist_lines(checklist)}\n")
+
+NUMBER_WORDS = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+
+def asked_count(text):
+    """The number of things an item asks for ("three ...", "5 ..."), or None. "At least three" counts as three."""
+    for word in plain_words(text):
+        if word in NUMBER_WORDS:
+            return NUMBER_WORDS[word]
+        if word.isdigit() and 2 <= int(word) <= 20:
+            return int(word)
+    return None
+
+def plain_words(text):
+    return re.findall(r"[a-z0-9]+", str(text).lower())
+
+def quoted_from(quote, text):
+    """Whether a quote (in other spacing or punctuation) is copied from the text: 80% of its word pairs."""
+    pairs = word_pairs(" ".join(plain_words(quote)))
+    return bool(pairs) and len(pairs & word_pairs(" ".join(plain_words(text)))) >= 0.8 * len(pairs)
+
+MISSING_STOPWORDS = {"the", "and", "or", "of", "from", "in", "on", "at", "to", "a", "an", "its", "their", "for", "with",
+                     "is", "are", "not", "mentioned", "specific", "exact", "details", "detail", "information"}
+
+def really_missing(missing, found):
+    """The parts of a "missing" verdict that the discoveries do not already contain.
+
+    On an explanation task the check said "missing H2O from the soil" and "missing O2" three times out of three,
+    while a discovery held "6CO2 + 6H2O + Light Energy -> C6H12O6 + 6O2 ... water from the soil", and the finish it
+    sent back ran out of time. A short claim (up to MAX_MISSING_CLAIM_WORDS key words) whose every key word is in
+    the discoveries is dropped; longer ones ("what happens during the light-dependent reactions") cannot be checked
+    by words and are kept.
+    """
+    text = " ".join(e["extracted_data"] for e in found).lower()
+    kept = []
+    for part in re.split(r"\s*(?:[,;]|\band\b)\s*", missing):
+        words = [w for w in plain_words(part) if w not in MISSING_STOPWORDS]
+        present = words and all(re.search(rf"(?<![a-z]){re.escape(w)}(?![a-z])", text) for w in words)
+        if part.strip() and not (len(words) <= MAX_MISSING_CLAIM_WORDS and present):
+            kept.append(part.strip())
+    return ", ".join(kept)
+
+def states(text, condition):
+    """Whether the text contains every word of a condition ("open-source" matches "open source")."""
+    words = set(plain_words(text))
+    return all(w in words for w in plain_words(condition) if len(w) > 2)
+
+async def coverage_gaps(client, objective, checklist, journal, only=None):
+    """What the discoveries still lack for each checklist item, judged item by item just before finishing.
+
+    The finish check takes the model's word that an item is covered: on an explanation task it finished from one
+    overview paragraph it said covered all four items, without oxygen or water, and on a list it counted WPS
+    Office as "free, open-source". Asked about all items at once, the model skipped items and judged both ways
+    wrong; asked about one item at a time it named such gaps. Conditions are not taken on its word: for each
+    thing it names, it must copy words from the discoveries, and the code checks they are there and state the
+    condition. A condition counts only if the item itself states it (the model copied one item's conditions to
+    the next). Items asking for an opinion or recommendation are not checked; a failed call reports no gaps.
+
+    Each item is asked in a prompt of its own, with the item last so the long instructions before it are read once.
+    Asked as a continuation of the browsing conversation instead (which kept that conversation in LM Studio's
+    cache), the check was more lenient: on an explanation task's finish it found the gaps twice out of twice in
+    separate prompts and never inside the conversation, which also overflowed the context near its limit.
+    """
+    found = [e for e in journal if e.get("action") == "DISCOVER"]
+    listing = "\n\n".join(f"[{n}] {e['extracted_data']}" for n, e in enumerate(found, 1))
+    items = "\n".join(f"{n}. {item['text']}" for n, item in enumerate(checklist, 1))
+    gaps, unanswered, unproven = [], [], []
+    for n, item in enumerate(checklist, 1):
+        if OPINION_REQUEST.search(item["text"]) or (only is not None and n not in only):
+            continue
+        # The discoveries come before the item, so after the first item LM Studio only reads the question
+        request = (f"### OBJECTIVE\n{objective}\n\n### DISCOVERIES\n{listing}\n\n### CHECKLIST\n{items}\n\n"
+                   f"{COVERAGE_ITEM_CHECK}\n\nThe item to check: ITEM {n}. {item['text']}")
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": request}]
+        try:
+            response = await client.chat.completions.create(
+                model=MODEL, temperature=0.2, max_tokens=COVERAGE_MAX_TOKENS, response_format=COVERAGE_FORMAT,
+                messages=messages)
+            verdict = json.loads(extract_message_content(response))
+            missing = really_missing(str(verdict.get("missing", "")).strip(" '\"."), found)
+            # Real conditions are short properties ("free", "open-source", "official", "on Windows"); the model also
+            # gave "in different cultures or religions", the item's own topic, and sent back a good opinion task
+            # Conditions are checked only on items that ask for a number of things ("three free, open-source
+            # alternatives"), where each thing named must meet them; elsewhere the model took the question's own
+            # wording for one ("in the fridge" in "how long it keeps in the fridge"), and a correct finish was sent
+            # back to search for proof of it
+            conditions = [c for c in verdict.get("conditions") or [] if isinstance(c, str) and states(item["text"], c)
+                          and len([w for w in plain_words(c) if len(w) > 2]) <= MAX_CONDITION_WORDS
+                          and asked_count(item["text"])]
+            things = [t for t in verdict.get("things") or [] if isinstance(t, dict) and str(t.get("name", "")).strip()]
+        except Exception as err:
+            print(f"⚠️ Coverage check of item {n} failed ({err}); treating it as covered.")
+            continue
+        # Nothing copied for the item, not even a discovery number, means nothing recorded answers it: on a how-to
+        # the check gave empty evidence and nothing missing for "care in the first two weeks", the agent had linked
+        # that item to "the best time to repot is spring and summer", and the final result invented a care routine
+        if not re.search(r"\w", str(verdict.get("evidence", ""))):
+            unanswered.append(n)
+            gaps.append(f"Item {n} ({item['text']}): nothing in DISCOVERIES SO FAR answers it")
+        elif missing:
+            gaps.append(f"Item {n} ({item['text']}): missing {missing}")
+        # A number the item asks for is counted, not judged: a list run recorded only LibreOffice, twice, and the
+        # check found nothing missing from "three free, open-source alternatives"
+        wanted = asked_count(item["text"])
+        names = list(dict.fromkeys(str(t["name"]).strip() for t in things))
+        # Only with a real condition: the model lists every thing it names only for those
+        if wanted and conditions and names and len(names) < wanted:
+            gaps.append(f"Item {n} ({item['text']}): only {len(names)} of {wanted} found ({', '.join(names)})")
+        for thing in things:
+            proof = str(thing.get("proof", ""))
+            # Copied from a discovery that names the thing: another thing's sentence with this name put in front
+            # ("OnlyOffice is free and open source" from LibreOffice's) does not prove anything about it
+            name = {w for w in plain_words(thing["name"]) if len(w) > 2}
+            copied = any(quoted_from(proof, e["extracted_data"]) and name & set(plain_words(e["extracted_data"]))
+                         for e in found)
+            unmet = [c for c in conditions if not (copied and states(proof, c))]
+            if unmet:
+                condition = " and ".join(unmet)
+                unproven.append(f"{thing['name']} (not shown to be {condition})")
+                gaps.append(f"Item {n}: {thing['name']}: no words in DISCOVERIES SO FAR show it is {condition}. SEARCH "
+                            f"for '{thing['name']} {condition}' to check it, or replace it with one that is")
+    return gaps, unanswered, unproven
+
+async def coverage_refusal(client, objective, tried, journal):
+    # Once per run, so a noisy verdict costs one turn at most and a gap that cannot be filled never blocks finishing
+    checklist = tried.get("checklist")
+    if tried.get("coverage_checked") or tried.get("search_exhausted") or not checklist:
+        return None
+    tried["coverage_checked"] = True
+    if any(e.get("action") == "DISCOVER" for e in journal):
+        print("🔎 Checking each checklist item against the discoveries before finishing...")
+        gaps, tried["unanswered"], unproven = await coverage_gaps(client, objective, checklist, journal)
+        # Items whose named things lacked proof of a condition are checked again before the final result
+        tried["unproven_items"] = sorted({n for n, item in enumerate(checklist, 1) if any(
+            g.startswith(f"Item {n}: ") and "no words in DISCOVERIES SO FAR show it is" in g for g in gaps)})
+    else:
+        # A factual run finished with nothing recorded (its answer was refused as not on the page shown) and its
+        # final result said nothing was found
+        gaps = ["Nothing has been recorded for any checklist item yet"]
+        tried["unanswered"] = [n for n, item in enumerate(checklist, 1) if not OPINION_REQUEST.search(item["text"])]
+    if not gaps:
+        return None
+    print("⚠️ Gaps found:\n" + "\n".join(f"   - {g}" for g in gaps))
+    return "BLOCKED_COVERAGE", ("Before finishing, each checklist item was checked against DISCOVERIES SO FAR, and these "
+                                "gaps were found:\n" + "\n".join(f"- {g}" for g in gaps) + "\nWork on them first: DISCOVER "
+                                "the missing information, or words that show a condition is met, from the current page if "
+                                "it has them, or look for them elsewhere; replace a thing that does not meet a condition "
+                                "with one that does. If something cannot be found, FINISH again and say so in the final "
+                                "result.")
+
+async def not_found_items(client, objective, tried, journal):
+    """The checklist items no discovery answers, and the things not shown to meet an item's conditions, decided in
+    code just before the final result is written.
+
+    The final result is told to say "not found" for such items, but filled one from the model's own knowledge
+    instead (a care routine for repotted plants that no discovery gave). Items nothing is linked to, or that the
+    coverage check found nothing for, are checked once more (the agent may have recorded more since); those still
+    unanswered are left out of what the final result is asked to write, and the code reports them itself. Things
+    named for an item with conditions are rechecked the same way: sent back once, a list run proved two of its three
+    office suites open source and finished with the third, WPS Office, which is not, still in the result.
+    """
+    checklist = tried.get("checklist") or []
+    if len(checklist) < 2:
+        return [], []
+    candidates = sorted({n for n, item in enumerate(checklist, 1) if not item["discoveries"]
+                         and not OPINION_REQUEST.search(item["text"])} | set(tried.get("unanswered") or []))
+    rechecked = sorted(set(candidates) | set(tried.get("unproven_items") or []))
+    if not rechecked or not any(e.get("action") == "DISCOVER" for e in journal):
+        return candidates, []
+    print(f"🔎 Checking checklist item(s) {', '.join(map(str, rechecked))} once more before writing the final result...")
+    _, unanswered, unproven = await coverage_gaps(client, objective, checklist, journal, only=set(rechecked))
+    return [n for n in unanswered if n in candidates or n in rechecked], unproven
 
 def finish_check_text(tried):
     return (f"Before finishing, {check_parts(tried)} If any part is 'not covered', do not finish: choose the action that "
@@ -885,6 +1124,13 @@ async def run_agent_turn(client, page, objective, journal, current_url, tried, p
     conversation.update(messages=messages, tokens=tokens)
     return decision, refused
 
+# With the objective split into a checklist, the first search went after the first item only ("SQLite vs PostgreSQL
+# setup and administration", 3 times out of 3), so the run went item by item through pages that each covered one;
+# asked on the first turn for one short search for the whole objective, it searched for the whole comparison, and for
+# the documentation task "official python documentation venv" instead of dropping "official"
+FIRST_TURN_INSTRUCTION = ("This is the first turn: SEARCH for the whole OBJECTIVE at once, in a short query that names its "
+                          "main subject and its conditions rather than every detail.\n")
+
 TURN_INSTRUCTIONS = """If the CURRENT ENVIRONMENT contains information relevant to the objective that is not in DISCOVERIES SO FAR, choose DISCOVER now.
 Determine your next tactical move. Output your decision in the mandatory JSON format:"""
 
@@ -921,7 +1167,7 @@ URLs visited (you may return to one that still has information you need, at most
 Active URL: {current_url if current_url else "None (Loop Initializing)"}
 {environment}{warning_prompt}
 
-{TURN_INSTRUCTIONS}"""
+{"" if journal else FIRST_TURN_INSTRUCTION}{TURN_INSTRUCTIONS}"""
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_payload}
@@ -992,6 +1238,11 @@ async def request_decision(client, messages, journal, tried, page_state, current
         if refusal[0].startswith("CONFIRM_"):
             # Not a true refusal: repeating the action is an allowed answer, so no "do not repeat" wording
             correction = f"CHECK: {refusal[1]} Reply with only the JSON object."
+        elif refusal[0] == "BLOCKED_NOT_ON_PAGE" and len(refused) < 2:
+            # The refusal says what to do instead (DISCOVER the quoted sentence or read on); with the usual "Do NOT
+            # choose DISCOVER ... choose a different action" around it, the model read on 3 times out of 3 past the
+            # sentence it was shown
+            correction = f"REFUSED: {refusal[1]} Reply with only the JSON object."
         elif len(refused) >= 2:
             correction = escalation_message(len(refused), action, refusal[1], page_state, current_url) + "\nReply with only the JSON object."
         messages += [{"role": "assistant", "content": original_content}, {"role": "user", "content": correction}]
@@ -1059,7 +1310,7 @@ def write_report(objective, journal, checklist=None):
 COMPOSE_SYSTEM = ("You write the final result of a web research task, using only the findings that were recorded "
                   "during it.")
 
-async def compose_final_result(client, objective, journal, checklist=None):
+async def compose_final_result(client, objective, journal, checklist=None, not_found=(), unproven=()):
     """Writes the final result in a model call whose only job is writing.
 
     Deciding what to browse and writing the deliverable compete for a small model's attention: in a live run
@@ -1075,8 +1326,17 @@ async def compose_final_result(client, objective, journal, checklist=None):
     # for three, and added "My view" to a request for strengths) are given as a short numbered list
     # The checklist gives the parts in order: the strict documentation result did not say that the parameter
     # schemas it was asked for were never found
-    parts = ("### CHECKLIST (the parts of the OBJECTIVE)\n" + "\n".join(f"{n}. {item['text']}" for n, item in enumerate(checklist, 1))
+    # Items no discovery answers are not asked for at all, and are reported by the code after the result
+    unfound = [checklist[n - 1]["text"] for n in not_found if checklist and 0 < n <= len(checklist)]
+    asked = [item["text"] for item in checklist or [] if item["text"] not in unfound]
+    parts = ("### CHECKLIST (the parts of the OBJECTIVE)\n" + "\n".join(f"{n}. {text}" for n, text in enumerate(asked, 1))
              + "\n\n") if checklist and len(checklist) > 1 else ""
+    if unfound:
+        parts += ("### NOT FOUND (no discovery answers these; they are reported after your result)\n"
+                  + "\n".join(f"- {text}" for text in unfound) + "\n\n")
+    if unproven:
+        parts += ("### NOT SHOWN TO MEET THE CONDITIONS (do not list these; they are reported after your result)\n"
+                  + "\n".join(f"- {text}" for text in unproven) + "\n\n")
     request = (f"### OBJECTIVE\n{objective}\n\n{parts}### DISCOVERIES\n{listing}\n\n"
                "Write the complete final result the OBJECTIVE asks for: do exactly what it asks (for example answer "
                "the question, write the summary or the plan, or give the opinion). Rules:\n"
@@ -1087,12 +1347,15 @@ async def compose_final_result(client, objective, journal, checklist=None):
                "2. A discovery about one source's own situation (for example a company's workload in a case study) "
                "describes that situation, not the one in the OBJECTIVE: say whose situation it is, and do not assume "
                "details of the OBJECTIVE's situation that it does not state.\n"
-               "3. If the objective asks for a specific number of items, give exactly that many (the best supported).\n"
+               "3. If the objective asks for a specific number of items, give that many (the best supported); if the "
+               "discoveries have fewer different ones, give those and say how many could not be found. Never list the "
+               "same item twice.\n"
                "4. Refer to the discoveries that support each point by their numbers, like [2], and only cite a number "
                "for something that discovery actually says.\n"
                "5. Do not add a 'My view:' paragraph unless the objective explicitly asks for your view, opinion or "
                "recommendation; if it does, give it in a paragraph that starts with 'My view:'.\n"
-               + ("6. Cover every CHECKLIST item; for an item no discovery supports, say plainly that it was not found.\n"
+               + ("6. Cover every CHECKLIST item; for an item no discovery supports, say plainly that it was not found. "
+                  "Write nothing about the NOT FOUND items.\n"
                   "7. Write plain text, not JSON." if parts else "6. Write plain text, not JSON."))
     # A fresh prompt with only the discoveries, not the browsing conversation: continuing that conversation let
     # the model use page text it had read but not recorded, and cite discovery numbers that did not say it
@@ -1120,6 +1383,10 @@ async def compose_final_result(client, objective, journal, checklist=None):
         paragraph = extract_message_content(view).strip()
         if paragraph:
             text += "\n\n" + (paragraph if paragraph.lower().startswith("my view:") else f"My view: {paragraph}")
+    if unfound:
+        text += "\n\nNot found in the pages read:\n" + "\n".join(f"- {t}" for t in unfound)
+    if unproven:
+        text += "\n\nLeft out, not shown to meet the conditions in the pages read:\n" + "\n".join(f"- {t}" for t in unproven)
     return text
 
 async def load_page(page, url=None):
@@ -1203,19 +1470,27 @@ async def main():
                 print(f"🎬 Chosen Action: [{action}] -> Parameter: {parameter}")
 
                 refusal = check_decision(action, parameter, journal, tried, page_state, current_url, thought)
+                if not refusal and action == "FINISH":
+                    refusal = await coverage_refusal(client, objective, tried, journal)
                 if refusal:
                     # Only reached once this turn's cheap retries are used up
                     print(f"⚠️ Action refused: {refusal[1]}")
                     journal.append({"turn": turn_counter, "thought": thought, "action": refusal[0], "requested": parameter, "reason": refusal[1]})
                     loop_msg = f"Your {action} was refused. {refusal[1]}"
                     set_note(conversation, f"RESULT: Nothing changed. {where_you_are(page_state, current_url)}", current_url)
+                    if refusal[0] == "BLOCKED_COVERAGE":
+                        # The coverage prompts pushed the conversation out of LM Studio's cache, and re-reading it took
+                        # 626-651 s; a fresh prompt is shorter and starts with the system prompt they left cached
+                        conversation["messages"] = None
 
                 elif action == "FINISH":
                     print("\n🎯 Agent has signaled mission complete. Writing the final result...")
                     finish_entry = {"turn": turn_counter, "thought": thought, "action": "FINISH", "finding": parameter}
                     journal.append(finish_entry)
                     try:
-                        final = await compose_final_result(client, objective, journal, tried.get("checklist"))
+                        missing, unproven = await not_found_items(client, objective, tried, journal)
+                        final = await compose_final_result(client, objective, journal, tried.get("checklist"), missing,
+                                                           unproven)
                         if final:
                             finish_entry.update(draft=parameter, finding=final)
                     except Exception as err:

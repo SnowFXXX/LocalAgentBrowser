@@ -51,7 +51,15 @@ TASKS = [
                   "many simultaneous users, and features. Then recommend one for a hobby project with a few hundred users.",
      "expect": [["sqlite"], ["postgresql", "postgres"], ["concurren", "simultaneous"], ["setup", "set up", "install",
                                                                                          "administ", "configur"]]},
-    {"id": "howto", "kind": "Step-by-step how-to", "core": True, "minutes": 45,
+    # Replaced the repotting how-to in the core set on 2026-10-18: in three suite runs in a row the first search led
+    # to the same guide, which has no section on care in the first two weeks, so that part could not be found there
+    # whatever the agent did. Same kind of task (what you need, steps in order, and a follow-up part); a new id, so
+    # its times are never compared with the repotting runs, which keep the id "howto"
+    {"id": "howto-coldbrew", "kind": "Step-by-step how-to", "core": True, "minutes": 45,
+     "objective": "How do I make cold brew coffee at home? List what I need with the quantities, give the steps in "
+                  "order, and say how long it keeps in the fridge.",
+     "expect": [["coffee"], ["water"], ["hour"], ["fridge", "refrigerat"]]},
+    {"id": "howto", "kind": "Step-by-step how-to", "core": False, "minutes": 45,
      "objective": "How do I repot a houseplant? List what I need, give the steps in order, and say how to care for the "
                   "plant during the first two weeks after repotting.",
      "expect": [["pot"], ["soil", "potting mix"], ["water"], ["root"]]},
@@ -64,7 +72,9 @@ TASKS = [
      "objective": "Find out how at least three different cultures or religions have viewed owls (for example as wise, "
                   "unlucky or sacred), then give your own opinion on why owls attract such different meanings.",
      "expect": [["owl"], ["wis"], ["omen", "unlucky", "death", "bad luck"]]},
-    {"id": "docs", "kind": "Documentation research", "core": True, "minutes": 30,
+    # 45 minutes like the other tasks since 2026-10-18: at 30 it ran out twice while working through the official
+    # page, which it reads part by part
+    {"id": "docs", "kind": "Documentation research", "core": True, "minutes": 45,
      "objective": "Using the official Python documentation, find out how to create a virtual environment with venv, how "
                   "to activate it on Windows and on macOS or Linux, and how to install packages into it.",
      "expect": [["python -m venv", "python3 -m venv", "py -m venv"], ["activate"], ["pip install"]],
@@ -272,6 +282,12 @@ def summary_markdown(meta, scores, baseline=None):
                 lines.append(f"- {s['id']}: " + "; ".join(
                     ([f"finished {'now' if s['finished'] else 'no longer'}"] if old["finished"] != s["finished"] else [])
                     + [f"gone: {p}" for p in fixed] + [f"new: {p}" for p in new]))
+            # A task that keeps failing on the same site may be failing because of the site: the repotting how-to
+            # went to the same guide in three runs, and that guide had no answer for one part of the objective
+            shared = sorted(set(s["sources"]) & set(old["sources"]))
+            if not s["finished"] and not old["finished"] and shared:
+                lines.append(f"- {s['id']}: failed again on the same site as before ({', '.join(shared)}): check "
+                             "whether that site can answer the objective at all before changing the agent for it.")
     lines += ["", "Read each task's research_report.md before drawing conclusions: these checks only find words."]
     return "\n".join(lines) + "\n"
 
