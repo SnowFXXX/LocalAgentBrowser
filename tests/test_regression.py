@@ -110,3 +110,9 @@ def test_task_ids_are_unique_and_every_kind_has_a_core_task():
     ids = [t["id"] for t in rg.TASKS]
     assert len(ids) == len(set(ids))
     assert {t["kind"] for t in rg.TASKS} == {t["kind"] for t in rg.TASKS if t["core"]}
+
+
+def test_a_caveated_forbidden_item_is_not_a_missed_condition():
+    result = "1. LibreOffice [1]\n2. OnlyOffice [1]\n3. **FreeOffice** (not shown in the pages read to be free and open-source)"
+    assert rg.score_run(TASK, journal(result, "LibreOffice and OnlyOffice ..."))["forbidden"] == []
+    assert rg.score_run(TASK, journal("3. FreeOffice [1]", "x"))["forbidden"] == ["freeoffice"]

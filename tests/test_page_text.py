@@ -51,7 +51,7 @@ def test_render_part_footer():
     assert "[End of page]" in ab.render_part(page)
 
 
-MENU = [{"text": f"Menu item {i}", "href": f"https://site.example/menu{i}"} for i in range(15)]
+MENU = [{"text": f"Menu item {i}", "href": f"https://site.example/menu{i}"} for i in range(ab.MAX_LINKS)]
 CONTENT = [{"text": f"Content link {i}", "href": f"https://site.example/content{i}"} for i in range(5)]
 
 
@@ -66,9 +66,23 @@ def test_next_page_on_the_same_site_lists_new_links_instead_of_the_menu():
     asyncio.run(ab.extract_page_links(FakeLinksPage("https://site.example/a", MENU + CONTENT), shown))
     links = asyncio.run(ab.extract_page_links(FakeLinksPage("https://site.example/b", MENU + CONTENT), shown))
     assert links.count("->") == 5 and "Content link 0" in links and "Menu item" not in links
-    assert "(15 links already listed" in links
+    assert f"({ab.MAX_LINKS} links already listed" in links
 
 
 def test_without_a_running_conversation_the_full_list_is_shown():
     links = asyncio.run(ab.extract_page_links(FakeLinksPage("https://site.example/b", MENU + CONTENT)))
     assert links.count("->") == ab.MAX_LINKS and "not repeated" not in links
+
+
+def test_links_whose_text_is_html_are_skipped():
+    images = [{"text": '<img src="https://site.example/x.jpg">', "href": f"https://shop.example/{i}"} for i in range(5)]
+    links = asyncio.run(ab.extract_page_links(FakeLinksPage("https://site.example/a", images + CONTENT)))
+    assert "<img" not in links and links.count("->") == 5
+
+
+def test_links_with_a_few_words_come_before_menu_items():
+    menu = [{"text": f"Menu{i}", "href": f"https://site.example/m{i}"} for i in range(10)]
+    article = [{"text": "How to repot a houseplant", "href": "https://site.example/repot"}]
+    links = asyncio.run(ab.extract_page_links(FakeLinksPage("https://site.example/a", menu + article)))
+    assert links.splitlines()[0] == "- How to repot a houseplant -> https://site.example/repot"
+    assert links.count("->") == ab.MAX_LINKS

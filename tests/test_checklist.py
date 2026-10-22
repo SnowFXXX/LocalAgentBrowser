@@ -72,6 +72,34 @@ class TestChecksUseTheChecklist:
         assert "serves the OBJECTIVE (above all the checklist items with nothing recorded yet: 1. What goes in), or write 'none'" in reason
         assert "Where it happens" not in reason
 
+    def test_read_on_check_points_to_the_outline_part_naming_an_open_item(self):
+        tried = {"queries": [], "urls": [], "checklist": checklist("Compare SQLite and PostgreSQL setup and administration",
+                                                                   "Compare SQLite and PostgreSQL features")}
+        outline = ["SQLite vs PostgreSQL / Why", "What is SQLite? / What is PostgreSQL?", "SQLite vs PostgreSQL: Similarities",
+                   "SQLite vs PostgreSQL: Data types", "SQLite / PostgreSQL / Licenses / Administration",
+                   "Performance / Features", "Scalability"]
+        page = {"url": DOCS, "parts": ["x"] * 7, "outline": outline, "index": 0, "seen_parts": {0}}
+        reason = ab.check_decision("READ_MORE", "", discoveries("x"), tried, page, DOCS)[1]
+        assert ("If there are none, repeat your READ_MORE: it will show part 5, not the next part, because the Page "
+                "Outline names 'administration' there") in reason
+        # Repeated plainly, the READ_MORE reads the part named; a part number the model gives is kept
+        assert ab.read_more_target("", page) == 4 and ab.read_more_target("2", page) == 1
+        assert ab.read_more_target("", dict(page, index=1)) == 2
+        # Words in many labels ("sqlite") and item verbs ("compare") point nowhere
+        assert ab.outline_pointer(dict(page, seen_parts={0, 4, 5}), tried["checklist"]) is None
+        # A label taken from the first line of code is not a heading
+        code = dict(page, parts=["x"] * 4 + ["```\n    Administration of the pool\n"] + ["x"] * 2)
+        assert ab.outline_pointer(code, tried["checklist"]) == (6, "features")
+
+    def test_read_on_check_asks_for_finish_once_every_item_has_its_discoveries(self):
+        tried = {"queries": [], "urls": [], "checklist": checklist("What goes in", "Where it happens")}
+        ab.link_discovery(tried["checklist"], [1], 1)
+        ab.link_discovery(tried["checklist"], [2], 2)
+        page = {"url": DOCS, "parts": ["a", "b"], "index": 0, "seen_parts": {0}}
+        reason = ab.check_decision("READ_MORE", "", discoveries("x", "y"), tried, page, DOCS)[1]
+        assert "already has the discoveries it asks for. Choose FINISH now" in reason
+        assert "repeat your READ_MORE" not in reason
+
 
 class TestFinalResult:
     def test_checklist_is_given_with_a_rule_to_cover_it(self):
@@ -119,8 +147,15 @@ class TestCoverageGaps:
                           "'OnlyOffice free and open-source' to check it, or replace it with one that is"]
 
     def test_long_descriptions_are_not_conditions(self):
-        reply = verdict(conditions=["in different cultures or religions"], things=[("Western cultures", "")])
+        reply = verdict(conditions=["in different cultures or religions"],
+                        things=[("Western cultures", ""), ("Hopi", ""), ("Greece", "")])
         assert gaps(["How at least three different cultures or religions viewed owls"], [reply])[0] == []
+
+    def test_a_short_count_is_found_without_a_condition(self):
+        reply = verdict(things=[("Dakota Hidatsa Indians", "the Dakota Hidatsa"), ("Hopis Indians", "the Hopis")])
+        assert gaps(["How at least three different cultures viewed owls"], [reply])[0] == [
+            "Item 1 (How at least three different cultures viewed owls): only 2 of 3 found (Dakota Hidatsa Indians, "
+            "Hopis Indians)"]
 
     def test_conditions_the_item_does_not_state_are_ignored(self):
         reply = verdict(conditions=["open-source"], things=[("WPS Office", "")])
@@ -132,12 +167,21 @@ class TestCoverageGaps:
 
 
 class TestCoverageRefusal:
-    def test_sent_back_once_with_the_gaps(self):
-        client, _ = fake_client([verdict(missing="oxygen")])
+    def test_sent_back_once_for_an_item_nothing_answers(self):
+        client, _ = fake_client([verdict(evidence="", missing="oxygen")])
         tried = {"checklist": checklist("What comes out")}
         refusal = asyncio.run(ab.coverage_refusal(client, "objective", tried, discoveries("x")))
-        assert refusal[0] == "BLOCKED_COVERAGE" and "- Item 1 (What comes out): missing oxygen" in refusal[1]
+        assert refusal[0] == "BLOCKED_COVERAGE"
+        assert "- Item 1 (What comes out): nothing in DISCOVERIES SO FAR answers it" in refusal[1]
         assert asyncio.run(ab.coverage_refusal(client, "objective", tried, discoveries("x"))) is None
+
+    def test_the_model_s_other_verdicts_do_not_send_back(self):
+        reply = verdict(missing="official documentation", conditions=["free"],
+                        things=[("ONLYOFFICE", ""), ("LibreOffice", ""), ("OpenOffice", "")])
+        client, _ = fake_client([reply])
+        tried = {"checklist": checklist("Name three free suites")}
+        assert asyncio.run(ab.coverage_refusal(client, "objective", tried, discoveries("ONLYOFFICE is open source."))) is None
+        assert tried["unproven_items"] == [1], "the unmet condition still counts for the final result"
 
     def test_skipped_after_an_exhausted_search(self):
         client, model = fake_client([])
@@ -158,6 +202,8 @@ class TestCountedItems:
         assert ab.asked_count("Name three free, open-source alternatives") == 3
         assert ab.asked_count("Find at least 4 examples") == 4
         assert ab.asked_count("How tall is it in meters?") is None
+        assert ab.asked_count("Say how to care for the plant during the first two weeks") is None
+        assert ab.asked_count("Name two drinks made with 2 cups of water") == 2
 
     def test_fewer_different_things_than_asked_is_a_gap(self):
         reply = verdict(conditions=["open-source"], things=[("LibreOffice", "LibreOffice is free and open source"),
@@ -220,12 +266,25 @@ class TestUnprovenThings:
         tried = {"checklist": items, "unproven_items": [1]}
         found = discoveries("LibreOffice is free and open source. WPS Office has a familiar interface.")
         missing, unproven = asyncio.run(ab.not_found_items(client, "o", tried, found))
-        assert missing == [] and unproven == ["WPS Office (not shown to be open-source)"]
+        assert missing == [] and unproven == [("WPS Office", "open-source")]
 
-        client, model = fake_client(["1. LibreOffice [1]"])
+        client, model = fake_client(["1. **LibreOffice** [1]\n2. **WPS Office**"])
         text = asyncio.run(ab.compose_final_result(client, "o", found, items, [], unproven))
-        assert "### NOT SHOWN TO MEET THE CONDITIONS (do not list these" in model.calls[0][-1]["content"]
-        assert text.endswith("Left out, not shown to meet the conditions in the pages read:\n- WPS Office (not shown to be open-source)")
+        assert "- WPS Office: not shown to be open-source" in model.calls[0][-1]["content"]
+        assert text == "1. **LibreOffice** [1]\n2. **WPS Office** (not shown in the pages read to be open-source)"
+
+    def test_unnamed_things_are_listed_after_the_result_and_notes_are_not_doubled(self):
+        text = ab.with_caveats("LibreOffice [1]. ONLYOFFICE (not shown in the pages read to be free).",
+                               [("ONLYOFFICE", "free"), ("WPS Office", "open-source")])
+        assert text == ("LibreOffice [1]. ONLYOFFICE (not shown in the pages read to be free).\n\n"
+                        "Not shown in the pages read to meet the conditions:\n- WPS Office: not shown in the pages read "
+                        "to be open-source")
+
+    def test_things_with_the_same_condition_are_each_marked(self):
+        note = "(not shown in the pages read to be free and open-source)"
+        text = ab.with_caveats("1. **OnlyOffice** [1]\n2. **WPS Office** [2]",
+                               [("OnlyOffice", "free and open-source"), ("WPS Office", "free and open-source")])
+        assert text == f"1. **OnlyOffice** {note} [1]\n2. **WPS Office** {note} [2]"
 
 
 def test_opinion_items_are_shown_as_written_at_finish():
@@ -249,3 +308,39 @@ class TestReallyMissing:
 
     def test_co2_does_not_count_as_o2(self):
         assert ab.really_missing("O2", discoveries("Plants take in CO2.")) == "O2"
+
+
+def test_descriptions_are_not_things():
+    reply = verdict(conditions=["open-source"], things=[
+        ("LibreOffice", "LibreOffice is free and open source"),
+        ("OnlyOffice", ""),
+        (".docx/.xlsx/.pptx compatibility is genuinely excellent\nBuilt-in real-time collaboration", "")])
+    client, _ = fake_client([reply])
+    result, _, unproven = asyncio.run(ab.coverage_gaps(client, "o", checklist("Name three free, open-source suites"),
+                                                       discoveries("LibreOffice is free and open source.")))
+    assert "Item 1 (Name three free, open-source suites): only 2 of 3 found (LibreOffice, OnlyOffice)" in result
+    assert unproven == [("OnlyOffice", "open-source")]
+
+
+class TestAfterDiscoveryAdvice:
+    def test_says_finish_when_every_item_has_what_it_asks_for(self):
+        items = checklist("Find how at least three cultures viewed owls", "Give your own opinion on why")
+        for n in (1, 2):
+            ab.link_discovery(items, [1], n)
+        assert "If DISCOVERIES SO FAR now cover" in ab.after_discovery_advice(items), "two of three is not enough"
+        ab.link_discovery(items, [1], 3)
+        assert ab.after_discovery_advice(items).startswith("Every item of the OBJECTIVE CHECKLIST now has the discoveries")
+
+    def test_an_item_without_discoveries_keeps_the_usual_advice(self):
+        items = checklist("Setup", "Features")
+        ab.link_discovery(items, [1], 1)
+        assert not ab.every_item_has_discoveries(items)
+
+
+def test_one_discovery_linked_to_every_item_is_not_enough():
+    items = checklist("What goes in", "What comes out", "Light reactions", "Calvin cycle")
+    ab.link_discovery(items, [1, 2, 3, 4], 1)
+    assert not ab.every_item_has_discoveries(items)
+    for n in (2, 3, 4):
+        ab.link_discovery(items, [n], n)
+    assert ab.every_item_has_discoveries(items)

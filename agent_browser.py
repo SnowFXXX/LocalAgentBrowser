@@ -30,11 +30,13 @@ SEARCH_URL = "https://html.duckduckgo.com/html/?q="
 REPORT_FILE = "research_report.md"
 JOURNAL_BATCH = 6        # The prompt shows 6-11 recent journal entries; old ones are dropped 6 at a time
 MAX_JOURNAL_DETAIL_CHARS = 120  # Longest query/URL/request text shown per journal line
+MAX_JOURNAL_REASON_CHARS = 120  # Longest refusal reason shown per journal line (the full text is in research_log.txt)
 MAX_THOUGHT_CHARS = 120 # Old reasoning is trimmed in the prompt; the full text stays in research_log.txt
 MAX_SEARCH_RESULTS = 8
 MAX_SNIPPET_CHARS = 200
 PAGE_PART_CHARS = 2500   # Pages are shown in parts of about this size; READ_MORE shows the next part
-MAX_LINKS = 15
+MAX_LINKS = 8           # Links listed per page; most pages are reached from search results
+CONTENT_LINK_WORDS = 3   # Links with at least this many words of text are listed before shorter (menu) links
 OUTLINE_MIN_PARTS = 5    # Pages with at least this many parts get an outline of what each part covers
 MAX_OUTLINE_LINES = 40
 MAX_OUTLINE_LABEL = 90
@@ -75,6 +77,8 @@ MAX_CHECKLIST_ITEM_CHARS = 200
 SPLIT_MAX_TOKENS = 300
 COVERAGE_MAX_TOKENS = 400  # Length limit for the check of one checklist item before finishing
 MAX_CONDITION_WORDS = 2    # Longer "conditions" are descriptions of the item, not properties a thing must have
+MAX_THING_NAME_WORDS = 6   # Longer "things" named by the coverage check are descriptions, not names
+UNANSWERED_GAP = "nothing in DISCOVERIES SO FAR answers it"
 MAX_MISSING_CLAIM_WORDS = 4  # Short "missing" claims are checked against the discoveries' words; longer ones are kept
 COVERAGE_ITEM_CHECK = (
     "Check the one CHECKLIST item named at the end against the DISCOVERIES. Give:\n"
@@ -86,9 +90,10 @@ COVERAGE_ITEM_CHECK = (
     "Do not repeat what the evidence already says; '' if the evidence fully answers it;\n"
     "- conditions: the conditions the item sets on the things it asks for, in its own words (for example \"free\", "
     "\"open-source\", \"official\"); [] if it sets none;\n"
-    "- things: if the item has conditions, one entry for each thing the evidence names for it, with \"proof\": the exact "
-    "words from the DISCOVERIES that show that thing meets the conditions ('' if the DISCOVERIES do not say it); [] if "
-    "the item has no conditions.")
+    "- things: if the item asks for a number of things or has conditions, one entry for each different thing the "
+    "evidence names for it, with \"proof\": the exact words from the DISCOVERIES that show that thing meets the "
+    "conditions, or that name it if there are no conditions ('' if the DISCOVERIES do not say it); [] if the item asks "
+    "for neither.")
 COVERAGE_FORMAT = {"type": "json_schema", "json_schema": {"name": "coverage", "strict": True, "schema": {
     "type": "object", "properties": {
         "evidence": {"type": "string"}, "missing": {"type": "string"},
@@ -364,10 +369,19 @@ async def extract_page_links(page, shown_links=None):
     seen = set()
     link_lines = []
     omitted = 0
+    # Links with a few words of text (article titles, "Next: ...") before short ones (menu items such as "GUIDES"),
+    # each group in page order: the list is capped, and menus come first on most pages. In 4 regression suites the
+    # agent opened 39 pages, all from search results and none from page links, while the links were more than half
+    # of every new page it was shown
+    links = sorted(links, key=lambda link: len(link["text"].split()) < CONTENT_LINK_WORDS)
     for link in links:
         if link["href"] in seen or normalize_url(link["href"]) == normalize_url(page.url):
             continue
         seen.add(link["href"])
+        # Image links whose text is the image's HTML ('<img src="...') say nothing and took about a third of a
+        # site's link list (shop links, mostly)
+        if link["text"].startswith("<"):
+            continue
         if shown_links is not None and link["href"] in shown_links:
             omitted += 1
             continue
@@ -559,6 +573,11 @@ def read_more_target(parameter, page_state):
     # The model sometimes writes "2 of 2" or "part 3"; the first number is the part it means
     number = re.search(r'\d+', parameter)
     target = int(number.group()) - 1 if number else page_state["index"] + 1
+    # Told by the read-on check to read the outline part that names an open item, the model repeated a plain
+    # READ_MORE for the next part in 2 to 3 of 6 replays; a plain READ_MORE after that advice reads the named part
+    pointed = page_state.get("pointed")
+    if not number and pointed and pointed[0] == (page_state.get("url"), page_state["index"]):
+        target = pointed[1]
     # Asking for the part already shown nearly always meant the next one ("READ_MORE 9" while on part 9 came up
     # in most long-page runs, and refusing it cost a retry each time), so it is read as that, except on the last part
     if target == page_state["index"] and target < len(page_state["parts"]) - 1:
@@ -611,14 +630,80 @@ def read_on_check(page_state, current_url, target, checklist=None):
     confirmed.add(index)
     # Naming the items still open: on an explanation task the model answered 'none' for every part of an overview
     # that gave the inputs and outputs it still needed, while it was thinking about the Calvin cycle
+    # With every item holding what it asks for, a documentation task got "choose FINISH now" after a discovery and
+    # read four more parts anyway, answering each of these checks 'none' and repeating READ_MORE: then this check
+    # asks for FINISH first and no longer offers reading on
+    if every_item_has_discoveries(checklist):
+        return "CONFIRM_READ_ON", (f"Before reading on: every item of the OBJECTIVE CHECKLIST already has the discoveries "
+                                   f"it asks for. Choose FINISH now with the complete final result. Only if part "
+                                   f"{index + 1}, which is shown now, gives something an item still clearly lacks, "
+                                   "DISCOVER that instead.")
     still_open = open_items(checklist)
     serves = f"the OBJECTIVE (above all the checklist items with nothing recorded yet: {still_open})" if still_open else "the OBJECTIVE"
+    pointer = outline_pointer(page_state, checklist)
+    if pointer and pointer[0] != index + 2:
+        page_state["pointed"] = ((page_state.get("url"), index), pointer[0] - 1)
+    read_on = (f"repeat your READ_MORE: it will show part {pointer[0]}, not the next part, because the Page Outline "
+               f"names '{pointer[1]}' there, from an item with nothing recorded yet" if pointer and pointer[0] != index + 2
+               else "repeat your READ_MORE")
     return "CONFIRM_READ_ON", (f"Before reading on: you have recorded nothing from part {index + 1}, which is shown now. "
                                f"In thought_process, list each fact in it that serves {serves}, or write 'none'. If any "
-                               "of them are not in DISCOVERIES SO FAR, DISCOVER them now. If there are none, repeat your "
-                               "READ_MORE. But if DISCOVERIES SO FAR already cover every item of the OBJECTIVE CHECKLIST, choose "
+                               f"of them are not in DISCOVERIES SO FAR, DISCOVER them now. If there are none, {read_on}. "
+                               "But if DISCOVERIES SO FAR already cover every item of the OBJECTIVE CHECKLIST, choose "
                                "FINISH instead of reading on, and if this page is not about the OBJECTIVE at all, leave "
                                "it with SEARCH or NAVIGATE.")
+
+# Words that say what to do with an item, not what it is about ("Compare ... features" matched "How do they compare")
+ITEM_VERBS = {"compare", "find", "explain", "describe", "detail", "list", "give", "name", "say", "what", "which", "each",
+              "about", "into", "does", "make"}
+
+def outline_words(text):
+    # Hyphenated words stay whole: "open-source" split into "open" matched "Can I open and edit ..." in an FAQ
+    return re.findall(r"[a-z0-9]+(?:-[a-z0-9]+)*", str(text).lower())
+
+def outline_word_parts(outline):
+    """For each word in the outline labels, the part numbers (1-based) whose label has it."""
+    parts = {}
+    for number, label in enumerate(outline, 1):
+        for word in set(outline_words(label)):
+            parts.setdefault(word.rstrip("s"), set()).add(number)
+    return parts
+
+def outline_pointer(page_state, checklist):
+    """The first unread part whose outline label names a word of an open checklist item, as (part, word), or None.
+
+    Told to use the outline to reach an open item, the model still read the next part 6 of 6 times on a 10-part
+    comparison page whose outline named "Administration" and "Features" in parts 5 and 6. Words in many labels
+    ("SQLite", "PostgreSQL" in every heading of that page) say nothing about where an item is, so only words in
+    at most a third of the labels count.
+    """
+    outline = page_state.get("outline") or []
+    if len(outline) < OUTLINE_MIN_PARTS:
+        return None
+    seen = page_state.get("seen_parts") or set()
+    parts = page_state.get("parts") or []
+    where = outline_word_parts(outline)
+    # Topic words point anywhere: the page's own title (its first label: "photosynthesis" on the Photosynthesis
+    # article, "free" on a page of free office suites) and words every item shares ("SQLite" in each item of a
+    # comparison) say what the whole page is about, not where one item is
+    to_find = [item for item in checklist or [] if not OPINION_REQUEST.search(item["text"])]
+    topic = {w.rstrip("s") for w in outline_words(outline[0])}
+    if len(to_find) > 1:
+        topic |= set.intersection(*({w.rstrip("s") for w in outline_words(item["text"])} for item in to_find))
+    for item in to_find:
+        if item["discoveries"]:
+            continue
+        for word in outline_words(item["text"]):
+            key = word.rstrip("s")
+            if len(key) < 4 or word in MISSING_STOPWORDS or word in ITEM_VERBS or key in topic:
+                continue
+            # A part that starts inside code is labelled by its first code line, not a heading: on the venv docs,
+            # "Install pip in the virtual environment." was a docstring in the module's source
+            numbers = sorted(n for n in where.get(key, ()) if n - 1 not in seen
+                             and not str(parts[n - 1] if n <= len(parts) else "").lstrip().startswith("```"))
+            if numbers and len(where[key]) <= len(outline) / 3:
+                return numbers[0], word
+    return None
 
 def gap_check(thought, tried):
     # The model is asked to write 'not covered' for missing parts; on a comparison it wrote "Available Libraries:
@@ -776,6 +861,29 @@ def checklist_lines(checklist):
         lines.append(f"{number}. {item['text']} (discoveries for it: {found or 'none yet'})")
     return "\n".join(lines)
 
+def every_item_has_discoveries(checklist):
+    """Whether each item to find has at least the discoveries it asks for: one, or the number it names."""
+    items = [item for item in checklist or [] if not OPINION_REQUEST.search(item["text"])]
+    needed = [asked_count(item["text"]) or 1 for item in items]
+    # As many different discoveries as the items ask for in all: on 1.53 one overview paragraph was linked to all four
+    # items of an explanation, and finishing from it gave a thin result
+    distinct = {n for item in items for n in item["discoveries"]}
+    return (bool(items) and all(len(item["discoveries"]) >= k for item, k in zip(items, needed, strict=True))
+            and len(distinct) >= sum(needed))
+
+def after_discovery_advice(checklist):
+    # With Western, European and Native American views recorded for "at least three cultures", an owl task kept
+    # searching for more until its time ran out (twice); told only "if DISCOVERIES SO FAR now cover every item", the
+    # model kept judging that they did not. When the code can see each item has what it asks for, it says so; the
+    # coverage check before FINISH still looks at what the discoveries say
+    if every_item_has_discoveries(checklist):
+        return ("Every item of the OBJECTIVE CHECKLIST now has the discoveries it asks for (an item asking for three "
+                "things has three). Choose FINISH now with the complete final result, unless one of these discoveries "
+                "clearly does not answer its item; do not read further for extra or merely interesting details.")
+    return ("If DISCOVERIES SO FAR now cover every item of the OBJECTIVE CHECKLIST, choose FINISH now; do not read further "
+            "for extra or merely interesting details. If some items are still not covered, work on those next instead of "
+            "adding more detail to items already covered.")
+
 def open_items(checklist):
     """The checklist items nothing has been recorded for yet (opinions are written at FINISH), as one line for prompts."""
     return "; ".join(f"{n}. {item['text']}" for n, item in enumerate(checklist or [], 1)
@@ -806,10 +914,17 @@ def check_parts(tried):
             f"OBJECTIVE CHECKLIST:\n{checklist_lines(checklist)}\n")
 
 NUMBER_WORDS = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+MEASURE_WORDS = {"second", "seconds", "minute", "minutes", "hour", "hours", "day", "days", "week", "weeks", "month",
+                 "months", "year", "years", "cup", "cups", "times", "percent"}
 
 def asked_count(text):
-    """The number of things an item asks for ("three ...", "5 ..."), or None. "At least three" counts as three."""
-    for word in plain_words(text):
+    """The number of things an item asks for ("three ...", "5 ..."), or None. "At least three" counts as three.
+
+    A number of time units or amounts ("the first two weeks", "2 cups") is not a number of things to find."""
+    words = plain_words(text)
+    for word, after in zip(words, words[1:] + [""], strict=True):
+        if after in MEASURE_WORDS:
+            continue
         if word in NUMBER_WORDS:
             return NUMBER_WORDS[word]
         if word.isdigit() and 2 <= int(word) <= 20:
@@ -892,7 +1007,10 @@ async def coverage_gaps(client, objective, checklist, journal, only=None):
             conditions = [c for c in verdict.get("conditions") or [] if isinstance(c, str) and states(item["text"], c)
                           and len([w for w in plain_words(c) if len(w) > 2]) <= MAX_CONDITION_WORDS
                           and asked_count(item["text"])]
-            things = [t for t in verdict.get("things") or [] if isinstance(t, dict) and str(t.get("name", "")).strip()]
+            # A thing is a name ("OnlyOffice"), not a sentence: the model also listed ".docx/.xlsx/.pptx compatibility
+            # is genuinely excellent ..." as one, which got a caveat of its own and made two suites count as three
+            things = [t for t in verdict.get("things") or [] if isinstance(t, dict) and str(t.get("name", "")).strip()
+                      and "\n" not in str(t["name"]).strip() and len(str(t["name"]).split()) <= MAX_THING_NAME_WORDS]
         except Exception as err:
             print(f"⚠️ Coverage check of item {n} failed ({err}); treating it as covered.")
             continue
@@ -901,15 +1019,16 @@ async def coverage_gaps(client, objective, checklist, journal, only=None):
         # that item to "the best time to repot is spring and summer", and the final result invented a care routine
         if not re.search(r"\w", str(verdict.get("evidence", ""))):
             unanswered.append(n)
-            gaps.append(f"Item {n} ({item['text']}): nothing in DISCOVERIES SO FAR answers it")
+            gaps.append(f"Item {n} ({item['text']}): {UNANSWERED_GAP}")
         elif missing:
             gaps.append(f"Item {n} ({item['text']}): missing {missing}")
         # A number the item asks for is counted, not judged: a list run recorded only LibreOffice, twice, and the
         # check found nothing missing from "three free, open-source alternatives"
         wanted = asked_count(item["text"])
         names = list(dict.fromkeys(str(t["name"]).strip() for t in things))
-        # Only with a real condition: the model lists every thing it names only for those
-        if wanted and conditions and names and len(names) < wanted:
+        # Also without a condition: an owl task finished from one discovery naming two tribes for "at least three
+        # cultures", with the two named as things and nothing missing, because the count ran only with conditions
+        if wanted and names and len(names) < wanted:
             gaps.append(f"Item {n} ({item['text']}): only {len(names)} of {wanted} found ({', '.join(names)})")
         for thing in things:
             proof = str(thing.get("proof", ""))
@@ -921,7 +1040,7 @@ async def coverage_gaps(client, objective, checklist, journal, only=None):
             unmet = [c for c in conditions if not (copied and states(proof, c))]
             if unmet:
                 condition = " and ".join(unmet)
-                unproven.append(f"{thing['name']} (not shown to be {condition})")
+                unproven.append((str(thing["name"]).strip(), condition))
                 gaps.append(f"Item {n}: {thing['name']}: no words in DISCOVERIES SO FAR show it is {condition}. SEARCH "
                             f"for '{thing['name']} {condition}' to check it, or replace it with one that is")
     return gaps, unanswered, unproven
@@ -943,9 +1062,17 @@ async def coverage_refusal(client, objective, tried, journal):
         # final result said nothing was found
         gaps = ["Nothing has been recorded for any checklist item yet"]
         tried["unanswered"] = [n for n, item in enumerate(checklist, 1) if not OPINION_REQUEST.search(item["text"])]
+    # Only gaps the code can confirm send the agent back: an item nothing was copied for, fewer things than the item
+    # asks for, or nothing recorded at all. About half of the send-backs for the model's other verdicts were wrong in
+    # four suite runs ("missing official documentation" on a comparison, "H2O, O2" already recorded, "free" on a
+    # correct list of open-source suites) and cost a finish each; those verdicts now only shape the final result
+    hard = [g for g in gaps if g.endswith(UNANSWERED_GAP) or re.search(r"\): only \d+ of \d+ found", g)
+            or g.startswith("Nothing has been recorded")]
+    if gaps:
+        print("⚠️ Gaps found:\n" + "\n".join(f"   - {g}{'' if g in hard else ' (not sent back)'}" for g in gaps))
+    gaps = hard
     if not gaps:
         return None
-    print("⚠️ Gaps found:\n" + "\n".join(f"   - {g}" for g in gaps))
     return "BLOCKED_COVERAGE", ("Before finishing, each checklist item was checked against DISCOVERIES SO FAR, and these "
                                 "gaps were found:\n" + "\n".join(f"- {g}" for g in gaps) + "\nWork on them first: DISCOVER "
                                 "the missing information, or words that show a condition is met, from the current page if "
@@ -1058,7 +1185,10 @@ def journal_line(e):
         detail += f" (landed on {destination})"
     line = f"T{e.get('turn')} {action} {detail}".rstrip()
     if e.get("reason") or e.get("error"):
-        line += f" -> {e.get('reason') or e.get('error')}"
+        # Shortened like the details: the model saw the full refusal when it happened, and repeating it in every
+        # fresh prompt made the journal the largest part of one (up to 7,000 characters, mostly read-on checks
+        # and the finish and coverage checks with their lists), at about 8 tokens a second
+        line += f" -> {shorten(e.get('reason') or e.get('error'), MAX_JOURNAL_REASON_CHARS)}"
     thought = e.get("thought", "")
     if thought:
         line += f" | thought: {thought[:MAX_THOUGHT_CHARS] + '...' if len(thought) > MAX_THOUGHT_CHARS else thought}"
@@ -1335,8 +1465,9 @@ async def compose_final_result(client, objective, journal, checklist=None, not_f
         parts += ("### NOT FOUND (no discovery answers these; they are reported after your result)\n"
                   + "\n".join(f"- {text}" for text in unfound) + "\n\n")
     if unproven:
-        parts += ("### NOT SHOWN TO MEET THE CONDITIONS (do not list these; they are reported after your result)\n"
-                  + "\n".join(f"- {text}" for text in unproven) + "\n\n")
+        parts += ("### NOT SHOWN TO MEET THE CONDITIONS (the discoveries do not show these meet them; if you list one, "
+                  "say so right after it)\n" + "\n".join(f"- {name}: not shown to be {cond}" for name, cond in unproven)
+                  + "\n\n")
     request = (f"### OBJECTIVE\n{objective}\n\n{parts}### DISCOVERIES\n{listing}\n\n"
                "Write the complete final result the OBJECTIVE asks for: do exactly what it asks (for example answer "
                "the question, write the summary or the plan, or give the opinion). Rules:\n"
@@ -1385,8 +1516,27 @@ async def compose_final_result(client, objective, journal, checklist=None, not_f
             text += "\n\n" + (paragraph if paragraph.lower().startswith("my view:") else f"My view: {paragraph}")
     if unfound:
         text += "\n\nNot found in the pages read:\n" + "\n".join(f"- {t}" for t in unfound)
-    if unproven:
-        text += "\n\nLeft out, not shown to meet the conditions in the pages read:\n" + "\n".join(f"- {t}" for t in unproven)
+    return with_caveats(text, unproven)
+
+def with_caveats(text, unproven):
+    """The final result with each thing not shown to meet a condition marked where it is first named.
+
+    Leaving such things out dropped correct answers along with wrong ones: a page said "open-source" of
+    LibreOffice, ONLYOFFICE and Apache OpenOffice, but not "free". So they stay, marked by the code, which does not
+    rely on the final result to say it; things the result does not name are listed after it.
+    """
+    unnamed = []
+    for name, condition in unproven:
+        note = f"(not shown in the pages read to be {condition})"
+        match = re.search(re.escape(name) + r"(\*\*)?", text, re.I)
+        if not match:
+            unnamed.append(f"- {name}: {note[1:-1]}")
+        # Only a note right after this name counts as already there: checked against the whole text, the note added
+        # to OnlyOffice left WPS Office, with the same condition, unmarked in a list run's result
+        elif not text[match.end():].lstrip().lower().startswith(note.lower()):
+            text = text[:match.end()] + f" {note}" + text[match.end():]
+    if unnamed:
+        text += "\n\nNot shown in the pages read to meet the conditions:\n" + "\n".join(unnamed)
     return text
 
 async def load_page(page, url=None):
@@ -1582,10 +1732,7 @@ async def main():
                     set_note(conversation, f"RESULT: Your DISCOVER was recorded as discovery [{number}]{linked_note}. "
                                            f"{where_you_are(page_state, current_url)} The page is unchanged.\n"
                                            f"OBJECTIVE CHECKLIST now:\n{checklist_lines(tried['checklist'])}\n"
-                                           "Do not record the same information again. If DISCOVERIES SO FAR now cover "
-                                           "every item of the OBJECTIVE CHECKLIST, choose FINISH now; do not read further "
-                                           "for extra or merely interesting details. If some items are still not covered, "
-                                           "work on those next instead of adding more detail to items already covered.",
+                                           f"Do not record the same information again. {after_discovery_advice(tried['checklist'])}",
                              current_url)
 
                 # A single refusal gets a short warning; repeated refusals get an explicit list of other options

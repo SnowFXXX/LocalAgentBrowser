@@ -210,7 +210,10 @@ def score_run(task, journal, console="", checklist=None):
         "unverified_numbers": ab.unverified_numbers(result, found) if finish else [],
         "gap_statements": [m.group(0) for m in GAP_STATEMENT.finditer(result)],
         "missing": ["/".join(group[:3]) for group in task.get("expect", []) if not any(word in low for word in group)],
-        "forbidden": [word for word in task.get("forbid", []) if word in low],
+        # A forbidden item marked by the agent's own caveat ("FreeOffice (not shown in the pages read to be ...") is
+        # flagged to the reader, so it does not count as a missed condition
+        "forbidden": [word for word in task.get("forbid", []) if word in low
+                      and not re.search(re.escape(word) + r"\W{0,3}\(not shown in the pages read", low)],
         # How far a run got, so one that was about to finish is not read the same as one that was stuck
         "finish_attempts": sum(1 for e in journal if e.get("action") in ("FINISH", "BLOCKED_FINISH", "CONFIRM_FINISH")
                                or str(e.get("requested", "")).startswith("FINISH")),

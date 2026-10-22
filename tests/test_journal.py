@@ -72,3 +72,10 @@ def test_restore_path_escapes():
     row = "Medium plants\t4-5 inches\tChoose a pot just 1-2 inches wider"
     assert ab.restore_path_escapes(row) == row, "tabs from a page table stay"
     assert ab.restore_path_escapes("C:" + "\t" + "emp") == r"C:\temp"
+
+
+def test_long_refusal_reasons_are_shortened_in_the_journal():
+    reason = "Before reading on: you have recorded nothing from part 3. " + "List each fact. " * 40
+    line = ab.journal_line({"turn": 8, "action": "REFUSED_IN_TURN", "requested": "READ_MORE", "reason": reason})
+    assert line.startswith("T8 REFUSED_IN_TURN READ_MORE -> Before reading on: you have recorded nothing from part 3.")
+    assert len(line) < 200 and line.endswith("...")

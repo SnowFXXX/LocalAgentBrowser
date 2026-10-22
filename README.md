@@ -167,19 +167,19 @@ does not generalise; the [changelog](https://github.com/SnowFXXX/LocalAgentBrows
 
 Since 1.53, every change is measured on the same seven objectives, one of each kind above, run one after the other
 with a time limit each (`tools/regression.py`, see [Testing](#testing)). Single runs vary with the pages a search
-turns up, so the suite compares versions on all seven at once. 1.54 to 1.56 were internal steps measured this way
-and released together as 1.57; [docs/regression-history.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md)
+turns up, so the suite compares versions on all seven at once. 1.54 to 1.56 and 1.58 to 1.60 were internal steps
+measured this way and released with 1.57 and 1.61; [docs/regression-history.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md)
 has every step's results and what each one showed.
 
-| Task | 1.52 | 1.53 (objective checklist) | 1.57 (coverage check) |
-|---|---|---|---|
-| Factual question | Finished, 12 min | Finished, 14 min | Finished, 13 min |
-| List of three office suites | Time limit | Finished, 30 min; but WPS Office is not open source | Time limit: three correct open-source suites by turn 7, sent back because no words showed them to be "free" |
-| Comparison and recommendation | Time limit | Finished, 39 min | Time limit, after a send-back for "official documentation", which the objective does not ask for |
-| How-to (cold brew from 1.55; repotting before) | Time limit | Time limit | Finished, 36 min; but "how long it keeps" answered with the steeping time |
-| Explanation (photosynthesis) | Time limit | Finished, 13 min, but thin: no oxygen or water | Finished, 59 min: inputs, outputs and both stages, cited |
-| Opinion (owls) | Time limit | Finished, 38 min | Time limit: its first page covered two of the three cultures asked for |
-| Documentation (venv, official docs) | Finished, 15 min, from a tutorial site | Time limit (30 min) | Finished, 37 min, all from python.org; but the Windows line repeats the create command instead of the activate one |
+| Task | 1.52 | 1.53 (objective checklist) | 1.57 (coverage check) | 1.61 (verified send-backs, outline pointer) |
+|---|---|---|---|---|
+| Factual question | Finished, 12 min | Finished, 14 min | Finished, 13 min | Finished, 17 min |
+| List of three office suites | Time limit | Finished, 30 min; but WPS Office is not open source | Time limit: three correct open-source suites by turn 7, sent back because no words showed them to be "free" | Finished, 21 min: LibreOffice, WPS Office and OnlyOffice, each marked "not shown in the pages read to be free and open-source" |
+| Comparison and recommendation | Time limit | Finished, 39 min | Time limit, after a send-back for "official documentation", which the objective does not ask for | Finished, 26 min, setup and administration from the part of a long page the outline pointer chose |
+| How-to (cold brew from 1.55; repotting before) | Time limit | Time limit | Finished, 36 min; but "how long it keeps" answered with the steeping time | Finished, 33 min: every step, the 16-hour steep and the shelf life, cited |
+| Explanation (photosynthesis) | Time limit | Finished, 13 min, but thin: no oxygen or water | Finished, 59 min: inputs, outputs and both stages, cited | Finished, 39 min |
+| Opinion (owls) | Time limit | Finished, 38 min | Time limit: its first page covered two of the three cultures asked for | Finished, 42 min: four cultures, cited, with a view |
+| Documentation (venv, official docs) | Finished, 15 min, from a tutorial site | Time limit (30 min) | Finished, 37 min, all from python.org; but the Windows line repeats the create command instead of the activate one | Time limit: all four items found from python.org, then it read on |
 
 ## How it works
 
@@ -291,9 +291,9 @@ Measured on an Intel i5-9500 (6 cores, no GPU) with Qwen2.5-7B-Instruct Q4_K_M a
 | Coverage check before finishing (all checklist items) | about 1–3 min |
 | Writing the final result (once, at the end) | 50–190 s, depending on how much was found |
 
-Whole runs vary with the pages a search turns up. In the regression runs since 1.53, a factual question took 13 to
-19 minutes of model time; the list, comparison, how-to, opinion and documentation tasks 21 to 44 when they finished;
-and the explanation 13 to 59. A GPU or a smaller model will be much faster.
+Whole runs vary with the pages a search turns up. In the regression runs since 1.53, a factual question took 9 to
+19 minutes of model time; the list, comparison, how-to, opinion and documentation tasks 17 to 44 when they finished;
+and the explanation 13 to 59. A whole suite of seven tasks took 171 to 272 minutes. A GPU or a smaller model will be much faster.
 
 ## FAQ
 
@@ -331,15 +331,17 @@ turn that brings in a new page takes a few minutes. See [Performance](#performan
 - **Judging whether a finding covers an item is the weakest area.** The model's verdict is unreliable both ways:
   on 1.53 the explanation finished from one overview paragraph without oxygen or water, and in the regression runs
   since 1.54 about half of the coverage check's send-backs were for gaps that were not real ("missing official
-  documentation" on a comparison that did not ask for it, "H2O, O2" already recorded). The code now verifies what
-  it can (an item nothing answers, a count, word-for-word proof of a condition), but each wrong send-back still
-  costs a finish on this hardware, since a send-back costs 8–10 minutes.
+  documentation" on a comparison that did not ask for it, "H2O, O2" already recorded). Since 1.58 the agent is sent
+  back only for what the code verifies (an item nothing answers, fewer things than asked for); the model's other
+  verdicts only shape the final result, so a thin answer can still pass (on 1.61 the comparison's "many
+  simultaneous users" part is short).
 - **Conditions in the objective.** A small model tends to drop conditions such as "open source" or "using the
   official documentation": a list of open-source office suites once included FreeOffice (free but not open
   source), and a task that asked for the official Python documentation used a tutorial site. The objective
   checklist keeps the conditions in view (the documentation task uses python.org since 1.55), and a thing not
-  shown in the findings to meet a condition is left out of the result and listed after it. The check is strict:
-  on 1.57 it sent back three correct open-source suites because no words showed them to be "free". Check the
+  shown in the findings to meet a condition is marked where it is named ("not shown in the pages read to be free
+  and open-source"). The mark says what the pages read did not show, not that the thing fails the condition: on
+  1.61 it marked LibreOffice and OnlyOffice, which are open source, as well as WPS Office, which is not. Check the
   result against any conditions you set.
 - **A small model's judgement is the ceiling.** It sometimes drifts to loosely related pages, prefers
   secondary sources or stays with one source too long, and results vary with the first pages a search turns
@@ -370,8 +372,10 @@ turn that brings in a new page takes a few minutes. See [Performance](#performan
 - [x] Keep a fixed checklist of the objective's parts instead of re-splitting it at every check (1.53)
 - [ ] Check that a finding really covers its checklist item, including conditions like "open source" (partly, since
   1.57: a coverage check before finishing, with what the code can verify)
-- [ ] Send the agent back only for gaps the code verifies, and let the model's other verdicts only shape the final
-  result (the next step after 1.57)
+- [x] Send the agent back only for gaps the code verifies, and let the model's other verdicts only shape the final
+  result (1.58, released in 1.61)
+- [x] Point the agent to the part of a long page whose outline names an item it still needs (1.61)
+- [ ] Keep the advice to finish when a conversation starts over from a fresh prompt (the next step after 1.61)
 - [ ] Rewind dead ends: save the conversation before an expensive step such as reading a long page, and if it
   leads nowhere, return to that point with a short note instead of carrying the unused page text in every later
   prompt (LM Studio reuses its cache up to the saved point)
@@ -424,8 +428,8 @@ the [Code of Conduct](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/CO
 ## Project history
 
 Every released version is a tagged commit, and [CHANGELOG.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/CHANGELOG.md) describes what changed in each one and
-why, with the measurements behind the decisions. Versions 1.54 to 1.56 were internal steps, each measured on the
-regression suite and released together as 1.57; their results are in
+why, with the measurements behind the decisions. Versions 1.54 to 1.56 and 1.58 to 1.60 were internal steps, each
+measured on the regression suite and released with 1.57 and 1.61; their results are in
 [docs/regression-history.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md).
 
 ## Acknowledgements

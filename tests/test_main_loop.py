@@ -144,10 +144,10 @@ def test_discoveries_are_linked_to_checklist_items(monkeypatch, tmp_path):
 
 
 def test_a_coverage_send_back_starts_the_next_turn_fresh(monkeypatch, tmp_path):
-    gap = json.dumps({"evidence": "[1] fact from a", "missing": "the second fact", "conditions": [], "things": []})
+    gap = json.dumps({"evidence": "", "missing": "the second fact", "conditions": [], "things": []})
     script = [reply("SEARCH", "docs a"), reply("NAVIGATE", A), reply("DISCOVER", "fact from a"),
               reply("FINISH", "done"), reply("FINISH", "done"),  # finish check, then repeated
-              gap, COVERED,                                       # coverage check: a gap in item 1 -> sent back
+              gap, COVERED,                                       # coverage check: nothing answers item 1 -> sent back
               reply("FINISH", "done"), reply("FINISH", "done"),   # next turn, fresh prompt
               COVERED, COVERED,                                   # nothing linked: both items checked once more
               "Final [1]."]

@@ -30,7 +30,7 @@ body:
     attributes:
       label: Agent version
       description: Shown by `pip show localagentbrowser`, or the commit you are on if you run from a clone.
-      placeholder: "1.57"
+      placeholder: "1.61"
     validations:
       required: true
   - type: input

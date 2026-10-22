@@ -1,10 +1,49 @@
 # Changelog
 
-Every version of `agent_browser.py`, newest first. Each released version is also a tagged commit (`v1.11` … `v1.57`); 1.54 to 1.56 were internal steps
-measured on the regression suite and released as part of 1.57 (see
+Every version of `agent_browser.py`, newest first. Each released version is also a tagged commit (`v1.11` … `v1.61`); 1.54 to 1.56 and 1.58 to 1.60 were internal steps
+measured on the regression suite and released as part of 1.57 and 1.61 (see
 [docs/regression-history.md](docs/regression-history.md)).
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
+
+## [1.61] - 2026-10-21
+Released together with the internal steps 1.58, 1.59 and 1.60, each measured on the regression suite
+([docs/regression-history.md](docs/regression-history.md) has every step's results, task by task).
+### Added
+- An outline pointer for long pages. On a page long enough to have an outline, the read-on check looks for an unread
+  part whose label names a word of an item with nothing recorded yet ("Administration" for "setup and
+  administration"), and a plain READ_MORE then reads that part instead of the next one. Told only to use the
+  outline, the model went on to the next part 6 times out of 6 on a 10-part comparison page; with the code making
+  the jump, it reaches the part every time. Words that say what the whole page is about are ignored (the page title's
+  words, words every item shares), as are item verbs and parts that start inside code; hyphenated words stay whole.
+  On 1.61 the comparison finished for the first time since 1.56, from that page's Administration part.
+- "Every item has the discoveries it asks for: choose FINISH now" in the note after a discovery, when each item has
+  at least what it asks for. When that holds, the read-on check also asks for FINISH instead of offering to read on
+  (replayed: read on 6 of 6 before, FINISH 9 of 9 after).
+### Changed
+- The agent is sent back before finishing only for gaps the code verifies: an item nothing was copied for, fewer
+  things than the item asks for, or nothing recorded. The model's other verdicts are logged "(not sent back)" and
+  only shape the final result. About half of the send-backs for those verdicts had been wrong, costing finishes.
+- Every item that asks for a number is counted, not only items with a condition: an owl task finished with two
+  tribes for "at least three cultures". Amounts of time or measure ("the first two weeks") are not counts.
+- A thing not shown to meet a condition stays in the result, marked where it is first named ("**OnlyOffice** (not
+  shown in the pages read to be free and open-source)"), instead of being left out: leaving such things out dropped
+  correct answers along with wrong ones.
+- A description named by the coverage check as one of a list's things is ignored (it had made two office suites
+  count as three).
+- Smaller fresh prompts: refusal reasons in the journal are cut to 120 characters, pages list 8 links instead of 15
+  (those with a few words of text first; in four suites the agent opened 39 pages, none from page links), and links
+  whose text is HTML are skipped. Fresh prompts are about 2,500 tokens instead of 3,500-4,900.
+- Regression suite: the scorer accepts a forbidden item when the result marks it with the caveat.
+### Fixed
+- When several things shared a caveat, only the first was marked: the identical note next to it counted for all.
+
+Regression runs, finished out of 7 (model minutes): 1.58 5 (214), 1.59 5 (209.5), 1.60 6 (170.6), 1.61 6 (222.1).
+What is still open: a fresh prompt (when a conversation reaches its token budget) does not carry the advice to
+finish, and on 1.61 the documentation task read on after one with all four items found; nothing checks that a
+recipe's steps reach their end (on 1.60 cold brew stopped after step 2). Measured and not used: checking a
+discovery's link to its item by shared words (most links without a shared word are right), and a 16,384-token
+context, which would halve the fresh prompts but needs more memory than the default aims for.
 
 ## [1.57] - 2026-10-19
 Released together with the internal steps 1.54, 1.55 and 1.56, each of which was measured on the regression suite
