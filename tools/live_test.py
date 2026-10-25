@@ -18,6 +18,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import agent_browser as ab  # noqa: E402
+from localagentbrowser import agent  # noqa: E402
 
 
 def main():
@@ -31,7 +32,7 @@ def main():
     os.chdir(args.out)
     builtins.input = lambda prompt="": (print(prompt + "<objective from command line>"), args.objective)[1]
 
-    original_client = ab.AsyncOpenAI
+    original_client = agent.AsyncOpenAI
 
     def traced_client(**kwargs):
         # Every model call, including the objective split before turn 1, logs its timing, token counts and newest message
@@ -53,7 +54,7 @@ def main():
         client.chat.completions.create = timed_create
         return client
 
-    ab.AsyncOpenAI = traced_client
+    agent.AsyncOpenAI = traced_client  # main() creates its client in the agent module
 
     async def run():
         try:

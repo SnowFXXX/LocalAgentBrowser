@@ -1,10 +1,29 @@
 # Changelog
 
-Every version of `agent_browser.py`, newest first. Each released version is also a tagged commit (`v1.11` … `v1.61`); 1.54 to 1.56 and 1.58 to 1.60 were internal steps
+Every version of LocalAgentBrowser, newest first. Each released version is also a tagged commit (`v1.11` … `v1.62`); 1.54 to 1.56 and 1.58 to 1.60 were internal steps
 measured on the regression suite and released as part of 1.57 and 1.61 (see
 [docs/regression-history.md](docs/regression-history.md)).
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
+
+## [1.62] - 2026-10-25
+No change in what the agent does: the same prompts, decisions and results as 1.61.
+### Changed
+- The code is now a package, `localagentbrowser`, with one file per job (settings, prompts, page reading,
+  grounding, checklist, coverage, checks, report, and the loop) instead of one 1,805-line `agent_browser.py`. The
+  code was moved, not rewritten: every line of the old file is in the package once, in its original order with its
+  comments. `python agent_browser.py`, the `localagentbrowser` command and `import agent_browser` work as before.
+  The README's Code layout section says which file holds what.
+### Added
+- Golden prompts (`tests/test_golden_prompts.py`): five scripted runs, including one through the outline pointer,
+  a refusal of a finding not on the page, a coverage send-back with a fresh prompt and caveats, compared character
+  for character with a recorded copy of every message sent to the model, the journal and the report. It was
+  recorded before the move and passed unchanged after it; a one-word change to a check's wording makes it fail and
+  name the model call that differs.
+
+Regression run on the reorganized code: 7 of 7 finished (168.3 model minutes), against 6 of 7 (222.1) on 1.61. With
+the same behaviour this is run-to-run variation (the documentation task finished in 5 turns this time), not an
+improvement; each task's first prompt was identical to 1.61's, and every check still fired where its path came up.
 
 ## [1.61] - 2026-10-21
 Released together with the internal steps 1.58, 1.59 and 1.60, each measured on the regression suite

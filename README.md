@@ -205,6 +205,25 @@ flowchart LR
     C -->|FINISH| R[research_report.md]
 ```
 
+### Code layout
+
+The code is in the `localagentbrowser` package, one file per job, each depending only on the ones above it:
+
+| File | What it holds |
+|---|---|
+| `config.py` | Settings: the LM Studio connection (from environment variables) and every limit and threshold |
+| `prompts.py` | Every fixed text the model reads: the system prompt, turn instructions, the checklist, coverage and final-result prompts |
+| `text.py` | Small word helpers the checks share |
+| `pages.py` | Reading the web: search results, page parts, the outline and its pointer, links |
+| `grounding.py` | Whether a finding is really on the page shown, or already recorded |
+| `checklist.py` | The objective split into a fixed checklist, and findings linked to its items |
+| `coverage.py` | The coverage check before finishing, verified in code, and what is reported as not found or not proven |
+| `checks.py` | Decisions refused or confirmed before they are carried out (leaving, reading on, finishing, ...) |
+| `report.py` | The journal, the research log, the final result and the report file |
+| `agent.py` | The loop: each turn's conversation with the model, in-turn retries, and `main()` |
+
+`agent_browser.py` keeps `python agent_browser.py` working from a clone.
+
 ### Keeping a small model on track
 
 - **Rules enforced in code, not just stated in the prompt.** Repeated searches, visiting the current page,
@@ -275,8 +294,8 @@ the conversation nears the context limit. The journal uses a compact one-line-pe
 | `LMSTUDIO_API_KEY` | `lm-studio` | API key, if your server requires one |
 | `LMSTUDIO_CONTEXT_LENGTH` | `8192` | Context length the model is loaded with; the conversation budget follows it |
 
-Behaviour limits (part size, retry counts, check intervals and so on) are named constants at the top of
-`agent_browser.py`, each with a comment explaining it.
+Behaviour limits (part size, retry counts, check intervals and so on) are named constants in
+`localagentbrowser/config.py`, each with a comment explaining it.
 
 ## Performance
 
@@ -395,6 +414,12 @@ pip install -r requirements-dev.txt
 python -m pytest
 python -m ruff check .
 ```
+
+`tests/test_golden_prompts.py` replays five scripted runs and compares every message sent to the model, and the
+journal and report, with a recorded copy in `tests/golden/prompts.json`. A change meant to leave the agent's
+behaviour alone must keep it passing unchanged; a deliberate change to what the model sees is recorded again with
+`GOLDEN_UPDATE=1 python -m pytest tests/test_golden_prompts.py`, and the diff of the recorded copy reviewed with
+the rest of the change.
 
 To try the real agent with a fixed objective and a time limit, logging the time and tokens of every model
 call:

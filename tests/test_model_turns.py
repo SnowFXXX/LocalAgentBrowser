@@ -7,6 +7,7 @@ import asyncio
 import pytest
 
 import agent_browser as ab
+from localagentbrowser import agent
 from fakes import discoveries, fake_client, reply
 
 URL, URL2 = "https://docs.example/a", "https://docs.example/b"
@@ -21,7 +22,7 @@ def scrapes(monkeypatch):
         calls.append(url)
         return "Page Text (part 1 of 2):\nfirst part\n[Page continues: READ_MORE shows part 2 of 2]\n\nLinks On Page:\n- x -> " + URL2
 
-    monkeypatch.setattr(ab, "build_environment", fake_environment)
+    monkeypatch.setattr(agent, "build_environment", fake_environment)
     return calls
 
 

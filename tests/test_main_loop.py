@@ -6,6 +6,7 @@ import json
 import urllib.parse
 
 import agent_browser as ab
+from localagentbrowser import agent
 from fakes import FakeSite, fake_client, reply
 
 A, B = "https://docs.example/a", "https://docs.example/b"
@@ -43,13 +44,13 @@ CHECKLIST_REPLY = json.dumps({"parts": ["the setup", "the fact"]})  # the object
 def run_agent(monkeypatch, tmp_path, objective_check_every=None, script=SCRIPT):
     client, model = fake_client([CHECKLIST_REPLY] + script, prompt_tokens=None)
     real_sleep = asyncio.sleep
-    monkeypatch.setattr(ab, "async_playwright", SITE.playwright)
-    monkeypatch.setattr(ab, "AsyncOpenAI", lambda **kwargs: client)
+    monkeypatch.setattr(agent, "async_playwright", SITE.playwright)
+    monkeypatch.setattr(agent, "AsyncOpenAI", lambda **kwargs: client)
     monkeypatch.setattr(ab.asyncio, "sleep", lambda seconds, *a, **k: real_sleep(0, *a, **k))
     monkeypatch.setattr(builtins, "input", lambda prompt="": "test objective")
     monkeypatch.chdir(tmp_path)
     if objective_check_every:
-        monkeypatch.setattr(ab, "OBJECTIVE_CHECK_EVERY", objective_check_every)
+        monkeypatch.setattr(agent, "OBJECTIVE_CHECK_EVERY", objective_check_every)
     asyncio.run(ab.main())
     journal = ab.read_research_log(tmp_path / "research_log.txt")[2]
     return model.calls[1:], journal  # Without the checklist call, so call numbers match the script

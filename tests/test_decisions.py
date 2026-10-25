@@ -5,6 +5,7 @@ import asyncio
 import pytest
 
 import agent_browser as ab
+from localagentbrowser import pages
 from fakes import discoveries, fake_client, reply
 
 DOCS = "https://docs.example/agents"
@@ -282,8 +283,8 @@ def test_recorded_parts_are_remembered_across_visits(monkeypatch):
     async def links(page, shown_links=None):
         return ""
 
-    monkeypatch.setattr(ab, "extract_page_parts", parts)
-    monkeypatch.setattr(ab, "extract_page_links", links)
+    monkeypatch.setattr(pages, "extract_page_parts", parts)
+    monkeypatch.setattr(pages, "extract_page_links", links)
     state = {"url": None, "parts": [], "index": 0}
     asyncio.run(ab.build_environment(None, GUIDE, state))
     state["recorded_parts"].add(0)  # what the main loop does on DISCOVER

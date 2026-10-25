@@ -15,17 +15,17 @@ explanation; the documentation task had 30 until 1.56). The how-to task changed 
 
 ## Results by step
 
-| Task | 1.52 | 1.53 | 1.54 | 1.54 fixed | 1.55 | 1.56 | 1.57 | 1.58 | 1.59 | 1.60 | 1.61 |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| Factual question | ✅ 11.9 | ✅ 13.6 | ✅ 17.0 | ✅ 15.7 | ✅ 18.5 | ✅ 16.3 | ✅ 13.2 | ✅ 9.5 | ✅ 9.3 | ✅ 9.5 | ✅ 16.6 |
-| List of three office suites | ❌ 40.9 | ✅ 30.1 ¹ | ✅ 36.9 ² | ✅ 20.7 ³ | ❌ 43.5 | ✅ 37.0 ⁴ | ❌ 43.9 | ✅ 40.1 ¹³ | ✅ 36.6 ¹⁶ | ✅ 33.3 ¹⁹ | ✅ 20.9 ²³ |
-| Comparison and recommendation | ❌ 43.4 | ✅ 39.0 | ❌ 43.5 | ❌ 39.8 | ✅ 28.7 ⁵ | ✅ 36.5 | ❌ 38.8 | ❌ 41.9 | ❌ 42.2 | ❌ 43.5 | ✅ 26.1 ²⁴ |
-| How-to (repotting; cold brew from 1.55) | ❌ 42.2 | ❌ 39.7 | ❌ 43.8 | ✅ 31.0 ⁶ | ✅ 42.1 | ❌ 43.4 | ✅ 35.8 ⁷ | ✅ 18.1 ¹⁴ | ✅ 32.9 ¹⁷ | ✅ 20.5 ²⁰ | ✅ 33.0 ²⁵ |
-| Explanation (photosynthesis) | ❌ 57.9 | ✅ 12.9 ⁸ | ✅ 38.0 | ✅ 46.6 | ✅ 33.5 ⁹ | ❌ 58.1 | ✅ 59.0 | ✅ 40.1 | ✅ 23.6 ²¹ | ✅ 15.1 ²¹ | ✅ 38.9 |
-| Opinion (owls) | ❌ 43.0 | ✅ 38.1 | ✅ 32.4 | ✅ 44.2 | ✅ 37.6 | ❌ 44.0 | ❌ 42.1 ¹² | ❌ 42.3 | ✅ 21.6 ¹⁸ | ✅ 17.0 | ✅ 42.3 ²⁶ |
-| Documentation (venv, official docs) | ✅ 15.1 ¹⁰ | ❌ 26.4 | ❌ 27.1 | ❌ 26.8 ¹⁰ | ❌ 28.6 | ✅ 36.8 ¹¹ | ✅ 36.7 ¹¹ | ✅ 22.4 ¹⁵ | ❌ 43.3 | ✅ 31.7 ²² | ❌ 44.3 ²⁷ |
-| **Finished** | **2 of 7** | **5 of 7** | **4 of 7** | **5 of 7** | **5 of 7** | **4 of 7** | **4 of 7** | **5 of 7** | **5 of 7** | **6 of 7** | **6 of 7** |
-| **Total model minutes** | 254 | 200 | 239 | 225 | 233 | 272 | 270 | 214 | 209.5 | 170.6 | 222.1 |
+| Task | 1.52 | 1.53 | 1.54 | 1.54 fixed | 1.55 | 1.56 | 1.57 | 1.58 | 1.59 | 1.60 | 1.61 | 1.62 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Factual question | ✅ 11.9 | ✅ 13.6 | ✅ 17.0 | ✅ 15.7 | ✅ 18.5 | ✅ 16.3 | ✅ 13.2 | ✅ 9.5 | ✅ 9.3 | ✅ 9.5 | ✅ 16.6 | ✅ 9.3 |
+| List of three office suites | ❌ 40.9 | ✅ 30.1 ¹ | ✅ 36.9 ² | ✅ 20.7 ³ | ❌ 43.5 | ✅ 37.0 ⁴ | ❌ 43.9 | ✅ 40.1 ¹³ | ✅ 36.6 ¹⁶ | ✅ 33.3 ¹⁹ | ✅ 20.9 ²³ | ✅ 19.7 ²⁸ |
+| Comparison and recommendation | ❌ 43.4 | ✅ 39.0 | ❌ 43.5 | ❌ 39.8 | ✅ 28.7 ⁵ | ✅ 36.5 | ❌ 38.8 | ❌ 41.9 | ❌ 42.2 | ❌ 43.5 | ✅ 26.1 ²⁴ | ✅ 35.3 ²⁹ |
+| How-to (repotting; cold brew from 1.55) | ❌ 42.2 | ❌ 39.7 | ❌ 43.8 | ✅ 31.0 ⁶ | ✅ 42.1 | ❌ 43.4 | ✅ 35.8 ⁷ | ✅ 18.1 ¹⁴ | ✅ 32.9 ¹⁷ | ✅ 20.5 ²⁰ | ✅ 33.0 ²⁵ | ✅ 29.8 ³⁰ |
+| Explanation (photosynthesis) | ❌ 57.9 | ✅ 12.9 ⁸ | ✅ 38.0 | ✅ 46.6 | ✅ 33.5 ⁹ | ❌ 58.1 | ✅ 59.0 | ✅ 40.1 | ✅ 23.6 ²¹ | ✅ 15.1 ²¹ | ✅ 38.9 | ✅ 36.1 |
+| Opinion (owls) | ❌ 43.0 | ✅ 38.1 | ✅ 32.4 | ✅ 44.2 | ✅ 37.6 | ❌ 44.0 | ❌ 42.1 ¹² | ❌ 42.3 | ✅ 21.6 ¹⁸ | ✅ 17.0 | ✅ 42.3 ²⁶ | ✅ 21.7 |
+| Documentation (venv, official docs) | ✅ 15.1 ¹⁰ | ❌ 26.4 | ❌ 27.1 | ❌ 26.8 ¹⁰ | ❌ 28.6 | ✅ 36.8 ¹¹ | ✅ 36.7 ¹¹ | ✅ 22.4 ¹⁵ | ❌ 43.3 | ✅ 31.7 ²² | ❌ 44.3 ²⁷ | ✅ 16.4 ³¹ |
+| **Finished** | **2 of 7** | **5 of 7** | **4 of 7** | **5 of 7** | **5 of 7** | **4 of 7** | **4 of 7** | **5 of 7** | **5 of 7** | **6 of 7** | **6 of 7** | **7 of 7** |
+| **Total model minutes** | 254 | 200 | 239 | 225 | 233 | 272 | 270 | 214 | 209.5 | 170.6 | 222.1 | 168.3 |
 
 ✅ finished, ❌ did not finish within its time limit. Notes on the results themselves:
 
@@ -69,6 +69,13 @@ explanation; the documentation task had 30 until 1.56). The how-to task changed 
 27. All four items found by turn 12; the next turn was a fresh prompt (the conversation had reached its token
     budget), which does not carry the "every item has the discoveries it asks for" advice, and it read on and
     searched again.
+28. LibreOffice, OnlyOffice and Calligra Suite; LibreOffice and Calligra marked as not shown to be free and
+    open-source, and a muddled closing line that also names Apache OpenOffice.
+29. Setup and administration and features cited; "many simultaneous users" honestly reported as not found, though
+    the view still leans on scalability.
+30. Every step cited; the ratio and "1-2 weeks" in the fridge come from the model, each introduced with "the text
+    does not specify", and the "2" flagged by the number check.
+31. All four items from python.org in 5 turns; Windows activation given as `\venv\Scripts\activate`.
 
 ## What each step changed, and what the suite showed
 
@@ -205,6 +212,17 @@ documentation task found all four items and ran out of time after a fresh prompt
 total is higher than 1.60's 170.6 because the explanation, opinion and cold brew runs went to longer pages this time
 (38.9, 42.3 and 33.0 minutes), each finishing with a fuller result.
 
+### 1.62 (run 2026-10-25 07:18)
+No change in behaviour: the code was moved from one file into the `localagentbrowser` package, checked by the new
+golden-prompts test (five scripted runs whose every model message, journal and report match a copy recorded before
+the move). The suite was the live check: each task's first prompt was identical to 1.61's, and so was its first
+browsing prompt in the four tasks where the model split the objective the same way; there were no errors, and the
+read-on check, the outline pointer (twice), the not-on-page refusal, coverage send-backs and caveats all fired.
+
+Result: 7 of 7 for the first time, in 168.3 minutes. With identical behaviour this is run-to-run variation, not an
+improvement: the documentation task finished in 5 turns this time (it timed out on 1.61), and the opinion task in
+21.7 minutes (42.3). It is the second Qwen2.5-7B sample on this code, the baseline for the model tests.
+
 ## What the steps showed overall
 
 - **The fixed checklist was the big step** (1.53). The model no longer invents parts of the objective or loses
@@ -222,5 +240,10 @@ total is higher than 1.60's 170.6 because the explanation, opinion and cold brew
 
 - **Fresh prompts lose the finish advice.** A fresh prompt does not carry "every item has the discoveries it asks
   for: choose FINISH now"; the documentation task read on after one on 1.61.
+- **Recover from a lost model instead of stopping.** A failed model call ends the run at once ("check that LM
+  Studio is running and the model is loaded"). LM Studio's server loads a model on its own when a request names
+  one that is not loaded (on 2026-10-25 it loaded Qwen 7B for a request after the model had been unloaded), so
+  waiting and retrying the call a few times could carry a run through an unloaded model or a restarted app. To be
+  tested: an unload mid-run, an app restart, and how long a reload takes for each model size.
 - **Incomplete steps.** A how-to recorded two of a recipe's steps and finished; nothing checks that a list of steps
   reaches its end.

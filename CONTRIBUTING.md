@@ -48,7 +48,13 @@ python tools/live_test.py "Your objective here" --minutes 25
 - **Explain the why.** Commit messages and changelog entries in this project say what changed and why,
   ideally with the observation or measurement behind it. Please add an entry under a new version at the top
   of [CHANGELOG.md](CHANGELOG.md).
-- Keep the code style consistent with the surrounding code: named constants at the top of
-  `agent_browser.py` with a comment explaining each, and comments that explain why rather than what.
+- Keep the code style consistent with the surrounding code: named constants in
+  `localagentbrowser/config.py` with a comment explaining each, model-facing text in `prompts.py`, and
+  comments that explain why rather than what. The README's
+  [Code layout](README.md#code-layout) says which file holds what.
+- **Check the golden prompts.** `tests/test_golden_prompts.py` compares every message the agent sends to the
+  model in five scripted runs with a recorded copy. A refactor must keep it passing unchanged. If your change is
+  meant to change what the model sees, record it again (`GOLDEN_UPDATE=1 python -m pytest
+  tests/test_golden_prompts.py`) and mention the prompt changes in your pull request.
 
 By participating you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
