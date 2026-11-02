@@ -2,14 +2,14 @@
 import asyncio
 import json
 import re
-from openai import AsyncOpenAI
+from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, BadRequestError, InternalServerError
 from playwright.async_api import async_playwright
-from .config import API_KEY, BASE_URL, MAX_CHEAP_RETRIES, MAX_CONVERSATION_TOKENS, MAX_DISCOVERY_PROMPT_CHARS, MAX_FOLLOWUPS, MAX_JSON_RETRIES, MAX_VISITS_PER_URL, MODEL, OBJECTIVE_CHECK_EVERY, REPORT_FILE, STALL_TURNS, TURN_PAUSE_SECONDS
-from .prompts import FINAL_RESULT, FIRST_TURN_INSTRUCTION, GIVE_UP_RULE, READ_FIRST, RESPONSE_FORMAT, SYSTEM_PROMPT, TURN_INSTRUCTIONS
-from .text import extract_message_content
-from .pages import build_environment, count_search_results, determine_url, load_page, normalize_url, read_more_target, render_part, search_query, where_you_are
+from .config import API_KEY, BASE_URL, MAX_CHEAP_RETRIES, MAX_CONVERSATION_TOKENS, MAX_DISCOVERY_PROMPT_CHARS, MAX_FOLLOWUPS, MAX_JSON_RETRIES, MAX_QUERY_WORDS, MAX_VISITS_PER_URL, MODEL, MODEL_RETRY_WAITS, MODEL_TIMEOUT_SECONDS, TURN_MAX_TOKENS, OBJECTIVE_CHECK_EVERY, REPORT_FILE, STALL_TURNS, TURN_PAUSE_SECONDS
+from .prompts import CUT_OFF, FINAL_RESULT, FIRST_TURN_INSTRUCTION, GIVE_UP_RULE, READ_FIRST, RESPONSE_FORMAT, SYSTEM_PROMPT, TURN_INSTRUCTIONS
+from .text import extract_message_content, was_cut_off
+from .pages import build_environment, count_search_results, determine_url, is_search_page, load_page, normalize_url, read_more_target, render_part, search_query, where_you_are
 from .checklist import after_discovery_advice, check_parts, checklist_lines, link_discovery, split_objective
-from .coverage import coverage_refusal, not_found_items
+from .coverage import amounts_not_found, coverage_refusal, not_found_items
 from .checks import check_decision, escalation_message, numbered_discoveries, numbered_lines, refusal_correction, source_note
 from .report import compact_journal, compose_final_result, visited_summary, write_report, write_research_log
 
@@ -96,6 +96,31 @@ def restore_path_escapes(text):
     text = re.sub(r"(?<=\w)\n(?=[a-z])", r"\\n", text)
     return re.sub(r"[\t\r\b\f](?=[A-Za-z])", lambda m: PATH_ESCAPES[m.group()], text)
 
+def cut_decision(raw, on_search_page=False):
+    """The SEARCH, NAVIGATE or READ_MORE in a reply cut off inside its parameter, the parameter ending where it
+    starts to repeat itself; None when the cut came earlier, or for a DISCOVER or FINISH, whose cut text is never
+    sound (every cut DISCOVER in the 3B's runs was its own looping words, and one of them got recorded). On the
+    results page a DISCOVER is kept: it is always refused there, and the refusal says to open a result, which the
+    plain cut-off note did not (three cut DISCOVERs there lost a turn)."""
+    found = re.match(r'\s*\{\s*"thought_process"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"action"\s*:\s*"([A-Z_]+)"\s*,'
+                     r'\s*"parameter"\s*:\s*"((?:[^"\\]|\\.)*)', raw)
+    if not found or found.group(2) not in ("SEARCH", "NAVIGATE", "READ_MORE", *(("DISCOVER",) if on_search_page else ())):
+        return None
+    thought, action, parameter = (json.loads(f'"{text.rstrip(chr(92))}"') for text in found.groups())
+    words = parameter.split()
+    # The cut parameters looped ("...comprehensive guide for beginners professionals cold brew coffee making..."
+    # again and again): the first six words seen twice mark where the loop began
+    seen = set()
+    for i in range(len(words) - 5):
+        run = tuple(w.lower() for w in words[i:i + 6])
+        if run in seen:
+            words = words[:i]
+            break
+        seen.add(run)
+    if action == "SEARCH":
+        words = words[:MAX_QUERY_WORDS]
+    return {"thought_process": thought, "action": action, "parameter": " ".join(words), "checklist_items": []} if words else None
+
 async def request_decision(client, messages, journal, tried, page_state, current_url):
     # Cheap retries: a reply that is invalid or would be refused is answered with a short correction
     # appended to the same conversation. Everything before the correction is identical to what LM Studio
@@ -109,6 +134,7 @@ async def request_decision(client, messages, journal, tried, page_state, current
             model=MODEL,
             messages=messages,
             temperature=0.2,
+            max_tokens=TURN_MAX_TOKENS,
             response_format=RESPONSE_FORMAT
         )
         original_content = extract_message_content(response)
@@ -125,13 +151,25 @@ async def request_decision(client, messages, journal, tried, page_state, current
                 if isinstance(action_decision.get(key), str):
                     action_decision[key] = restore_path_escapes(action_decision[key])
         except (json.JSONDecodeError, ValueError) as parse_err:
-            json_failures += 1
-            print(f"⚠️ Model returned invalid JSON (attempt {json_failures}/{MAX_JSON_RETRIES}): {raw_content[:200]}")
-            if json_failures >= MAX_JSON_RETRIES:
-                raise ValueError(f"No valid JSON decision after {MAX_JSON_RETRIES} attempts.") from parse_err
-            messages += [{"role": "assistant", "content": original_content},
-                         {"role": "user", "content": f"That reply was not a valid JSON object ({parse_err}). Reply with only the JSON object in the mandatory format."}]
-            continue
+            # A 3B model's search queries looped through the same words until the cap, three times in a row; their
+            # start is a usable decision, which the checks below judge like any other
+            action_decision = cut_decision(raw_content, is_search_page(current_url)) if was_cut_off(response) else None
+            if action_decision:
+                print(f"✂️ The reply was cut off inside its parameter; going on with its start: [{action_decision['action']}] {action_decision['parameter'][:120]}")
+            else:
+                json_failures += 1
+                print(f"⚠️ Model returned invalid JSON (attempt {json_failures}/{MAX_JSON_RETRIES}): {raw_content[:200]}")
+                if json_failures >= MAX_JSON_RETRIES:
+                    raise ValueError(f"No valid JSON decision after {MAX_JSON_RETRIES} attempts.") from parse_err
+                if was_cut_off(response):
+                    # A 3B model's replies ran past the cap in 25 replies of one suite; asked only for valid JSON, it
+                    # wrote the same long reply again, and 8 turns were lost. The cut reply is left out, so the model
+                    # is not shown a long reply to continue.
+                    messages += [{"role": "user", "content": CUT_OFF.format(limit=TURN_MAX_TOKENS)}]
+                    continue
+                messages += [{"role": "assistant", "content": original_content},
+                             {"role": "user", "content": f"That reply was not a valid JSON object ({parse_err}). Reply with only the JSON object in the mandatory format."}]
+                continue
 
         action = str(action_decision.get("action", "FINISH")).upper()
         parameter = str(action_decision.get("parameter", "")).strip()
@@ -148,7 +186,7 @@ async def request_decision(client, messages, journal, tried, page_state, current
         if refusal[0].startswith("CONFIRM_"):
             # Not a true refusal: repeating the action is an allowed answer, so no "do not repeat" wording
             correction = f"CHECK: {refusal[1]} Reply with only the JSON object."
-        elif refusal[0] == "BLOCKED_NOT_ON_PAGE" and len(refused) < 2:
+        elif refusal[0] in ("BLOCKED_NOT_ON_PAGE", "BLOCKED_CODE_NOT_ON_PAGE") and len(refused) < 2:
             # The refusal says what to do instead (DISCOVER the quoted sentence or read on); with the usual "Do NOT
             # choose DISCOVER ... choose a different action" around it, the model read on 3 times out of 3 past the
             # sentence it was shown
@@ -157,11 +195,42 @@ async def request_decision(client, messages, journal, tried, page_state, current
             correction = escalation_message(len(refused), action, refusal[1], page_state, current_url) + "\nReply with only the JSON object."
         messages += [{"role": "assistant", "content": original_content}, {"role": "user", "content": correction}]
 
+def with_retries(client):
+    """The client, with each model call tried again when the server fails it (no connection, or a server error).
+
+    A failed call used to end the run at once. LM Studio's server loads a model by itself when a request names one
+    that is not loaded (it unloads idle ones too), so waiting and trying again carries a run through an unloaded
+    model or a restarted app. Only failures of the server are retried: a reply that cannot be used is handled where
+    it is read, as before. A model unloaded in the middle of a call does not drop the connection: LM Studio answers
+    that call with "400 - Model unloaded by user or API request", so that refusal is retried too. A timeout is not
+    retried: the server is up but the model has not finished, and a 3B model that kept writing for 10 minutes kept
+    writing when the same request was sent again."""
+    create = client.chat.completions.create
+
+    async def create_with_retries(*args, **kwargs):
+        for attempt, wait in enumerate((*MODEL_RETRY_WAITS, None), start=1):
+            try:
+                return await create(*args, **kwargs)
+            except (APIConnectionError, InternalServerError, BadRequestError) as err:
+                unloaded = isinstance(err, BadRequestError) and re.search(r"\b(unloaded|not loaded)\b", str(err), re.I)
+                if wait is None or isinstance(err, APITimeoutError) or (isinstance(err, BadRequestError) and not unloaded):
+                    raise
+                print(f"⚠️ The model server failed the call ({type(err).__name__}: {err}). Trying again in {wait} s "
+                      f"({attempt}/{len(MODEL_RETRY_WAITS)}); LM Studio loads the model again by itself if it was unloaded.")
+                await asyncio.sleep(wait)
+
+    client.chat.completions.create = create_with_retries
+    return client
+
 async def main():
-    client = AsyncOpenAI(
+    # The client's own silent retries are off (its default retried a timed-out runaway reply twice); with_retries
+    # decides what is tried again
+    client = with_retries(AsyncOpenAI(
         base_url=BASE_URL,
-        api_key=API_KEY
-    )
+        api_key=API_KEY,
+        max_retries=0,
+        timeout=MODEL_TIMEOUT_SECONDS
+    ))
 
     print("🤖 ==================================================== 🤖")
     print("🚀 Initializing Autonomous Discovery Agent Setup...")
@@ -240,16 +309,22 @@ async def main():
 
                 elif action == "FINISH":
                     print("\n🎯 Agent has signaled mission complete. Writing the final result...")
-                    finish_entry = {"turn": turn_counter, "thought": thought, "action": "FINISH", "finding": parameter}
+                    # "writing" is cleared only once the final result is written: stopped during the checks before it
+                    # (a 14B model ran into the test's time limit there), the report said "finished" over the model's
+                    # unchecked FINISH text
+                    finish_entry = {"turn": turn_counter, "thought": thought, "action": "FINISH", "finding": parameter,
+                                    "writing": True}
                     journal.append(finish_entry)
                     try:
                         missing, unproven = await not_found_items(client, objective, tried, journal)
+                        no_amounts = amounts_not_found(tried.get("checklist"), journal, skip=missing)
                         final = await compose_final_result(client, objective, journal, tried.get("checklist"), missing,
-                                                           unproven)
+                                                           unproven, no_amounts, tried.get("evidence"))
                         if final:
                             finish_entry.update(draft=parameter, finding=final)
                     except Exception as err:
                         print(f"⚠️ Could not write the final result separately ({err}); keeping the agent's FINISH text.")
+                    finish_entry.pop("writing", None)
                     break
 
                 elif action in ["SEARCH", "NAVIGATE"]:

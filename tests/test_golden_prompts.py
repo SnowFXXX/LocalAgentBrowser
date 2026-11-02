@@ -67,7 +67,7 @@ LONG_SCRIPT = [
     reply("FINISH", "Use PostgreSQL."),  # repeated: the coverage check of each item
     verdict("[1] " + ADMIN),
     verdict("[2] " + FEATURES),
-    verdict("[2]", things=[("JSON columns", "JSON columns"), ("window functions", "window functions")]),  # 2 of 3
+    verdict("[2] " + FEATURES, things=[("JSON columns", "JSON columns"), ("window functions", "window functions")]),  # 2 of 3
     reply("READ_MORE", "6"),            # sent back: the next turn starts from a fresh prompt
     reply("FINISH", "Use PostgreSQL."),  # the finish check again
     reply("FINISH", "Use PostgreSQL."),  # repeated: the coverage check ran once, so the final result is written

@@ -1,11 +1,74 @@
 """Decisions refused or confirmed before they are carried out (leaving, reading on, re-reading, finishing, repeated
 searches, discoveries not on the page) and the notes that go with them."""
-from .config import GAP_REFUSAL_LIMIT, LONG_PAGE_UNREAD, MAX_CHECK_DISCOVERY_CHARS, MAX_VISITS_PER_URL
+import re
+from .config import GAP_REFUSAL_LIMIT, LONG_PAGE_UNREAD, MAX_CHECK_DISCOVERY_CHARS, MAX_VISITS_PER_URL, OBJECTIVE_ECHO_SHARE
 from .prompts import FINAL_RESULT, GIVE_UP_RULE
-from .text import shorten
-from .pages import determine_url, normalize_query, normalize_url, outline_pointer, read_more_target, search_query, where_you_are
-from .grounding import discovery_lines, grounding_check, is_known_discovery
+from .text import MISSING_STOPWORDS, shorten
+from .pages import determine_url, is_search_page, normalize_query, normalize_url, outline_pointer, read_more_target, search_query, where_you_are
+from .grounding import DESCRIBES_PAGE, discovery_lines, grounded_share, grounding_check, is_known_discovery, page_hint
 from .checklist import check_parts, every_item_has_discoveries, open_items
+
+ECHO_WORD = r"[A-Za-z0-9][A-Za-z0-9'.-]*"
+ECHO_STOPWORDS = MISSING_STOPWORDS | {"how", "what", "where", "do", "does", "i", "you", "your", "be", "by", "as", "this",
+                                      "that", "it", "can", "should", "need"}
+
+
+CHECK_WORDING = re.compile(r"\bcovered by\s*\[\d|\bnot covered\b|\bwritten at FINISH\b|\bchecklist item", re.I)
+
+QUESTION_START = re.compile(r"(?:what|how|where|which|why|when|who|does)\b", re.I)  # Not "do", "can", "is": "Do not grind too fine"
+
+def is_question_discovery(parameter):
+    """True when every sentence of a discovery starts like a question and none gives an answer (a colon or number)."""
+    sentences = [s for line in content_lines(parameter) for s in re.split(r"(?<=[.!?])\s+", line) if s.strip()]
+    return bool(sentences) and all(QUESTION_START.match(s) and not re.search(r"[:\d]", s) for s in sentences)
+
+def content_lines(parameter):
+    """A discovery's lines with web addresses taken out ("from https://...", "URL: https://..."), empty ones dropped."""
+    # A page title with " from https://..." added went through as a finding: the title alone matched the results page
+    lines = (re.sub(r"\s*\b(?:from|at|on|url:)?\s*https?://\S+", "", line).strip(" -|:,") for line in discovery_lines(parameter))
+    return {line for line in lines if line}
+
+def echoes_objective(parameter, page_state, objective, queries=()):
+    # Scored against the objective, the copied question and checklist parts shared 48-100% of their word pairs and
+    # real discoveries in every suite run up to 43%; one that matches the page as well is an answer, not an echo.
+    # The model's own search queries count here too: a 3B model recorded a page title with its query after it
+    # ("...with quantities, steps and shelf life in fridge official documentation site recipes guides").
+    if not objective:
+        return False
+    shown = [part for i, part in enumerate(page_state.get("parts") or []) if i in page_state.get("seen_parts", {0})]
+    asked_text = " ".join([objective, *queries])
+    if grounded_share(parameter, [asked_text]) >= OBJECTIVE_ECHO_SHARE and grounded_share(parameter, shown) < OBJECTIVE_ECHO_SHARE:
+        return True
+    # Short labels of the 3B's own ("What you need for cold brew coffee at home") and the 7B's "administration" had
+    # too few word pairs for either score; every discovery in the suite runs adding at most one lowercase word to the
+    # objective's was one of these. A new name or number ("LibreOffice is free and open source") is information.
+    # Queries are left out here, as this does not look at the page: a 7B model once searched with a sentence it then
+    # found on a page and recorded.
+    asked = {w.lower() for w in re.findall(ECHO_WORD, objective)}
+    new = [w for w in re.findall(ECHO_WORD, parameter) if w.lower() not in asked and w.lower() not in ECHO_STOPWORDS]
+    return len(new) == 0 or (len(new) == 1 and new[0].islower())
+
+def is_heading_discovery(parameter, page_state):
+    """True when every word of a discovery comes from the page's headings (a sentence ending in "." is not one)."""
+    # Matched by words, not whole lines: a 3B model joined the page title to one step heading after another
+    # ("How to Make Cold Brew Coffee: Step-by-Step Grind Your Coffee"), dropping the "Step 1:"
+    headings = list(page_state.get("headings") or ()) + [h for label in page_state.get("outline") or () for h in label.split(" / ")]
+    heading_words = {w.lower() for w in re.findall(ECHO_WORD, " ".join(headings))}
+    # The outline's own notes are not words of a discovery: a 3B model recorded three labels as "The grind: coarse,
+    # like sea salt (part 2), The cold brew ratio explained (part 3), Method (part 4)"
+    # Section numbers too ("10.4: The Light-Dependent Reactions / How the Light-Dependent Reactions Work (read)")
+    lines = {re.sub(r"^\d+(?:\.\d+)*[.:)]?\s+|\s*\((?:read|part \d+(?: of \d+)?)\)", "", line)
+             for line in content_lines(parameter)}
+    # Section and page numbers are not new words here: an outline label came as "4.1.06: Light-independent
+    # Reactions/3" (only those: a height such as "5,895" next to a heading's words is a fact)
+    lines = {re.sub(r"\b\d+(?:\.\d+)+\b|/\d+\b", " ", line) for line in lines}
+    words = {w for line in lines for w in re.findall(ECHO_WORD, line)} - ECHO_STOPWORDS
+    return bool(words) and words <= heading_words and not any(line.endswith(".") for line in lines)
+
+def is_snippet_discovery(parameter, page_state):
+    """True when every line of a discovery, URL lines aside, is a title or description from a results page."""
+    lines = content_lines(parameter)
+    return bool(lines) and lines <= discovery_lines("\n".join(page_state.get("snippets", ())))
 
 def leave_check(action, page_state, current_url, journal=()):
     # The model often left content pages without recording what it needed from them. The first attempt to
@@ -96,6 +159,16 @@ def check_decision(action, parameter, journal, tried, page_state, current_url, t
             return "BLOCKED_SEARCH", "The SEARCH query was empty."
         # Repeats are blocked outright; a warning alone does not stop small models from looping
         if normalize_query(query) in [normalize_query(q) for q in tried["queries"]]:
+            # On a page it has opened and recorded nothing from, the search already did its work: a 3B model repeated
+            # its search twice on the official venv page, was told it could finish with "not found", and did
+            on_unrecorded_page = (current_url and not is_search_page(current_url) and page_state.get("parts")
+                                  and page_state.get("url") == normalize_url(current_url)
+                                  and not page_state.get("visit_discoveries"))
+            if on_unrecorded_page:
+                return "BLOCKED_SEARCH", (f"This exact query was already searched, and it led to the page you are on. "
+                                          f"{where_you_are(page_state, current_url)} Nothing has been recorded from it "
+                                          "yet: DISCOVER what it says for the OBJECTIVE, READ_MORE to read on, or SEARCH "
+                                          "with clearly different words for another part of the OBJECTIVE.")
             # A model looking for something the web does not have kept resubmitting the same search (three times
             # in one turn); from the second repeat it is told plainly that finishing with the gap is an option
             repeats = tried.setdefault("repeated_searches", {})
@@ -132,6 +205,11 @@ def check_decision(action, parameter, journal, tried, page_state, current_url, t
         total = len(page_state["parts"])
         target = read_more_target(parameter, page_state)
         if not (current_url and page_state["url"] == normalize_url(current_url)) or total == 0:
+            # On the results page a 3B model kept choosing READ_MORE to "read more on one of these sources" and, told
+            # only that there were no parts, repeated its search; it never opened a result
+            if current_url and is_search_page(current_url):
+                return "BLOCKED_READ_MORE", (f"{where_you_are(page_state, current_url)} A results page has no parts to "
+                                             "read: to read one of the results, NAVIGATE to its URL.")
             return "BLOCKED_READ_MORE", f"{where_you_are(page_state, current_url)} This page has no parts to read."
         if not 0 <= target < total:
             return "BLOCKED_READ_MORE", (f"There is no part {target + 1}. {where_you_are(page_state, current_url)} "
@@ -152,12 +230,84 @@ def check_decision(action, parameter, journal, tried, page_state, current_url, t
         return read_on_check(page_state, current_url, target, tried.get("checklist"))
     elif action == "DISCOVER":
         if not discovery_lines(parameter):
+            # A 3B model described the page's facts in thought_process and left the parameter empty four times in one
+            # task; told only that it was empty, it kept doing so
+            if str(thought).strip():
+                # Told this, the 3B still sent empty DISCOVERs seven times on the venv page ("I need to DISCOVER
+                # information from this page"): it gets a page sentence to copy, and the other way on as well
+                shown = [p for i, p in enumerate(page_state.get("parts") or []) if i in page_state.get("seen_parts", {0})]
+                hint = page_hint("", shown, tried.get("objective", "")) if not is_search_page(current_url) else ""
+                return "BLOCKED_DISCOVER", ("The DISCOVER parameter was empty. DISCOVER does not extract anything: "
+                                            "only the parameter is recorded, not thought_process, so put the facts "
+                                            "themselves in the parameter, in the page's own wording. If the part "
+                                            f"shown has nothing for the OBJECTIVE, READ_MORE or SEARCH instead.{hint}")
             return "BLOCKED_DISCOVER", "The DISCOVER parameter was empty. Put the actual information in the parameter."
+        # A result's snippet is a summary written to be clicked, not the source: in the 2026-10-25 model tests a 3B
+        # model recorded snippets in 5 of 7 tasks without opening a page, and its final results cited the search page.
+        # It comes first: refused there as repeating its search, the 3B searched again and lost the turn, while
+        # this refusal was followed by NAVIGATE in every run
+        if current_url and is_search_page(current_url):
+            return "BLOCKED_DISCOVER_SEARCH", ("That is the search results page: its short descriptions are summaries "
+                                               "written to be clicked, not sources. NAVIGATE to the result that looks "
+                                               "right and DISCOVER from the page itself.")
+        # A 3B model recorded a bare web address and then the objective's own question, and both counted as findings
+        # (the grounding check accepts the objective's wording, so a paraphrase is not sent back)
+        def fact_hint(text):
+            # The refusals below are for text that is not a fact; quoting the page sentence closest to it and the
+            # objective is what got such refusals followed by a real discovery (a 3B model repeated a description of
+            # the page, refused without one, until the turn was lost)
+            shown = [p for i, p in enumerate(page_state.get("parts") or []) if i in page_state.get("seen_parts", {0})]
+            return page_hint(text, shown, tried.get("objective", ""))
+        if not content_lines(parameter):
+            # A 3B model gave the page's address to "DISCOVER more from this page", as if DISCOVER looked it up, and
+            # did so three turns running; a quoted page sentence is what got such refusals recorded before
+            return "BLOCKED_DISCOVER_URL", ("That DISCOVER is only a web address. DISCOVER does not open or look up "
+                                            "anything: it records the text you write in its parameter. Write in the "
+                                            f"facts the page gives for the OBJECTIVE, in its own wording.{fact_hint('')}")
+        # Headings alone ("Method", "How long to keep cold brew in the fridge?") were recorded by the 3B, the 7B and
+        # Llama, and the checklist then counted the item as covered
+        if is_heading_discovery(parameter, page_state):
+            return "BLOCKED_DISCOVER_HEADING", ("That DISCOVER is a heading of the page, not what the page says under "
+                                                "it. DISCOVER the facts given under that heading, or READ_MORE to the "
+                                                f"part it heads if they are not shown.{fact_hint(parameter)}")
+        # "...Guide from https://... contains a list of what is needed, step-by-step instructions, and information on
+        # how long it keeps": sent back as not matching the page, the 3B repeated it and it was recorded. In every
+        # suite run this wording appeared only in such descriptions, never in a real discovery.
+        if DESCRIBES_PAGE.search(parameter):
+            return "BLOCKED_DISCOVER_DESCRIBES", ("That DISCOVER describes what the page contains instead of giving "
+                                                  "it. DISCOVER the facts themselves, in the page's own wording: the "
+                                                  f"amounts, steps, names or dates it gives.{fact_hint(parameter)}")
+        # "what are the quantities needed for cold brew coffee at home, what are the steps in order...": in every suite
+        # run a discovery made only of questions was a restated objective or a heading; the one real one gave its
+        # answer after a colon ("How to activate a virtual environment on macOS or Linux: $ source ...")
+        if is_question_discovery(parameter):
+            return "BLOCKED_DISCOVER_QUESTION", ("That DISCOVER only asks questions. DISCOVER the page's answers to "
+                                                 f"them, in its own wording.{fact_hint(parameter)}")
+        # The finish check's own wording copied into a DISCOVER ("not covered by [1, 2, 3]"): in 471 suite
+        # discoveries this appeared only in such 3B notes, and they were recorded as findings
+        if CHECK_WORDING.search(parameter):
+            return "BLOCKED_DISCOVER_CHECK", ("That DISCOVER is a note about the checklist, not something the page "
+                                              "says. Write such notes in thought_process; DISCOVER only the page's "
+                                              f"facts, in its own wording.{fact_hint(parameter)}")
+        if echoes_objective(parameter, page_state, tried.get("objective", ""), tried.get("queries", ())):
+            return "BLOCKED_DISCOVER_OBJECTIVE", ("That DISCOVER repeats the OBJECTIVE or your search, not something the page says. "
+                                                  "DISCOVER what the page text shown says in answer to it, or READ_MORE "
+                                                  f"or look elsewhere if it does not say.{fact_hint(parameter)}")
         if is_known_discovery(parameter, journal):
             # The model has weighed this part: without this, the read-on check asked it to DISCOVER again
             # right after this refusal, and it repeated the duplicate until the turn was lost
             page_state.setdefault("read_on_confirmed", set()).add(page_state.get("index", 0))
-            return "DUPLICATE_DISCOVER", "Everything in that DISCOVER is already recorded in DISCOVERIES SO FAR."
+            # Told only that, a 3B model sent the same DISCOVER three times and lost the turn
+            return "DUPLICATE_DISCOVER", ("Everything in that DISCOVER is already recorded in DISCOVERIES SO FAR. "
+                                          "DISCOVER a fact from the page that is not recorded yet, READ_MORE to read "
+                                          "on, or FINISH if DISCOVERIES SO FAR cover every item of the OBJECTIVE "
+                                          "CHECKLIST.")
+        # Refused on the search page, a 3B model opened the result and recorded the same title and description
+        # there, which the page's own heading let through; its final result then came from its own knowledge
+        if is_snippet_discovery(parameter, page_state):
+            return "BLOCKED_DISCOVER_SNIPPET", ("That DISCOVER is the search result's title and description, not what "
+                                                "this page says. DISCOVER the facts the page text shown gives for the "
+                                                "OBJECTIVE, in its own wording, or READ_MORE if they are further on.")
         return grounding_check(parameter, page_state, current_url, tried.get("objective", ""))
     elif action == "FINISH":
         return finish_check(tried, journal, page_state, current_url) or gap_check(thought, tried)
@@ -172,7 +322,11 @@ def finish_check(tried, journal, page_state=None, current_url=None):
     if tried.get("finish_confirmed") or tried.get("search_exhausted"):
         return None
     tried["finish_confirmed"] = True  # Reset at the start of every turn
-    return "CONFIRM_FINISH", (f"{source_note(journal)}{unread_note(page_state or {}, current_url)}"
+    # How many pages the discoveries came from is shown only while some item still lacks them: with every item
+    # covered from one long page, the note sent the 7B away from its finish four times in one task, and cost Llama
+    # a retry on a factual question one page fully answered
+    sources = "" if every_item_has_discoveries(tried.get("checklist")) else source_note(journal)
+    return "CONFIRM_FINISH", (f"{sources}{unread_note(page_state or {}, current_url)}"
                               f"{numbered_discoveries(journal)} {finish_check_text(tried)}")
 
 def numbered_discoveries(journal, limit=MAX_CHECK_DISCOVERY_CHARS):

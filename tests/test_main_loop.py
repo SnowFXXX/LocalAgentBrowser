@@ -18,11 +18,11 @@ SITE = FakeSite(
     },
     results=[{"title": "Doc A", "href": "//duckduckgo.com/l/?uddg=" + urllib.parse.quote(A), "snippet": "about a"}],
 )
-COVERED = json.dumps({"evidence": "[1] fact from a", "missing": "", "conditions": [], "things": []})
+COVERED = json.dumps({"evidence": "[1] Fact from page A", "missing": "", "conditions": [], "things": []})
 SCRIPT = [
     reply("SEARCH", "docs a"),         # turn 1: fresh prompt
     reply("NAVIGATE", A),              # turn 2: search results arrive as a follow-up note
-    reply("DISCOVER", "fact from a"),  # turn 3: page A arrives as a follow-up note
+    reply("DISCOVER", "Fact from page A"),  # turn 3: page A arrives as a follow-up note
     reply("NAVIGATE", A),              # turn 4: already on A -> cheap retry
     reply("NAVIGATE", A),              #         again -> cheap retry 2
     reply("NAVIGATE", A),              #         again -> refused for the turn
@@ -92,14 +92,14 @@ def test_full_run(monkeypatch, tmp_path):
     assert "The item to check: ITEM 2" in last_message(calls[13])
     compose_request = last_message(calls[last])
     assert len(calls[last]) == 2, "the final result is written from a fresh prompt, not the browsing conversation"
-    assert f"[1] (from {A})\nfact from a" in compose_request and "final answer" not in compose_request
+    assert f"[1] (from {A})\nFact from page A" in compose_request and "final answer" not in compose_request
     assert actions[-1] == "FINISH", "FINISH must be saved to the log"
     assert journal[-1]["finding"] == "Composed final result citing [1]." and journal[-1]["draft"] == "final answer"
 
     report = (tmp_path / ab.REPORT_FILE).read_text(encoding="utf-8")
     assert "**Objective:** test objective" in report and "finished by the agent on turn 8" in report
     assert "## Final result\n\nComposed final result citing [1]." in report
-    assert "## Discoveries (1)" in report and f"Turn 3, from {A}" in report and "fact from a" in report
+    assert "## Discoveries (1)" in report and f"Turn 3, from {A}" in report and "Fact from page A" in report
 
 
 def test_error_pages_are_failed_navigations(monkeypatch, tmp_path):
@@ -124,7 +124,7 @@ def test_report_is_written_when_the_run_stops_early(monkeypatch, tmp_path):
     run_agent(monkeypatch, tmp_path, script=SCRIPT[:3])
     report = (tmp_path / ab.REPORT_FILE).read_text(encoding="utf-8")
     assert "stopped before the agent finished (after turn 3)" in report
-    assert "## Discoveries (1)" in report and "fact from a" in report
+    assert "## Discoveries (1)" in report and "Fact from page A" in report
 
 
 def test_objective_check_schedule(monkeypatch, tmp_path):
@@ -136,17 +136,17 @@ def test_objective_check_schedule(monkeypatch, tmp_path):
 
 
 def test_discoveries_are_linked_to_checklist_items(monkeypatch, tmp_path):
-    linked = json.dumps({"thought_process": "t", "action": "DISCOVER", "parameter": "fact from a", "checklist_items": [2, 9]})
+    linked = json.dumps({"thought_process": "t", "action": "DISCOVER", "parameter": "Fact from page A", "checklist_items": [2, 9]})
     script = [reply("SEARCH", "docs a"), reply("NAVIGATE", A), linked]
     calls, journal = run_agent(monkeypatch, tmp_path, script=script)
     assert journal[-1]["checklist_items"] == [2], "item numbers outside the checklist are dropped"
     report = (tmp_path / ab.REPORT_FILE).read_text(encoding="utf-8")
-    assert "fact from a" in report
+    assert "Fact from page A" in report
 
 
 def test_a_coverage_send_back_starts_the_next_turn_fresh(monkeypatch, tmp_path):
     gap = json.dumps({"evidence": "", "missing": "the second fact", "conditions": [], "things": []})
-    script = [reply("SEARCH", "docs a"), reply("NAVIGATE", A), reply("DISCOVER", "fact from a"),
+    script = [reply("SEARCH", "docs a"), reply("NAVIGATE", A), reply("DISCOVER", "Fact from page A"),
               reply("FINISH", "done"), reply("FINISH", "done"),  # finish check, then repeated
               gap, COVERED,                                       # coverage check: nothing answers item 1 -> sent back
               reply("FINISH", "done"), reply("FINISH", "done"),   # next turn, fresh prompt

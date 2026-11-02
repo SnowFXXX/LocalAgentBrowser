@@ -30,8 +30,9 @@ def test_outline_labels_parts_by_their_headings():
     mark = ab.HEADING_MARK
     parts = [f"{mark}Getting started\nIntro text.", "Plain paragraph with no heading at all.",
              f"Text before.\n{mark}Planner\nMore.\n{mark}  Generator  \nEven more.", "```\ncode first\n```"]
-    clean, outline = ab.build_outline(parts)
+    clean, outline, headings = ab.build_outline(parts)
     assert outline == ["Getting started", "Plain paragraph with no heading at all.", "Planner / Generator", "code first"]
+    assert headings == ["Getting started", "Planner", "Generator"]
     assert all(mark not in part for part in clean) and clean[0] == "Getting started\nIntro text."
 
 

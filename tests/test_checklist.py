@@ -109,13 +109,36 @@ class TestFinalResult:
         request = model.calls[0][-1]["content"]
         assert "### CHECKLIST (the parts of the OBJECTIVE)\n1. Create it\n2. Activate it\n\n### DISCOVERIES" in request
         assert "6. Cover every CHECKLIST item; for an item no discovery supports, say plainly that it was not found." in request
-        assert "7. Write plain text, not JSON." in request
+        assert '7. Reply with JSON: {"result": "..."}' in request
 
     def test_a_single_item_adds_nothing(self):
         client, model = fake_client(["Result [1]."])
         asyncio.run(ab.compose_final_result(client, "objective", discoveries("x"), checklist("objective")))
         request = model.calls[0][-1]["content"]
-        assert "CHECKLIST" not in request and "6. Write plain text, not JSON." in request
+        assert "CHECKLIST" not in request and '6. Reply with JSON: {"result": "..."}' in request
+
+    def test_the_result_is_read_from_its_field(self):
+        client, model = fake_client([json.dumps({"result": "Kilimanjaro, 5,895 m [1]."})])
+        assert asyncio.run(ab.compose_final_result(client, "objective", discoveries("x"))) == "Kilimanjaro, 5,895 m [1]."
+
+    def test_a_tool_call_or_the_prompt_repeated_is_asked_for_again(self):
+        # What Llama 3.1 8B and Qwen 3B wrote instead of a final result in the 2026-10-25 model tests
+        tool_call = json.dumps({"name": "get_mountain_info", "parameters": {"height_in_meters": 5895}})
+        echoed = json.dumps({"result": "### OBJECTIVE\nHow tall is it?\n### DISCOVERIES\n[1] x"})
+        for first in (tool_call, echoed):
+            client, model = fake_client([first, json.dumps({"result": "It is 5,895 m tall [1]."})])
+            assert asyncio.run(ab.compose_final_result(client, "objective", discoveries("x"))) == "It is 5,895 m tall [1]."
+            assert model.calls[1][-1]["content"].startswith("That reply was not the final result")
+
+    def test_two_unusable_replies_are_reported_as_no_result(self):
+        tool_call = json.dumps({"name": "get_mountain_info", "parameters": {}})
+        client, model = fake_client([tool_call, tool_call])
+        assert asyncio.run(ab.compose_final_result(client, "objective", discoveries("x"))) == ab.NO_RESULT
+
+    def test_a_reply_cut_off_at_the_token_limit_still_gives_its_text(self):
+        assert ab.result_text('{"result": "Step 1. Grind the coffee.') == "Step 1. Grind the coffee."
+        assert ab.result_text("Plain text from a server that ignores the format.") == (
+            "Plain text from a server that ignores the format.")
 
 
 def verdict(evidence="[1] x", missing="", conditions=(), things=()):
@@ -141,7 +164,8 @@ class TestCoverageGaps:
             ("WPS Office", "WPS Office has a familiar interface"),       # copied, states neither
             ("OnlyOffice", "OnlyOffice is free and open source")])       # states both, but not in the discoveries
         result, _ = gaps(["Name three free, open-source suites"], [reply])
-        assert result == ["Item 1: WPS Office: no words in DISCOVERIES SO FAR show it is free and open-source. SEARCH for "
+        assert result == ["Item 1 (Name three free, open-source suites): only 2 of 3 found (LibreOffice, WPS Office)",
+                          "Item 1: WPS Office: no words in DISCOVERIES SO FAR show it is free and open-source. SEARCH for "
                           "'WPS Office free and open-source' to check it, or replace it with one that is",
                           "Item 1: OnlyOffice: no words in DISCOVERIES SO FAR show it is free and open-source. SEARCH for "
                           "'OnlyOffice free and open-source' to check it, or replace it with one that is"]
@@ -149,11 +173,13 @@ class TestCoverageGaps:
     def test_long_descriptions_are_not_conditions(self):
         reply = verdict(conditions=["in different cultures or religions"],
                         things=[("Western cultures", ""), ("Hopi", ""), ("Greece", "")])
-        assert gaps(["How at least three different cultures or religions viewed owls"], [reply])[0] == []
+        found = ("In Western cultures owls stand for wisdom.", "The Hopi feared owls.", "In Greece the owl was Athena's bird.")
+        assert gaps(["How at least three different cultures or religions viewed owls"], [reply], found)[0] == []
 
     def test_a_short_count_is_found_without_a_condition(self):
         reply = verdict(things=[("Dakota Hidatsa Indians", "the Dakota Hidatsa"), ("Hopis Indians", "the Hopis")])
-        assert gaps(["How at least three different cultures viewed owls"], [reply])[0] == [
+        found = ("The Dakota Hidatsa saw the owl as a protector.", "The Hopis feared the owl.")
+        assert gaps(["How at least three different cultures viewed owls"], [reply], found)[0] == [
             "Item 1 (How at least three different cultures viewed owls): only 2 of 3 found (Dakota Hidatsa Indians, "
             "Hopis Indians)"]
 
@@ -180,7 +206,8 @@ class TestCoverageRefusal:
                         things=[("ONLYOFFICE", ""), ("LibreOffice", ""), ("OpenOffice", "")])
         client, _ = fake_client([reply])
         tried = {"checklist": checklist("Name three free suites")}
-        assert asyncio.run(ab.coverage_refusal(client, "objective", tried, discoveries("ONLYOFFICE is open source."))) is None
+        found = discoveries("ONLYOFFICE is open source.", "LibreOffice is a full suite.", "OpenOffice is the original suite.")
+        assert asyncio.run(ab.coverage_refusal(client, "objective", tried, found)) is None
         assert tried["unproven_items"] == [1], "the unmet condition still counts for the final result"
 
     def test_skipped_after_an_exhausted_search(self):
@@ -219,9 +246,53 @@ class TestNotFound:
                                                           discoveries("Repot in spring.")))
         assert unanswered == [1] and result == ["Item 1 (Care in the first two weeks): nothing in DISCOVERIES SO FAR answers it"]
 
-    def test_a_discovery_number_alone_counts_as_evidence(self):
-        client, _ = fake_client([verdict(evidence="[2]")])
-        assert asyncio.run(ab.coverage_gaps(client, "o", checklist("a"), discoveries("x")))[1] == []
+    def test_a_discovery_number_alone_is_asked_for_its_words_and_counts_when_they_are_there(self):
+        client, model = fake_client([verdict(evidence="[1]"), verdict(evidence="[1] PostgreSQL handles many connections well")])
+        found = discoveries("PostgreSQL handles many connections well, using one process per connection.")
+        assert asyncio.run(ab.coverage_gaps(client, "o", checklist("Handling of many users"), found))[1] == []
+        assert len(model.calls) == 2 and "only discovery numbers" in model.calls[1][-1]["content"]
+
+    def test_evidence_quoting_several_discoveries_counts_when_each_part_is_in_one(self):
+        found = discoveries("If an owl flew over Greek soldiers before a battle, they took it as a sign of victory.",
+                            "In English folklore, hearing an owl's call meant imminent death.")
+        quoted = ("[1] If an owl flew over Greek soldiers before a battle, they took it as a sign of victory.\n"
+                  "[2] In English folklore, hearing an owl's call meant imminent death.")
+        client, _ = fake_client([verdict(evidence="[1], [2]"), verdict(evidence=quoted)])
+        assert asyncio.run(ab.coverage_gaps(client, "o", checklist("How two cultures viewed owls"), found))[1] == []
+
+    def test_numbers_given_twice_lead_to_a_yes_or_no_question_about_the_cited_discovery(self):
+        items = checklist("Compare setup and administration", "Compare handling of many simultaneous users")
+        no = json.dumps({"answer": "no", "quote": ""})
+        intro = "SQLite and PostgreSQL sit at opposite ends of the relational database spectrum."
+        client, model = fake_client([verdict(evidence="[1]"), verdict(evidence="[1]"), no])
+        assert asyncio.run(ab.coverage_gaps(client, "o", items, discoveries(intro), only=[2]))[1] == [2]
+        assert "### DISCOVERY\n" + intro in model.calls[2][1]["content"]
+        locking = "SQLite locks the whole file on writes, so many simultaneous users wait on each other."
+        yes = json.dumps({"answer": "yes", "quote": "SQLite locks the whole file on writes"})
+        client, _ = fake_client([verdict(evidence="[1]"), verdict(evidence="[1]"), yes])
+        assert asyncio.run(ab.coverage_gaps(client, "o", items, discoveries(locking), only=[2]))[1] == []
+        invented = json.dumps({"answer": "yes", "quote": "PostgreSQL handles thousands of users"})
+        client, _ = fake_client([verdict(evidence="[1]"), verdict(evidence="[1]"), invented])
+        assert asyncio.run(ab.coverage_gaps(client, "o", items, discoveries(intro), only=[2]))[1] == [2]
+
+    def test_a_no_still_counts_when_the_cited_discovery_has_the_items_own_words(self):
+        # The 7B said no 3 times out of 3 for a discovery placing the light-dependent reactions in the thylakoids
+        items = checklist("Detail the light-dependent reactions and their location in the plant cell",
+                          "Detail the Calvin cycle and its location in the plant cell")
+        no = json.dumps({"answer": "no", "quote": ""})
+        found = discoveries("The light-dependent reactions, which take place in the thylakoids, produce ATP and NADPH.")
+        client, _ = fake_client([verdict(evidence="[1]"), verdict(evidence="[1]"), no])
+        assert asyncio.run(ab.coverage_gaps(client, "o", items, found, only=[1]))[1] == []
+        # "location", "plant" and "cell" are shared with the other item, so they alone do not count
+        found = discoveries("The plant cell has a location for everything, and the Calvin cycle runs in the stroma.")
+        client, _ = fake_client([verdict(evidence="[1]"), verdict(evidence="[1]"), no])
+        assert asyncio.run(ab.coverage_gaps(client, "o", items, found, only=[1]))[1] == [1]
+
+    def test_a_discovery_number_with_no_real_words_behind_it_means_unanswered(self):
+        client, _ = fake_client([verdict(evidence="[1]"), verdict(evidence="[1] SQLite cannot handle many users")])
+        found = discoveries("SQLite and PostgreSQL sit at opposite ends of the relational database spectrum.")
+        result, unanswered, _ = asyncio.run(ab.coverage_gaps(client, "o", checklist("Handling of many users"), found))
+        assert unanswered == [1] and "nothing in DISCOVERIES SO FAR answers it" in result[0]
 
     def test_unanswered_items_are_rechecked_before_the_final_result(self):
         items = checklist("Steps", "Care")
@@ -318,7 +389,7 @@ def test_descriptions_are_not_things():
     client, _ = fake_client([reply])
     result, _, unproven = asyncio.run(ab.coverage_gaps(client, "o", checklist("Name three free, open-source suites"),
                                                        discoveries("LibreOffice is free and open source.")))
-    assert "Item 1 (Name three free, open-source suites): only 2 of 3 found (LibreOffice, OnlyOffice)" in result
+    assert "Item 1 (Name three free, open-source suites): only 1 of 3 found (LibreOffice)" in result  # OnlyOffice: named in none
     assert unproven == [("OnlyOffice", "open-source")]
 
 
@@ -344,3 +415,86 @@ def test_one_discovery_linked_to_every_item_is_not_enough():
     for n in (2, 3, 4):
         ab.link_discovery(items, [n], n)
     assert ab.every_item_has_discoveries(items)
+
+
+def test_a_gap_filled_from_the_models_own_knowledge_is_cut_back_to_the_gap():
+    text = ("Store it in the fridge [1]. How long it keeps in the fridge is not explicitly stated but generally, it can "
+            "be stored for several weeks if properly sealed and refrigerated. Serve over ice [1].")
+    assert ab.without_filled_gaps(text) == ("Store it in the fridge [1]. How long it keeps in the fridge is not "
+                                            "explicitly stated. Serve over ice [1].")
+    ratio = "The exact ratio is not specified in the text, but a common recommendation is 1 part coffee to 4 parts water (e.g., 1 cup)."
+    assert ab.without_filled_gaps(ratio) == "The exact ratio is not specified in the text."
+    honest = "Steep it for 16 hours [1], but no longer than 24 hours [2]."
+    assert ab.without_filled_gaps(honest) == honest
+
+
+def test_a_command_in_the_result_that_no_discovery_gives_is_cut_and_named():
+    # The 14B's venv result: commands in triple backticks, one of them written from memory
+    found = discoveries("Create one with python -m venv /path/to/env. On POSIX bash/zsh: $ source <venv>/bin/activate")
+    text = ("To create it, run ```python -m venv /path/to/env``` [1]. On Windows, run ```<venv>/Scripts/activate```.\n\n"
+            "On macOS or Linux, run `source venv/bin/activate` [1].")
+    assert ab.unverified_code(text, found) == ["<venv>/Scripts/activate"]
+    assert ab.without_invented_code(text, found) == (
+        "To create it, run ```python -m venv /path/to/env``` [1].\n\nOn macOS or Linux, run `source venv/bin/activate` "
+        "[1].\n\nLeft out, because no discovery gives them (the pages read may still have them): "
+        "`<venv>/Scripts/activate`.")
+    assert ab.without_invented_code("Run `python -m venv /path/to/env` [1].", found) == "Run `python -m venv /path/to/env` [1]."
+
+
+def test_a_code_block_line_no_discovery_gives_is_cut_and_an_emptied_block_removed():
+    # The 7B's venv result: a block with "pip install package_name" under "simply use pip as usual:"
+    found = discoveries("Create one:\n```\npython -m venv /path/to/env\n```",
+                        "If you have a requirements file requirements.txt, you can invoke pip install -r requirements.txt.")
+    text = ("To create it [1]:\n\n```\npython -m venv /path/to/env\n```\n\nTo install packages, use pip:\n\n```\n"
+            "pip install package_name\n```")
+    assert ab.unverified_code(text, found) == ["pip install package_name"]
+    assert ab.without_invented_code(text, found) == (
+        "To create it [1]:\n\n```\npython -m venv /path/to/env\n```\n\nTo install packages, use pip:\n\nLeft out, because "
+        "no discovery gives them (the pages read may still have them): `pip install package_name`.")
+
+
+def test_the_report_of_a_run_stopped_while_writing_shows_an_unchecked_draft(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    journal = [{"action": "DISCOVER", "turn": 1, "extracted_data": "LibreOffice is free."},
+               {"action": "FINISH", "turn": 2, "finding": "LibreOffice, OpenOffice and WPS Office.", "writing": True}]
+    ab.write_report("Name three free suites", journal)
+    report = (tmp_path / ab.REPORT_FILE).read_text(encoding="utf-8")
+    assert "stopped while the final result was being checked and written" in report
+    assert "finished by the agent" not in report and "unchecked draft" in report
+
+
+def test_items_asking_for_amounts_with_none_recorded_are_reported_by_the_code():
+    items = checklist("List what I need with the quantities", "Say how long it keeps in the fridge")
+    journal = discoveries("You need coffee beans, water, and a strainer.", "It keeps in the fridge for two weeks.")
+    ab.link_discovery(items, [1], 1)
+    ab.link_discovery(items, [2], 2)
+    assert ab.amounts_not_found(items, journal) == [1]
+    client, model = fake_client(["You need coffee beans, water and a strainer [1]. It keeps two weeks [2]."])
+    text = asyncio.run(ab.compose_final_result(client, "Cold brew at home", journal, items, (), (), [1]))
+    assert "NO AMOUNTS FOUND" in model.calls[0][1]["content"]
+    assert text.endswith("Not found in the pages read:\n- List what I need with the quantities: the amounts it asks for")
+
+
+def test_a_view_paragraph_repeating_the_whole_result_is_left_out():
+    result = "SQLite suits a hobby project; PostgreSQL handles many writers with MVCC [1]. I recommend SQLite."
+    client, model = fake_client([result, "My view: " + result])
+    text = asyncio.run(ab.compose_final_result(client, "Compare them, then recommend one for my hobby project.",
+                                               discoveries("PostgreSQL handles many writers with MVCC.")))
+    assert len(model.calls) == 2 and text.count("I recommend SQLite") == 1 and "My view:" not in text
+
+
+def test_a_caveat_finds_the_thing_by_its_distinctive_word():
+    text = "1. LibreOffice is the fullest suite [1].\n2. ONLYOFFICE is best at collaboration [2]."
+    marked = ab.with_caveats(text, [("ONLYOFFICE Docs", "free")])
+    assert "ONLYOFFICE (not shown in the pages read to be free) is best" in marked
+    assert ab.with_caveats(text, [("Apache OpenOffice", "free")]).endswith(
+        "- Apache OpenOffice: not shown in the pages read to be free")
+
+
+def test_a_thing_no_discovery_names_is_not_counted():  # here Chinese culture is in no discovery
+    reply = verdict(evidence="[1] Owls play a role in Native American cultures", things=[("Native American cultures", "Owls play a role in Native American cultures"),
+                                              ("Christianity", "In Christianity owls carry darker connotations"),
+                                              ("Chinese culture", "In Chinese culture owls symbolize wisdom")])
+    found = ("Owls play a role in Native American cultures.", "In Christianity owls carry darker connotations.")
+    result, _ = gaps(["Find out how at least three different cultures have viewed owls"], [reply], found)
+    assert any("only 2 of 3 found (Native American cultures, Christianity)" in g for g in result)

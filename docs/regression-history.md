@@ -15,17 +15,17 @@ explanation; the documentation task had 30 until 1.56). The how-to task changed 
 
 ## Results by step
 
-| Task | 1.52 | 1.53 | 1.54 | 1.54 fixed | 1.55 | 1.56 | 1.57 | 1.58 | 1.59 | 1.60 | 1.61 | 1.62 |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Factual question | ✅ 11.9 | ✅ 13.6 | ✅ 17.0 | ✅ 15.7 | ✅ 18.5 | ✅ 16.3 | ✅ 13.2 | ✅ 9.5 | ✅ 9.3 | ✅ 9.5 | ✅ 16.6 | ✅ 9.3 |
-| List of three office suites | ❌ 40.9 | ✅ 30.1 ¹ | ✅ 36.9 ² | ✅ 20.7 ³ | ❌ 43.5 | ✅ 37.0 ⁴ | ❌ 43.9 | ✅ 40.1 ¹³ | ✅ 36.6 ¹⁶ | ✅ 33.3 ¹⁹ | ✅ 20.9 ²³ | ✅ 19.7 ²⁸ |
-| Comparison and recommendation | ❌ 43.4 | ✅ 39.0 | ❌ 43.5 | ❌ 39.8 | ✅ 28.7 ⁵ | ✅ 36.5 | ❌ 38.8 | ❌ 41.9 | ❌ 42.2 | ❌ 43.5 | ✅ 26.1 ²⁴ | ✅ 35.3 ²⁹ |
-| How-to (repotting; cold brew from 1.55) | ❌ 42.2 | ❌ 39.7 | ❌ 43.8 | ✅ 31.0 ⁶ | ✅ 42.1 | ❌ 43.4 | ✅ 35.8 ⁷ | ✅ 18.1 ¹⁴ | ✅ 32.9 ¹⁷ | ✅ 20.5 ²⁰ | ✅ 33.0 ²⁵ | ✅ 29.8 ³⁰ |
-| Explanation (photosynthesis) | ❌ 57.9 | ✅ 12.9 ⁸ | ✅ 38.0 | ✅ 46.6 | ✅ 33.5 ⁹ | ❌ 58.1 | ✅ 59.0 | ✅ 40.1 | ✅ 23.6 ²¹ | ✅ 15.1 ²¹ | ✅ 38.9 | ✅ 36.1 |
-| Opinion (owls) | ❌ 43.0 | ✅ 38.1 | ✅ 32.4 | ✅ 44.2 | ✅ 37.6 | ❌ 44.0 | ❌ 42.1 ¹² | ❌ 42.3 | ✅ 21.6 ¹⁸ | ✅ 17.0 | ✅ 42.3 ²⁶ | ✅ 21.7 |
-| Documentation (venv, official docs) | ✅ 15.1 ¹⁰ | ❌ 26.4 | ❌ 27.1 | ❌ 26.8 ¹⁰ | ❌ 28.6 | ✅ 36.8 ¹¹ | ✅ 36.7 ¹¹ | ✅ 22.4 ¹⁵ | ❌ 43.3 | ✅ 31.7 ²² | ❌ 44.3 ²⁷ | ✅ 16.4 ³¹ |
-| **Finished** | **2 of 7** | **5 of 7** | **4 of 7** | **5 of 7** | **5 of 7** | **4 of 7** | **4 of 7** | **5 of 7** | **5 of 7** | **6 of 7** | **6 of 7** | **7 of 7** |
-| **Total model minutes** | 254 | 200 | 239 | 225 | 233 | 272 | 270 | 214 | 209.5 | 170.6 | 222.1 | 168.3 |
+| Task | 1.52 | 1.53 | 1.54 | 1.54 fixed | 1.55 | 1.56 | 1.57 | 1.58 | 1.59 | 1.60 | 1.61 | 1.62 | 1.63 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Factual question | ✅ 11.9 | ✅ 13.6 | ✅ 17.0 | ✅ 15.7 | ✅ 18.5 | ✅ 16.3 | ✅ 13.2 | ✅ 9.5 | ✅ 9.3 | ✅ 9.5 | ✅ 16.6 | ✅ 9.3 | ✅ 17.7 |
+| List of three office suites | ❌ 40.9 | ✅ 30.1 ¹ | ✅ 36.9 ² | ✅ 20.7 ³ | ❌ 43.5 | ✅ 37.0 ⁴ | ❌ 43.9 | ✅ 40.1 ¹³ | ✅ 36.6 ¹⁶ | ✅ 33.3 ¹⁹ | ✅ 20.9 ²³ | ✅ 19.7 ²⁸ | ✅ 38.1 |
+| Comparison and recommendation | ❌ 43.4 | ✅ 39.0 | ❌ 43.5 | ❌ 39.8 | ✅ 28.7 ⁵ | ✅ 36.5 | ❌ 38.8 | ❌ 41.9 | ❌ 42.2 | ❌ 43.5 | ✅ 26.1 ²⁴ | ✅ 35.3 ²⁹ | ✅ 23.2 |
+| How-to (repotting; cold brew from 1.55) | ❌ 42.2 | ❌ 39.7 | ❌ 43.8 | ✅ 31.0 ⁶ | ✅ 42.1 | ❌ 43.4 | ✅ 35.8 ⁷ | ✅ 18.1 ¹⁴ | ✅ 32.9 ¹⁷ | ✅ 20.5 ²⁰ | ✅ 33.0 ²⁵ | ✅ 29.8 ³⁰ | ✅ 22.6 |
+| Explanation (photosynthesis) | ❌ 57.9 | ✅ 12.9 ⁸ | ✅ 38.0 | ✅ 46.6 | ✅ 33.5 ⁹ | ❌ 58.1 | ✅ 59.0 | ✅ 40.1 | ✅ 23.6 ²¹ | ✅ 15.1 ²¹ | ✅ 38.9 | ✅ 36.1 | ✅ 18.1 |
+| Opinion (owls) | ❌ 43.0 | ✅ 38.1 | ✅ 32.4 | ✅ 44.2 | ✅ 37.6 | ❌ 44.0 | ❌ 42.1 ¹² | ❌ 42.3 | ✅ 21.6 ¹⁸ | ✅ 17.0 | ✅ 42.3 ²⁶ | ✅ 21.7 | ✅ 33.9 |
+| Documentation (venv, official docs) | ✅ 15.1 ¹⁰ | ❌ 26.4 | ❌ 27.1 | ❌ 26.8 ¹⁰ | ❌ 28.6 | ✅ 36.8 ¹¹ | ✅ 36.7 ¹¹ | ✅ 22.4 ¹⁵ | ❌ 43.3 | ✅ 31.7 ²² | ❌ 44.3 ²⁷ | ✅ 16.4 ³¹ | ❌ 43.8 |
+| **Finished** | **2 of 7** | **5 of 7** | **4 of 7** | **5 of 7** | **5 of 7** | **4 of 7** | **4 of 7** | **5 of 7** | **5 of 7** | **6 of 7** | **6 of 7** | **7 of 7** | **6 of 7** |
+| **Total model minutes** | 254 | 200 | 239 | 225 | 233 | 272 | 270 | 214 | 209.5 | 170.6 | 222.1 | 168.3 | 197.4 |
 
 ✅ finished, ❌ did not finish within its time limit. Notes on the results themselves:
 
@@ -157,7 +157,7 @@ list finished honestly (LibreOffice, OnlyOffice with its caveat, "the third alte
 task fully correct for the first time (`tutorial-env\Scripts\activate`, all from docs.python.org). The comparison
 researched item by item and the opinion task kept collecting after three cultures; neither finished.
 
-### 1.59 (internal; run 2026-10-20)
+### 1.59 (internal; run 2026-10-20 11:42)
 A description named as one of a list's "things" is ignored (it had made two office suites count as three); when every
 item has the discoveries it asks for, and there are at least as many different discoveries as the items ask for in
 all, the note after a discovery says to finish now (replay of the owl task: it searched again 2 of 2 times before, and
@@ -223,15 +223,66 @@ Result: 7 of 7 for the first time, in 168.3 minutes. With identical behaviour th
 improvement: the documentation task finished in 5 turns this time (it timed out on 1.61), and the opinion task in
 21.7 minutes (42.3). It is the second Qwen2.5-7B sample on this code, the baseline for the model tests.
 
+### 1.63 (runs 2026-10-25 to 2026-10-29: four models, then an untimed 7B suite)
+Four models ran on the same code with the same 90-minute limit per task. The two smallest exposed problems the 7B
+had hidden: replies cut off mid-parameter, findings recorded from search snippets, headings, the page's own
+description or the objective itself, and one model call longer than the client library's 10-minute default (the
+14B). Each was fixed for every model, with no per-model code; the full list is in the changelog.
+
+Round 3, after those fixes:
+
+| Model | Finished | Model time | Gaps filled from own knowledge | Numbers not in findings |
+|---|---|---|---|---|
+| Qwen2.5-7B | 6 of 7 | 197.4 min | 0 | 0 |
+| Qwen2.5-14B | 2 of 7 | 534.9 min | 0 | 0 |
+| Llama-3.1-8B | 2 of 7 | 278.0 min | 0 | 0 |
+| Qwen2.5-3B | 0 of 7 | 302.2 min | — | — |
+
+- **7B:** only the documentation task ran out of time, with all four items found.
+- **14B:** honest whenever it finished, but about 2.5 times the 7B's time per call. It reached FINISH on five tasks;
+  on three (list, opinion, documentation) the time limit hit while the final result was being checked and written.
+  The run's summary counted those unchecked drafts as finished (5 of 7). The harness no longer does, so the table
+  gives 2 of 7. The documentation draft also contained an invented command.
+- **3B:** found facts on every task (3 of 3 items on the fact, 4 of 4 on the docs) but never finished; that is its
+  floor at this size, and the next test swaps it for another 3B model.
+
+Untimed 7B suite (a 180-minute cap no task came near): **7 of 7 in 276.5 minutes**. The time limit had cost only
+the documentation task. With no limit, the remaining problems were in what got recorded and written, not in
+browsing:
+- The explanation listed its outputs as "not found" over a finding that gave them.
+- The opinion left out a culture its findings named.
+- The documentation task recorded `pip install package_name`, which the page never gives, and the suite counted
+  the result as clean.
+
+Fixes measured after that run:
+- **Commands are checked as exact text**, in findings and in the final result. Across every saved run, 21 of 525
+  findings and 5 of 119 results fail the check, all on the documentation task and all real.
+- **The yes-or-no coverage question accepts a partial answer**, with an item's own words as a second chance.
+  Replayed 3 to 6 times on each case, the false "not found" became found every time, and the "many simultaneous
+  users" item, which no finding answers, stayed unanswered every time.
+
+Three fresh check runs (documentation, explanation, opinion; untimed 7B) followed:
+- **Run 1** was stopped for a false "not found".
+- **Run 2** finished 3 of 3 but showed the swapped activation paths.
+- **Run 3** finished 3 of 3 in 125.6 minutes. All four documentation findings were copied correctly from
+  docs.python.org, and the opinion covered four cultures, each cited. One command in a code block of the final
+  result was invented; that led to the code-block check, which was checked against the saved runs.
+
+Measured and not used:
+- **Quoting a page sentence in the read-on check.** It scored good picks ("activated using a script in its binary
+  directory") and API-reference junk the same.
+- **Showing the final result the gaps the coverage check could not confirm.** One sample still filled them in;
+  another came out as empty headings.
+
 ## What the steps showed overall
 
 - **The fixed checklist was the big step** (1.53). The model no longer invents parts of the objective or loses
   parts of it.
-- **The model's judgement of "is this item covered?" is the weak link.** Over the four runs with a coverage check,
+- **The model's judgement of "is this item covered?" is the weak link.** Over the first four runs with a coverage check (1.54 to 1.56),
   about half of its send-backs were wrong, and the wrong ones cost finishes. What held up were the parts the code
   verifies: an item nothing was copied for, fewer things than asked for, nothing recorded at all, and the
   word-for-word proof of conditions.
-- **A send-back costs 8-10 minutes** on this hardware: a fresh prompt reads 3,000-4,000 tokens at about 8 per
+- **A send-back costs 8-10 minutes** on this hardware: a fresh prompt reads 3,000-4,000 tokens (about 2,500 since 1.61) at about 8 per
   second. Fresh prompts are now the most expensive kind of turn.
 - **A site can decide a task.** The repotting guide could not answer one part of the objective in any run; the suite
   now flags a task that fails again on the same site.
@@ -240,7 +291,9 @@ improvement: the documentation task finished in 5 turns this time (it timed out 
 
 - **Fresh prompts lose the finish advice.** A fresh prompt does not carry "every item has the discoveries it asks
   for: choose FINISH now"; the documentation task read on after one on 1.61.
-- **Recover from a lost model instead of stopping.** A failed model call ends the run at once ("check that LM
+- **Recover from a lost model instead of stopping.** *(Partly done in 1.63: a failed call is retried for about 4
+  minutes; tested live with the model unloaded mid-call. An app restart and reload times per model size are still to
+  test.)* A failed model call ended the run at once ("check that LM
   Studio is running and the model is loaded"). LM Studio's server loads a model on its own when a request names
   one that is not loaded (on 2026-10-25 it loaded Qwen 7B for a request after the model had been unloaded), so
   waiting and retrying the call a few times could carry a run through an unloaded model or a restarted app. To be

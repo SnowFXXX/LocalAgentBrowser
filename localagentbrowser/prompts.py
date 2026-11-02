@@ -30,6 +30,19 @@ COVERAGE_ITEM_CHECK = (
     "conditions, or that name it if there are no conditions ('' if the DISCOVERIES do not say it); [] if the item asks "
     "for neither.")
 
+COVERAGE_QUOTE = ("Your evidence gives only discovery numbers. Reply again with the same JSON, with evidence holding the "
+                  "words from those DISCOVERIES that answer ITEM {n} itself, copied exactly; '' if none of them answers it.")
+# "Or part of it": asked whether a discovery "says what the ITEM asks for", the 7B answered no 6 times out of 6 for
+# "the light-dependent reactions, which take place in the thylakoids" against an item asking to describe them and
+# their location; asked this way it said yes 6 of 6, and still no 6 of 6 for a page's opening that never mentions
+# the simultaneous users an item asked about
+CITED_QUESTION = ("Does the DISCOVERY answer the ITEM, or part of it, in any words (for example 'POSIX' for macOS or "
+                  "Linux, 'refrigerator' for fridge)? Reply with JSON: \"answer\": \"yes\" or \"no\", and \"quote\": the "
+                  "words of the DISCOVERY that answer it, copied exactly ('' if the answer is no).")
+CITED_FORMAT = {"type": "json_schema", "json_schema": {"name": "cited", "strict": True, "schema": {
+    "type": "object", "properties": {"answer": {"type": "string", "enum": ["yes", "no"]}, "quote": {"type": "string"}},
+    "required": ["answer", "quote"]}}}
+
 COVERAGE_FORMAT = {"type": "json_schema", "json_schema": {"name": "coverage", "strict": True, "schema": {
     "type": "object", "properties": {
         "evidence": {"type": "string"}, "missing": {"type": "string"},
@@ -50,9 +63,9 @@ SYSTEM_PROMPT = """You are an autonomous web discovery agent. Your job is to ach
 On every turn, evaluate the CURRENT ENVIRONMENT and your RESEARCH JOURNAL. You must output exactly ONE valid JSON block matching this structure:
 
 {
-  "thought_process": "Your active reasoning about what to discover next and why.",
+  "thought_process": "Your reasoning about the current page and what to do next, in a few sentences.",
   "action": "SEARCH" | "NAVIGATE" | "READ_MORE" | "DISCOVER" | "FINISH",
-  "parameter": "The search query string, the full target URL, a page part number, the extracted summary data, or an empty string",
+  "parameter": "The search query string, the full target URL, a page part number, the facts copied from the current page (for DISCOVER), or an empty string",
   "checklist_items": [numbers of the OBJECTIVE CHECKLIST items a DISCOVER gives information for; [] for other actions]
 }
 
@@ -102,3 +115,16 @@ Determine your next tactical move. Output your decision in the mandatory JSON fo
 
 COMPOSE_SYSTEM = ("You write the final result of a web research task, using only the findings that were recorded "
                   "during it.")
+# The final result comes back in a required field, as every browsing reply does: asked for plain text, a model
+# trained for tool use (Llama 3.1 8B) answered with a made-up tool call in 3 of 6 results
+RESULT_FORMAT = {"type": "json_schema", "json_schema": {"name": "final_result", "strict": True, "schema": {
+    "type": "object", "properties": {"result": {"type": "string"}}, "required": ["result"]}}}
+RESULT_REPLY = ("Reply with JSON: {\"result\": \"...\"}, with the whole final result as plain text in \"result\" "
+                "(line breaks, lists and headings as needed).")
+RESULT_RETRY = ("That reply was not the final result: it repeated the prompt or was not plain text. Write the final "
+                "result itself, following the rules above. " + RESULT_REPLY)
+CUT_OFF = ("Your reply was cut off at {limit} tokens because it was too long. Reply again with only the JSON object, "
+           "with thought_process in two or three short sentences and a short parameter (a search query is 3 to 10 "
+           "words).")
+NO_RESULT = ("The model did not write a final result (its replies repeated the prompt or were not text). The "
+             "discoveries below are what the agent found.")

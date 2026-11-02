@@ -29,8 +29,10 @@ class FakeCompletions:
         else:
             prompt_tokens = self.prompt_tokens
         usage = types.SimpleNamespace(prompt_tokens=prompt_tokens, completion_tokens=40)
-        message = types.SimpleNamespace(content=self.replies.pop(0))
-        return types.SimpleNamespace(usage=usage, choices=[types.SimpleNamespace(message=message)])
+        content = self.replies.pop(0)
+        content, finish_reason = content if isinstance(content, tuple) else (content, "stop")  # (text, "length") = cut off
+        message = types.SimpleNamespace(content=content)
+        return types.SimpleNamespace(usage=usage, choices=[types.SimpleNamespace(message=message, finish_reason=finish_reason)])
 
 
 def fake_client(replies, prompt_tokens=1500):

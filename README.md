@@ -16,7 +16,9 @@ A local language model served by [LM Studio](https://lmstudio.ai) decides what t
 [Playwright](https://playwright.dev/python/) carries it out in a visible Chromium window you can watch. Built
 and tuned to work well with a **small 7B model on a CPU, no GPU required**.
 
-- 🔒 **No cloud AI and no API keys.** The model runs in your own LM Studio.
+- 🔒 **No cloud AI and no API keys.** The model runs in your own LM Studio. (Its searches, written from your
+  objective, go to DuckDuckGo, and it reads pages from the web like any browser; the objective itself, the model and
+  the report stay on your computer.)
 - 🧭 **Goes from objective to findings unattended.** It searches, opens pages, reads long pages part by part,
   records what's relevant and finishes when the objective is met.
 - 🛡️ **Keeps a small model on track.** Rules enforced in code stop loops, repeats and drifting, and the model
@@ -24,8 +26,34 @@ and tuned to work well with a **small 7B model on a CPU, no GPU required**.
 - ⚡ **Built for slow hardware.** It reuses LM Studio's prompt cache, so most turns process only what changed.
 - 📝 **A readable report every time.** `research_report.md` holds the final result and every finding with its
   source, written however the run ends; `research_log.txt` keeps every action and reason.
-- ✅ **Tested.** 165 tests on Linux and Windows, Python 3.10–3.13, run in a few seconds with no model or browser,
+- ✅ **Tested.** 251 tests on Linux and Windows, Python 3.10–3.13, run in a few seconds with no model or browser,
   plus a [regression suite](#regression-suite) of live runs on seven different kinds of task.
+
+**New with 1.63:** the [project site](https://snowfxxx.github.io/LocalAgentBrowser/), an article,
+[We Can Do Better: A Small AI That Can't Cover Up](https://snowfxxx.github.io/LocalAgentBrowser/article.html), and a
+technical paper, [Verification over Trust](https://snowfxxx.github.io/LocalAgentBrowser/paper.html).
+
+### What it's good for, and what it can't do yet
+
+- **Good goals:** questions you would research by reading pages. Examples:
+  - a fact ("How tall is Kilimanjaro, in meters and feet?")
+  - a list with conditions ("Three free, open-source alternatives to Microsoft Office, and what each is best at")
+  - a comparison with a recommendation
+  - a how-to
+  - an explanation of a topic
+  - views from several sources
+  - looking something up in official documentation
+
+  These are the seven kinds of task the [regression suite](#regression-suite) measures.
+- **Not yet:**
+  - **Anything behind a form, a login or a button.** It reads pages; it does not click, fill in forms or sign
+    in. So goals like "the three cheapest flights to Denver next month" won't work: flight and hotel prices,
+    shopping and booking sites need searches it cannot type into.
+  - **Fast answers.** On a CPU a run takes about 10 to 45 minutes, and a 7B model sometimes returns thin findings,
+    so check the result against its listed sources.
+
+See [two example reports](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/examples/README.md), unedited,
+with what each got right and wrong.
 
 📖 **The story behind it:** [Teaching a 7B model on a CPU to finish what it starts](https://dev.to/snowfxxx/teaching-a-7b-model-on-a-cpu-to-finish-what-it-starts-1amc),
 six lessons from 30 versions of keeping a small local model on track.
@@ -190,7 +218,7 @@ current page, and answers with exactly one JSON action:
 |---|---|
 | `SEARCH` | Searches DuckDuckGo (HTML version) and shows a numbered list of results with their real URLs |
 | `NAVIGATE` | Opens a URL taken from the results or from the current page's links |
-| `READ_MORE` | Shows the next part of a long page (pages are read in parts of about 2,500 characters) |
+| `READ_MORE` | Shows the next part of a long page (pages are read in parts of about 2,500 characters), or the unread part whose outline label names an item still missing |
 | `DISCOVER` | Records information from the current page as a finding |
 | `FINISH` | Ends the run (after checking each part of the objective is covered); the final result is then written in a separate step |
 
@@ -240,6 +268,11 @@ The code is in the `localagentbrowser` package, one file per job, each depending
   its own knowledge when a page says "follow these 6 steps" and the steps come later. The refusal points the way:
   it quotes the one page sentence closest to what the model wrote, to record instead, or names what the parts
   shown never mention ("Japan, Navajo"), so the model reads on.
+- **Commands must be on the page, exactly.** Commands and paths in a finding (in backticks, in a code block, or
+  any word with a backslash, a `<placeholder>` or two slashes) must appear on the page as written, however often
+  the finding is repeated. Word matching cannot catch a wrong command: a 7B recorded `pip install package_name`,
+  which the official page never gives, and swapped `bin` and `Scripts` when copying its activation table. The same
+  goes for the final result: a command no finding gives is cut and named after the result.
 - **An objective checklist.** At the start, one short model call splits the objective into a fixed checklist of
   what the result must contain, keeping conditions like "free, open-source" or "three". Each finding names the
   items it serves, the checklist with its findings is in every prompt, and every check goes through these items
@@ -251,8 +284,10 @@ The code is in the `localagentbrowser` package, one file per job, each depending
   its own, and the code checks the verdict instead of taking it on trust: an item nothing was copied for, fewer
   things than asked for ("only 1 of 3 found"), and things not shown, in words copied from a finding about them,
   to meet a condition such as "open-source". A claim that something is missing is dropped when every word of it is
-  already in the findings. With gaps, the FINISH is sent back once, with the next step named ("SEARCH for
-  'OnlyOffice free and open-source' to check it, or replace it"), and the next turn starts from a fresh prompt.
+  already in the findings. Only gaps the code verifies send the FINISH back, once: an item nothing was copied for,
+  fewer things than asked for ("only 1 of 3 found"), or nothing recorded. The model's other verdicts, and things
+  not shown to meet a condition, only shape the final result. The send-back names the next step, and the next turn
+  starts from a fresh prompt.
 - **Numbered findings.** Findings are numbered in the prompt and listed with every check, and the model names
   the finding that covers each part of the objective ("covered by [2]") instead of just saying "covered".
 - **Knowing when it's done.** After every new finding the model is asked whether the objective is now fully
@@ -267,9 +302,10 @@ The code is in the `localagentbrowser` package, one file per job, each depending
   cite findings by number, give as many items as asked for (never repeating one, and saying how many were not
   found), and add a "My view:" paragraph only when the objective asks for an opinion. A small model writes far
   better when that is its only job, and every claim stays traceable to a recorded finding. What no finding
-  answers is not left to the model: those checklist items, and things not shown to meet a condition, are left out
-  of what it is asked to write, and the code adds them after the result as "Not found in the pages read" and
-  "Left out, not shown to meet the conditions". The report flags any number in the final result that appears in
+  answers is not left to the model: those checklist items are left out of what it is asked to write, and the code
+  adds them after the result as "Not found in the pages read". A thing not shown to meet a condition stays in the
+  result, and the code marks it where it is first named ("not shown in the pages read to be open-source"), or lists
+  it after the result if the result does not name it. The report flags any number in the final result that appears in
   none of the findings, the most harmful kind of slip in a how-to.
 - **Error pages are recognised.** A page answering 404, 403 and so on counts as a failed visit, not content.
 - **Readable pages.** Navigation menus, footers, cookie banners and site notices such as fundraising banners are
@@ -324,13 +360,32 @@ It was developed and tested with Qwen2.5-7B-Instruct (Q4_K_M). Any instruction-t
 serves should work, as long as the server supports `response_format` with a JSON schema (LM Studio 0.3 and
 later). Set `LMSTUDIO_MODEL` and `LMSTUDIO_CONTEXT_LENGTH` to match. Reports with other models are very welcome.
 
+The full suite, run on four models with the same code, 90 minutes per task, CPU only (October 2026):
+
+| Model | Tasks finished | Model time | Gaps filled from the model's own knowledge |
+|---|---|---|---|
+| Qwen2.5-7B-Instruct | 6 of 7 | 197 min | 0 |
+| Qwen2.5-14B-Instruct | 2 of 7 | 535 min | 0 |
+| Llama-3.1-8B-Instruct | 2 of 7 | 278 min | 0 |
+| Qwen2.5-3B-Instruct | 0 of 7 | 302 min | — |
+
+Where they finished, every model's results were honest by the suite's measures. What separates them is speed and
+follow-through:
+- The 14B was about 2.5 times slower than the 7B on a CPU. It reached FINISH on five tasks, but on three of them
+  the time limit hit while the final result was being written, so only two count.
+- Llama found most items but rarely finished in time.
+- The 3B recorded findings on every task but never finished one.
+
+With no time limit, the 7B finished 7 of 7 (277 minutes). These measures are word checks: the suite counted a
+documentation result with an invented command as clean, which led to the command check above.
+
 **Can I use another OpenAI-compatible server instead of LM Studio?**
 Probably: point `LMSTUDIO_BASE_URL` at it. It has only been tested with LM Studio, and the speed tricks rely
 on the server reusing cached prompt prefixes (llama.cpp-based servers do).
 
 **Is anything sent to the internet?**
 No AI service is involved, and nothing about your run is uploaded. The agent does browse the real web,
-though: search queries go to DuckDuckGo, and pages it opens load normally, as if you visited them yourself.
+though: search queries, written from your objective, go to DuckDuckGo, and pages it opens load normally, as if you visited them yourself.
 
 **Where are the results?**
 In the folder you ran it from: `research_report.md` has the final result and every finding with its source,
@@ -368,7 +423,8 @@ turn that brings in a new page takes a few minutes. See [Performance](#performan
 - **Very strict objectives.** An objective that forbids finishing until everything is "fully validated" used
   to keep the agent looking for something the web may not contain. On 1.50 it finished such an objective in 25
   minutes, but with thin findings and without naming what it could not find, so check the result against the
-  objective.
+  objective. Since 1.57 the code lists checklist items no finding answers after the result; this has not been
+  tested on a strict objective yet.
 - **Check the citations.** The final result is told to use only recorded findings, but a 7B model sometimes
   puts the wrong number on a citation, adds a line no finding supports, leaves out a step or misreads a part of
   the question (on 1.57 it answered "how long it keeps in the fridge" with the steeping time), so verify a claim
@@ -386,7 +442,7 @@ turn that brings in a new page takes a few minutes. See [Performance](#performan
 - [x] Write the final result in a separate, rule-bound step and flag unsupported numbers (1.32–1.38)
 - [x] Finish as soon as the objective is covered (1.35)
 - [x] Get the model to weigh each part of a long page before reading on (1.42)
-- [ ] Let very strict objectives end with the gaps named instead of searching indefinitely (they finish since 1.50; naming the gaps is still open)
+- [ ] Let very strict objectives end with the gaps named instead of searching indefinitely (they finish since 1.50; since 1.57 the code names checklist items no finding answers, not yet tested on a strict objective)
 - [x] Measure every change on a regression suite of seven kinds of task (1.53)
 - [x] Keep a fixed checklist of the objective's parts instead of re-splitting it at every check (1.53)
 - [ ] Check that a finding really covers its checklist item, including conditions like "open source" (partly, since
@@ -398,8 +454,13 @@ turn that brings in a new page takes a few minutes. See [Performance](#performan
 - [ ] Rewind dead ends: save the conversation before an expensive step such as reading a long page, and if it
   leads nowhere, return to that point with a short note instead of carrying the unused page text in every later
   prompt (LM Studio reuses its cache up to the saved point)
+- [ ] Catch an objective too ambiguous to research before the run starts, and only then ask one question: never
+  during a run, and only for extreme ambiguity, so the run can still be left unattended but isn't spent chasing an
+  objective it can't pin down
+- [ ] A small project site on GitHub Pages: the README's essentials, the example reports and `llms.txt` at the
+  site's root, where AI tools look for it
 - [ ] Try more kinds of objectives (seven so far) and adjust the rules that don't generalise
-- [ ] Make fresh prompts (the slowest kind of turn) cheaper still (31% cheaper since 1.34)
+- [ ] Make fresh prompts (the slowest kind of turn) cheaper still (31% cheaper since 1.34; about 2,500 tokens since 1.61, from 3,500–4,900)
 - [ ] Interacting with pages (clicking, forms) for tasks beyond reading
 
 Ideas and requests are welcome in [issues](https://github.com/SnowFXXX/LocalAgentBrowser/issues).
@@ -433,6 +494,10 @@ To measure a change on all seven kinds of task (about four hours on a CPU), comp
 ```bash
 python tools/regression.py --baseline regression_runs/<earlier run>/summary.json
 ```
+
+To measure another model on the same tasks, name it as LM Studio lists it, for example
+`--model meta-llama-3.1-8b-instruct`. The model is loaded before the first task and its context length checked, so
+every run is measured with the same context length; the run's folder and summary name the model.
 
 Each run gets a folder in `regression_runs/` with every task's report, journal, console output and prompt
 trace, and a `summary.md` that is updated after each task: whether it finished, turns, model time, how many

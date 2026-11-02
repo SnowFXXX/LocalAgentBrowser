@@ -6,6 +6,101 @@ measured on the regression suite and released as part of 1.57 and 1.61 (see
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.63] - 2026-11-01
+### Added
+- A model call the server fails is tried again after a wait (5, 15, 30, 60 and 120 seconds, about 4 minutes in all),
+  instead of ending the run. LM Studio loads a model by itself when a request names one that is not loaded, and
+  unloads idle ones, so this can carry a run through an unloaded model (tested) or, if the app comes back within
+  about 4 minutes, a restarted app (not yet tested). Tested live: with the model
+  unloaded in the middle of turn 2, LM Studio refused that call ("400 - Model unloaded by user or API request"), the
+  agent waited 5 seconds, LM Studio loaded the model again, and the run finished with the right answer (before, the
+  same unload ended the run). Only server failures are retried; that refusal is the one 400 that is.
+- Regression suite: `--model` runs the tasks with another model LM Studio has; the model is loaded first and its
+  context length checked, so every model is measured under the same conditions, and the run's folder and summary
+  name it.
+- Regression suite: honesty measures for each finished result: what it says was not found, the code's caveats,
+  gaps filled from the model's own knowledge ("the text does not specify, but it is generally recommended ..."),
+  numbers no discovery contains, uncited lines and citations of missing discoveries, in a table in every summary.
+### Fixed (from the first tests on other models: Qwen2.5 3B, Llama 3.1 8B, Qwen2.5 14B)
+- A runaway reply no longer stalls a run. A 3B model kept writing one turn's reply for 10 minutes (2,500+ tokens,
+  where real replies are at most a few hundred) until the connection timed out, and the request was then sent again;
+  two of its tasks never got past one turn. A browsing reply is now capped at 600 tokens, a timeout is not retried
+  (the model is still writing, not lost), and the client's own silent retries are off.
+- The final result is asked for in a required field, `{"result": "..."}`, like every browsing reply. Asked for plain
+  text, Llama 3.1 8B answered 3 of 6 results with a made-up tool call (`{"name": "get_mountain_info", ...}`), and a 3B
+  model "finished" a how-to with its own prompt repeated back. A reply that is still JSON or repeats the prompt's
+  sections is asked for once more; if that fails too, the report says no result was written and points to the
+  findings, instead of showing the broken reply as a result.
+- A finding recorded on the search results page is refused: "NAVIGATE to the result that looks right and DISCOVER from
+  the page itself". A result's snippet is a summary written to be clicked, not a source; the 3B recorded snippets in 5
+  of 7 tasks, and every model did it at least once.
+### Fixed (from the full suite on four models, and an untimed suite on the 7B)
+- **Commands are checked as exact text.** A command in a finding must be on the page shown. That covers text in
+  backticks, every line of a code block, and any path or placeholder (a backslash, `<venv>`, two slashes); prose
+  slashes such as "macOS/Linux" and web addresses are not counted. Word-by-word matching cannot see a wrong
+  command:
+  - The 7B recorded `pip install package_name`, which the page never gives. It scored 60% against the page, above
+    the two lines it really copied, because its words repeat the objective.
+  - Copying the official venv activation table, it swapped `bin` and `Scripts` (`C:\> <venv>\bin\activate.bat`)
+    in two runs.
+
+  Across every earlier suite run, 21 of 525 findings fail this check, all on the documentation task and all real.
+  The refusal quotes the page's own line for the same command. With that, the 7B recorded only the page's commands
+  in 3 of 6 tries, and repeated the refused one in the other 3, which is refused again; told only to leave the
+  command out, it kept the invented command and dropped the real ones 6 times out of 6.
+- **The final result's commands must come from a finding.** If one doesn't, its sentence (or code-block line) is cut
+  and the command is named after the result: "Left out, because no discovery gives them". In earlier runs this
+  caught 5 of 119 results, including the 14B's `<venv>/Scripts/activate` and a code block with `pip install
+  package_name`. The report warns about such commands, and the suite's honesty table counts them.
+- **Fewer findings recorded from the wrong place.** A finding is refused, with what to do instead, when:
+  - it is empty;
+  - it copies the page's headings or outline;
+  - it describes the page ("this guide covers…") instead of giving its facts;
+  - it only asks questions;
+  - it repeats the objective or the searches instead of the page;
+  - it repeats the checklist's own wording ("covered by [2]").
+- **Cut-off replies are rescued.** A reply cut off inside its parameter is kept for SEARCH, NAVIGATE and READ_MORE.
+  It is cut where the words start repeating, and a search is limited to 20 words. A cut-off finding on the results
+  page is refused as usual.
+- **Coverage check:**
+  - When the model cites only discovery numbers twice, it is asked a yes-or-no question about the cited
+    discovery alone, and a "yes" counts only with words copied from it. A "no" still counts when the discovery has
+    words that belong to that item alone: the 7B said "no" 3 times out of 3 for "the light-dependent reactions,
+    which take place in the thylakoids". The question accepts a partial answer ("answer the item, or part of
+    it"); asked whether the discovery "says what the item asks for", the 7B said "no" 6 times out of 6 for that
+    same partial answer.
+  - Things are counted only when a finding names them.
+  - The words that answered each item are shown to the final result, which had said "the discoveries do not
+    specify what goes into photosynthesis" over a discovery naming water, sunlight and carbon dioxide.
+- **Final result:**
+  - "Not specified …, but <something from the model>" is cut back to the gap.
+  - Items whose findings give no amounts are named, so none are supplied.
+  - A "My view" paragraph that repeats the result is dropped.
+- Refusal hints no longer quote a sentence where the page describes itself, or a question.
+- The 14B's model calls took longer than the client library's 10-minute default, which ended its runs. The timeout is
+  now 30 minutes.
+- A run stopped while its final result was being written says so in the report, and shows the unchecked draft; the
+  suite no longer counts it as finished.
+
+### Changed
+- The README says near the top which goals work and which can't yet: anything behind a form, a login or a button,
+  such as flight prices. An automated write-up of the project, built from the README, had suggested "the three
+  cheapest flights to Denver" as an example goal. The privacy line also says that searches, written from your
+  objective, go to DuckDuckGo and pages come from the web; the objective itself, the model and the report stay on your
+  computer.
+- Two real reports from the 1.62 suite run, unedited, in `docs/examples/`, with a note on what each got right and
+  wrong (a path slip in one; in the other, an opinion that leans on the one part it found nothing about). Linked
+  from the README.
+- `llms.txt`, a short plain-text summary for AI tools that read the repository (the convention described at
+  llmstxt.org), saying the same as the README: good goals, what it can't do yet, speed, privacy. Nothing in it is
+  hidden or addressed to a model as an instruction.
+- A project site (`docs/`, served by GitHub Pages at https://snowfxxx.github.io/LocalAgentBrowser/) with the
+  findings, a quick start and the challenge, plus two write-ups of this round: an article, "We Can Do Better: A
+  Small AI That Can't Cover Up", and a technical paper, "Verification over Trust". Every regression run so far is
+  attached to the release as a zip.
+- Corrected: the README and the regression history had counted the 14B's results that the time limit cut off while
+  they were being written. Of its five finishes, two count (2 of 7).
+
 ## [1.62] - 2026-10-25
 No change in what the agent does: the same prompts, decisions and results as 1.61.
 ### Changed

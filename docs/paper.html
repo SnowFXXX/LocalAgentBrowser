@@ -1,0 +1,743 @@
+<!doctype html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Verification over Trust</title>
+    <meta name="description" content="Code-enforced grounding for honest reporting by small local language models in autonomous web research: design, a four-model evaluation, and where our own measures failed.">
+    <meta property="og:title" content="Verification over Trust: Code-Enforced Grounding for Honest Reporting by Small Local Language Models in Autonomous Web Research">
+    <meta property="og:image" content="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/chart1.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <style>
+      :root { --bg:#0b111b; --ink:#e8eef5; --sub:#b9c7d6; --muted:#8191a5; --mint:#5fd3a6; --mint-hi:#8ff0c8;
+              --blue:#7fb3e6; --chip:#122438; --chip-line:#2f5577; }
+      * { box-sizing:border-box; margin:0; padding:0; }
+      body { background:var(--bg); color:var(--ink); font:19px/1.75 Georgia, "Iowan Old Style", "Times New Roman", serif;
+             -webkit-font-smoothing:antialiased; }
+      a { color:var(--blue); text-underline-offset:3px; } a:hover { color:var(--mint-hi); }
+      nav { border-bottom:1px solid rgba(47,85,119,.35); font-family:"Segoe UI", system-ui, sans-serif; }
+      nav div { max-width:760px; margin:0 auto; padding:16px 24px; display:flex; justify-content:space-between; gap:16px; }
+      nav a { text-decoration:none; font-size:15px; color:var(--sub); }
+      .mark { font-weight:800; font-size:18px; color:var(--ink); } .mark b { color:var(--mint); }
+      header { background:radial-gradient(800px 420px at 85% 0%, rgba(30,58,90,.9), transparent 70%);
+               background-color:var(--bg); }
+      header div { max-width:760px; margin:0 auto; padding:72px 24px 48px; font-family:"Segoe UI", system-ui, sans-serif; }
+      .kicker { font-size:14px; letter-spacing:.22em; font-weight:600; color:var(--blue); text-transform:uppercase; }
+      h1 { font-size:clamp(38px,6.5vw,62px); line-height:1.06; font-weight:800; letter-spacing:-.02em; margin-top:14px; }
+      h1 span { display:block; color:var(--mint); } h1 span.long { font-size:.55em; line-height:1.2; margin-top:10px; }
+      article { max-width:760px; margin:0 auto; padding:8px 24px 80px; }
+      article > p:first-child em { display:block; font-size:21px; color:var(--sub); font-style:italic; }
+      article p { margin-top:22px; } article p, article li { overflow-wrap:break-word; }
+      article h2 { font:800 30px/1.2 "Segoe UI", system-ui, sans-serif; margin-top:56px; letter-spacing:-.01em; }
+      article h3 { font:700 22px/1.3 "Segoe UI", system-ui, sans-serif; margin-top:40px; color:var(--mint); }
+      article hr { border:none; border-top:1px solid rgba(47,85,119,.45); margin:36px 0 8px; }
+      article ul { margin:18px 0 0 24px; } article li { margin-top:8px; } article li::marker { color:var(--mint); }
+      article blockquote { margin-top:26px; padding:6px 0 6px 24px; border-left:4px solid var(--mint); color:var(--sub);
+                            font-style:italic; }
+      article blockquote p { margin-top:0; }
+      article code { font:.85em Consolas, "Cascadia Mono", Menlo, monospace; background:var(--chip);
+                      border:1px solid var(--chip-line); padding:1px 6px; border-radius:5px; }
+      article strong { color:#fff; }
+      figure { margin:34px -60px 0; }
+      .tbl { overflow-x:auto; margin-top:22px; }
+      table { border-collapse:collapse; font:15px/1.45 "Segoe UI", system-ui, sans-serif; min-width:100%; }
+      th, td { border-bottom:1px solid rgba(47,85,119,.5); padding:7px 10px; text-align:left; vertical-align:top; }
+      th { color:var(--mint); font-weight:700; }
+      pre { margin-top:22px; background:var(--chip); border:1px solid var(--chip-line); border-radius:10px; padding:14px 16px; overflow-x:auto; }
+      pre code { background:none; border:none; padding:0; }
+      figure img { width:100%; height:auto; display:block; border-radius:12px; border:1px solid var(--chip-line); }
+      footer { border-top:1px solid rgba(47,85,119,.3); font:15px/1.6 "Segoe UI", system-ui, sans-serif; color:var(--muted); }
+      footer div { max-width:760px; margin:0 auto; padding:32px 24px 56px; }
+      @media (max-width:900px) { figure { margin:30px 0 0; } }
+      @media (max-width:600px) { body { font-size:18px; } header div { padding-top:48px; } }
+    </style>
+    </head>
+    <body>
+    <nav><div><a class="mark" href="index.html">LocalAgent<b>Browser</b></a>
+      <a href="https://github.com/SnowFXXX/LocalAgentBrowser">GitHub →</a></div></nav>
+    <header><div><div class="kicker">LocalAgentBrowser · Technical paper</div>
+      <h1>Verification over Trust:<span class=long>Code-Enforced Grounding for Honest Reporting by Small Local Language Models in Autonomous Web Research</span></h1><p style="margin-top:18px;color:var(--muted);font-size:16px">SnowFX · LocalAgentBrowser 1.63 · November 2026</p></div></header>
+    <article>
+    <h2>Abstract</h2>
+<p>Language models used as research assistants produce fluent answers whose claims are often not supported by any source.
+They are also unreliable judges of their own work. We describe LocalAgentBrowser, an open-source autonomous web
+research agent built for a small model (Qwen2.5-7B-Instruct, 4-bit, CPU only, 8,192-token context), in which honesty
+is enforced by code rather than requested from the model. The model chooses one of five actions per turn. Every
+finding it records must be copied from the page shown, and deterministic checks verify that before the finding
+counts. Commands and paths must match the page exactly. A checklist of the objective's parts is fixed at the start.
+The agent is sent back only for gaps the code can verify. The final answer is written in a separate call from the
+recorded findings alone, and the code appends what was not found.</p>
+<p>We evaluate on a fixed suite of seven task types run end to end on the live web. On identical code, four models
+(Qwen2.5 3B, 7B and 14B; Llama 3.1 8B) produced 10 finished results, none of which filled a gap from the model's own
+knowledge or stated a number or command absent from its findings, by the suite's lexical measures. The 7B finished 6
+of 7 tasks under a 90-minute limit and 7 of 7 without one. We report the measures' blind spots as findings in their
+own right: an invented command the scorer counted as clean, an uncited fill, and answers that silently omitted part of
+the objective. Each run is saved, and the suite can be rerun.</p>
+<hr />
+<h2>1. Introduction</h2>
+<p>Ask a language model a research question and it answers in the voice of someone who has checked. Often nobody has. The
+model may have filled a gap from its training data, mixed sources, or invented a plausible detail. When challenged,
+many assistants apologise and promise to do better, without any mechanism that makes the next answer more reliable.</p>
+<p>A common response is to ask the model to check itself: to cite, reflect, verify or critique. That still relies on the
+model's own judgement, which is the thing in doubt. This paper takes the opposite position. <strong>The model proposes; code
+decides what counts.</strong> We do not try to make a small model wiser. We make it hard for any model's claims to reach the
+final answer unless code can tie them to a page it actually read.</p>
+<p>We built this for the hardest practical setting we could run: a 7-billion-parameter model on an ordinary office PC
+(Intel i5-9500, six cores, no GPU), where each model call takes from under a minute to several minutes. Small models on
+a CPU drift, loop, hallucinate and get stuck, and everything they do costs time. This makes their failures easy to see
+and expensive to ignore, which makes them a good stress test for verification by code.</p>
+<p><strong>Contributions.</strong></p>
+<ol>
+<li><strong>A design</strong> for an autonomous web research agent in which honesty properties are enforced in code: findings
+grounded in the page shown, with exact-text checks for commands and paths; a fixed objective checklist;
+code-verified coverage before finishing; and a final result written only from recorded findings, with gaps and
+caveats added by the code (Section 3).</li>
+<li><strong>A reproducible, honesty-focused regression suite</strong> of seven task types, with measures of what finished results
+claim beyond their findings (Section 4).</li>
+<li><strong>A cross-model evaluation on identical code</strong> (four models), plus an untimed control run (Section 5).</li>
+<li><strong>Negative results and measured dead ends</strong>, including where our own measures failed (Sections 5.5 and 6).</li>
+</ol>
+<h2>2. Related work</h2>
+<p>Most work on making language-model agents reliable improves the model: it trains, fine-tunes or prompts the model to
+cite, to reflect, or to act better. We take the other route, <strong>verification instead of training</strong>. We change nothing
+in the model, and we move the checks out of the model and into code. We organise the related work around that
+difference.</p>
+<p><strong>Attribution and quoting.</strong> Retrieval-augmented generation (Lewis et al., 2020) conditions generation on retrieved
+text. Work on attribution asks whether generated statements are supported by a source: the AIS framework (Rashkin et
+al., 2021) and citation benchmarks such as ALCE (Gao et al., 2023). These <em>measure</em> attribution after the fact; our
+agent <em>enforces</em> it when a finding is recorded. The closest precedent for our core rule is GopherCite (Menick et al.,
+2022), which trained a 280B model to support its answers with verbatim quotes, judged by human raters. Our agent
+requires the same kind of quote from a 7B model without training, and code, not people, checks it against the page.
+Verbatim RAG, an open-source project, likewise builds answers only from extracted spans, for document question
+answering.</p>
+<p><strong>Hallucination, factuality and abstention.</strong> Surveys of hallucination (Ji et al., 2023) and fine-grained factuality
+scoring such as FActScore (Min et al., 2023) and SelfCheckGPT (Manakul et al., 2023) supply the measures this field
+uses; MiniCheck (Tang et al., 2024) shows that a 770M checker can judge support against a document about as well as
+GPT-4, a natural upgrade for our lexical measures (Section 5.5). The agent's &quot;not found&quot; behaviour is a form of
+abstention (Wen et al., 2025). ToolBeHonest (Zhang et al., 2024) found that tool-using models often fail to recognise
+unsolvable tasks and that larger models were not reliably better, which agrees with our finding that honesty did not
+scale with size (Section 5.2).</p>
+<p><strong>Self-correction.</strong> Self-Refine (Madaan et al., 2023), Reflexion (Shinn et al., 2023) and Chain-of-Verification
+(Dhuliawala et al., 2023) let a model revise its own output, and Self-RAG (Asai et al., 2023) trains 7B and 13B models
+to judge whether their own output is supported. Huang et al. (2024) found that models often cannot correct their
+reasoning without external feedback. Our measurements agree for a small model: about half of the 7B's own &quot;this item
+is not covered&quot; verdicts were wrong (Section 3.4). We therefore remove self-grading rather than train it.</p>
+<p><strong>Web agents.</strong> WebGPT (Nakano et al., 2021) trained a model to browse and cite. ReAct (Yao et al., 2023) interleaves
+reasoning and actions. Benchmarks include WebArena (Zhou et al., 2024) and Mind2Web (Deng et al., 2023). Open-source
+research tools such as GPT Researcher and Local Deep Research build multi-step, cited reports, and browser agents such
+as browser-use mainly target large hosted models. AgentBench (Liu et al., 2024) found a wide gap between commercial
+models and open models of 70B parameters or fewer.</p>
+<p><strong>Small and local models as agents.</strong> Most work on small agents closes that gap by changing the weights. AgentTuning
+(Zeng et al., 2023), FireAct (Chen et al., 2023), Lumos (Yin et al., 2023) and α-UMi (Shen et al., 2024) fine-tune
+open models on agent trajectories, the last splitting planning, calling and summarising across several small models.
+WebRL (Qi et al., 2025) uses online reinforcement learning to lift Llama-3.1-8B from 4.8% to 42.4% on WebArena-Lite.
+Search-R1 (Jin et al., 2025) trains Qwen2.5-3B and 7B, the family we use, to call a search engine while reasoning,
+and DeepResearcher (Zheng et al., 2025) trains research agents with reinforcement learning on the live web. On-device
+work such as TinyAgent (Erdogan et al., 2024) and Octopus v2 (Chen and Li, 2024) fine-tunes 1–7B models for fast
+local function calling. ACBench (Dong et al., 2025) measures what quantisation and pruning cost an agent; our model
+runs at 4 bits. Belcak et al. (2025) argue that small models should do most agent work, chiefly on cost. Our
+approach is orthogonal to all of these. We change nothing in the model, and one code path serves every model we
+tested (Section 3.6), so trying a new model needs no code change. Training can make an agent more
+capable; it cannot make the agent's claims checkable. The two compose: a WebRL- or Search-R1-trained model could run
+under our checks, gaining capability from training and verifiability from code.</p>
+<p>We are not aware of a published evaluation of a 7B-class model doing open-web research on a CPU-only computer,
+scored on whether its answers fill gaps from the model's own knowledge. The trained research agents use GPUs and
+report accuracy; the on-device work concerns tool calling; GopherCite's quotes were rated by people. Our system
+differs from most of this work in where the check sits: in deterministic code, at the moment a claim is recorded and
+again when the answer is written, rather than in a model's judgement after the fact. The model never grades its own
+work.</p>
+<h2>3. System design</h2>
+<p>The agent is about 2,500 lines of Python in ten modules, with 251 offline tests that replace the model and the
+browser with scripted fakes. LM Studio serves the model through an OpenAI-compatible API, and Playwright drives a
+visible Chromium window.</p>
+<h3>3.1 Loop and actions</h3>
+<p>Each turn, the model sees the objective, its numbered findings, a compact journal of recent actions, and the current
+page part. It replies with one JSON action, constrained by a JSON schema:</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SEARCH</code></td>
+<td>DuckDuckGo (HTML) results with their real URLs</td>
+</tr>
+<tr>
+<td><code>NAVIGATE</code></td>
+<td>Open a URL from the results or the current page</td>
+</tr>
+<tr>
+<td><code>READ_MORE</code></td>
+<td>Next part of a long page (parts of about 2,500 characters), or the unread part whose outline label names a missing item</td>
+</tr>
+<tr>
+<td><code>DISCOVER</code></td>
+<td>Record a finding from the current page</td>
+</tr>
+<tr>
+<td><code>FINISH</code></td>
+<td>End the run, after the checks in Section 3.4</td>
+</tr>
+</tbody>
+</table></div>
+<p>The agent only reads. It does not click, fill in forms or sign in.</p>
+<p>A browsing reply is capped at 600 tokens. A 3B model once wrote more than 2,500 tokens in one reply, at about 4 tokens
+per second. On a CPU, reading the prompt takes about 90% of each call (about 8 prompt tokens per second on our
+machine). So the agent keeps one growing conversation, which lets LM Studio reuse its prompt cache. It starts a fresh
+prompt only near 75% of the context budget.</p>
+<p>A refused action is corrected inside the same turn (&quot;cheap retry&quot;): a short note is appended, explaining why and what
+to do instead. This is how every check below talks to the model.</p>
+<h3>3.2 Grounding: a finding must be on the page shown</h3>
+<p>A <code>DISCOVER</code> is checked against the text of the page parts shown so far, in order:</p>
+<ol>
+<li><strong>Word-pair overlap.</strong> If fewer than 70% of the finding's word pairs appear in the page text, or any sentence falls
+below 35%, the model is asked once to confirm, using only the page's words. Below 40% overall, or 25% for any
+sentence, the finding is refused outright. Short findings and sentences (fewer than 20 or 8 pairs) are not scored,
+because a few connecting words would sink their score.</li>
+<li><strong>Pointing the way.</strong> A refusal quotes the one page sentence closest to what the model wrote, or names what the
+parts shown never mention (&quot;Japan, Navajo&quot;), so that the model can record the real text or read on. Sentences in
+which a page describes itself, and questions, are not quoted.</li>
+<li><strong>Exact text for code.</strong> Commands and paths must appear on the page as written. This covers text in backticks,
+every line of a fenced code block, and any token with a backslash, a <code>&lt;placeholder&gt;</code> or two or more slashes; URLs
+and prose such as &quot;macOS/Linux&quot; are excluded. Case, whitespace, quote style and placeholder brackets are
+normalised. Section 5.4 explains why word overlap cannot catch a wrong command.</li>
+<li><strong>Recorded from the wrong place.</strong> A finding is refused, with the next step, if it is made only of search-result
+snippets, the page's headings, the page describing itself (&quot;this guide covers…&quot;), questions, an echo of the
+objective or of the model's own searches (50% overlap with the objective and less with the page), or the
+checklist's own wording. Each rule was added after a model did exactly that. Where possible, a rule was checked
+against the saved findings before it was adopted; the hits found there were junk.</li>
+</ol>
+<h3>3.3 A fixed objective checklist</h3>
+<p>At the start, one short call splits the objective into at most eight checklist items, keeping conditions such as
+&quot;free, open-source&quot; or &quot;three&quot;. The checklist is fixed for the run. Every finding names the items it serves, and every
+later check goes through these items.</p>
+<p>Before version 1.53, the model re-split the objective from memory at each check. It drifted: it once blocked its own
+finish over &quot;migration strategies&quot;, which the objective never asked for. Fixing the checklist was the largest single
+improvement in the project's history (Section 5.1).</p>
+<h3>3.4 Coverage: verified in code, not taken on trust</h3>
+<p>When the model chooses <code>FINISH</code>, each checklist item is checked in a short call of its own. The model gives a verdict
+and the evidence: the numbers of the findings, or words copied from them. The code then verifies the verdict:</p>
+<ul>
+<li>An item counts as covered only if its evidence is found in the findings. When the model gives only finding numbers
+twice, a yes-or-no question about that one finding is asked, and a &quot;yes&quot; counts only with a quote found in it.</li>
+<li>Items that ask for a number of things (&quot;three suites&quot;) are counted, and things count only if a finding names them.</li>
+<li>Things that must meet a condition (&quot;open-source&quot;) must be shown to meet it, in words copied from a finding about
+them.</li>
+</ul>
+<p><strong>Only gaps the code can verify send the agent back:</strong> an item nothing was copied for, fewer things than asked for,
+or nothing recorded at all. The model's other verdicts only shape the final result. This rule comes from
+measurement. Over the first four suite runs with a coverage check (versions 1.54 to 1.56), about half of the model's
+send-backs were for gaps that were not real. Examples include &quot;missing official documentation&quot; on a task that did not
+ask for it, and &quot;H2O, O2&quot; already recorded. Each wrong send-back cost a finish or 8 to 10 minutes.</p>
+<h3>3.5 Writing the final result</h3>
+<p>After <code>FINISH</code>, one more call writes the result from only the objective, the checklist and the recorded findings,
+with short rules: cite findings by number, add nothing from outside, and give as many items as asked for. The code
+then does what the model cannot be trusted to do:</p>
+<ul>
+<li><strong>Not found:</strong> items no finding answers are left out of what the model is asked to write. The code appends them
+as &quot;Not found in the pages read&quot;.</li>
+<li><strong>Caveats:</strong> a thing not shown to meet a condition is marked where it is first named (&quot;not shown in the pages
+read to be open-source&quot;).</li>
+<li><strong>Filled gaps cut:</strong> a sentence of the form &quot;not specified …, but <claim>&quot; is cut back to the gap.</li>
+<li><strong>No supplied amounts:</strong> items whose findings contain no amounts are named to the writer, so that none are
+supplied.</li>
+<li><strong>Invented commands cut:</strong> a command no finding gives is removed (its sentence, or its line in a code block) and
+named after the result (&quot;Left out, because no discovery gives them&quot;).</li>
+<li><strong>Numbers flagged:</strong> any number in the result that appears in no finding is flagged in the report.</li>
+</ul>
+<p>The report always lists every finding with its source URL, however the run ends.</p>
+<h3>3.6 One code path for every model</h3>
+<p>Every rule applies to every model. There are no per-model prompts, branches or profiles. When a new model exposed a
+failure (Section 5.2), the fix went into the shared code and was measured on the default model too.</p>
+<h2>4. Evaluation method</h2>
+<h3>4.1 The suite</h3>
+<p>Seven objectives, one of each task type:</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Objective (abridged)</th>
+<th>What it tests</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Factual</td>
+<td>Tallest mountain in Africa, height in meters and feet</td>
+<td>Basic retrieval and finishing</td>
+</tr>
+<tr>
+<td>List</td>
+<td>Three free, open-source alternatives to Microsoft Office, and what each is best at</td>
+<td>Counts and conditions</td>
+</tr>
+<tr>
+<td>Comparison</td>
+<td>SQLite vs PostgreSQL for a small web app, then a recommendation</td>
+<td>Multiple items and reporting a gap</td>
+</tr>
+<tr>
+<td>How-to</td>
+<td>Cold brew coffee: equipment, steps with amounts, how long it keeps</td>
+<td>Amounts and step completeness</td>
+</tr>
+<tr>
+<td>Explanation</td>
+<td>How photosynthesis works: inputs, outputs, both stages and where</td>
+<td>Multi-part coverage on long pages</td>
+</tr>
+<tr>
+<td>Opinion</td>
+<td>How at least three cultures have viewed owls, then an opinion</td>
+<td>Counting, and an opinion kept separate</td>
+</tr>
+<tr>
+<td>Documentation</td>
+<td>From the official Python docs: create, activate (Windows; macOS/Linux) and install into a venv</td>
+<td>Source conditions and exact commands</td>
+</tr>
+</tbody>
+</table></div>
+<h3>4.2 Measures</h3>
+<p>For each task: finished or not, turns, model minutes, and how many checklist items have findings. For each finished
+result, the suite counts:</p>
+<ul>
+<li><strong>Honest gaps:</strong> items it says were not found, and code caveats.</li>
+<li><strong>Claims beyond the findings:</strong>
+<ul>
+<li>gaps filled from the model's own knowledge, detected lexically (&quot;the text does not specify, but…&quot;);</li>
+<li>numbers no finding contains;</li>
+<li>commands no finding contains (added in 1.63);</li>
+<li>uncited lines;</li>
+<li>citations of findings that do not exist.</li>
+</ul>
+</li>
+</ul>
+<p>All of these measures are <strong>lexical</strong>. They detect certain patterns, and they cannot judge meaning. Section 5.5 gives
+their known misses.</p>
+<h3>4.3 Setup</h3>
+<ul>
+<li><strong>Hardware:</strong> Intel i5-9500 (6 cores), no GPU.</li>
+<li><strong>Server:</strong> LM Studio, with Q4_K_M quantisation for every model and an 8,192-token context.</li>
+<li><strong>Time limits:</strong>
+<ul>
+<li>Version history: 45 minutes per task, 60 for the explanation.</li>
+<li>Cross-model round: 90 minutes per task for every model.</li>
+<li>Untimed control: a 180-minute cap that no task approached.</li>
+</ul>
+</li>
+</ul>
+<h3>4.4 Process rules</h3>
+<ul>
+<li>Every run starts fresh and runs from start to finish.</li>
+<li>No code changes during a run.</li>
+<li>If a run exposed a failure with a known fix, it was stopped, the fix was made for every model, and that model's
+suite was restarted from scratch (&quot;stop and fix&quot;).</li>
+<li>A run in which the time limit hit while the final result was being written is not counted as finished. Its
+unchecked draft is kept but not scored. <em>(This rule was added during this evaluation; see Section 5.2.)</em></li>
+</ul>
+<h3>4.5 Replays</h3>
+<p>Many decisions were tested on a single saved moment instead of a whole suite. The exact prompt from a run was sent to
+the model 3 to 9 times, before and after a change. This tests a change on the moment it is meant for, in minutes
+rather than hours.</p>
+<h3>4.6 Scale</h3>
+<p>From 2026-10-16 to 2026-10-29 we ran 44 suite runs on one machine. They comprised 205 task runs, recorded 525
+findings and took 118.7 hours of model time. Every run folder keeps the prompts, the model's replies, the journal and
+the report.</p>
+<h2>5. Results</h2>
+<h3>5.1 Progress over versions (Qwen2.5-7B)</h3>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Version</th>
+<th>1.52</th>
+<th>1.53</th>
+<th>1.54</th>
+<th>1.54b</th>
+<th>1.55</th>
+<th>1.56</th>
+<th>1.57</th>
+<th>1.58</th>
+<th>1.59</th>
+<th>1.60</th>
+<th>1.61</th>
+<th>1.62</th>
+<th>1.63</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Finished (of 7)</td>
+<td>2</td>
+<td>5</td>
+<td>4</td>
+<td>5</td>
+<td>5</td>
+<td>4</td>
+<td>4</td>
+<td>5</td>
+<td>5</td>
+<td>6</td>
+<td>6</td>
+<td>7</td>
+<td>6</td>
+</tr>
+<tr>
+<td>Model minutes</td>
+<td>254</td>
+<td>200</td>
+<td>239</td>
+<td>225</td>
+<td>233</td>
+<td>272</td>
+<td>270</td>
+<td>214</td>
+<td>209.5</td>
+<td>170.6</td>
+<td>222.1</td>
+<td>168.3</td>
+<td>197.4</td>
+</tr>
+</tbody>
+</table></div>
+<p><em>Figure 3 (chart3.png). Version 1.62 changed no behaviour (a code reorganisation verified by golden-prompt tests), so
+its 7 of 7 against 1.61's 6 of 7 is run-to-run variance. One run per version cannot separate small effects from
+variance, and we do not claim it does.</em></p>
+<p>The large steps were the fixed checklist (1.53: 2 → 5) and sending the agent back only for gaps the code verifies
+(1.58). Several versions finished fewer tasks because they were stricter: a check that refuses more costs turns, and
+each turn costs minutes.</p>
+<h3>5.2 Four models, identical code</h3>
+<p><em>Figure 1 (chart1.png).</em> Round 3, 90 minutes per task:</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Finished</th>
+<th>Model time</th>
+<th>Said not found</th>
+<th>Caveats</th>
+<th>Filled from own knowledge</th>
+<th>Numbers not in findings</th>
+<th>Commands not in findings</th>
+<th>Uncited lines</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Qwen2.5-7B</td>
+<td>6 of 7</td>
+<td>197.4 min</td>
+<td>2</td>
+<td>2</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>10</td>
+</tr>
+<tr>
+<td>Qwen2.5-14B</td>
+<td>2 of 7</td>
+<td>534.9 min</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Llama-3.1-8B</td>
+<td>2 of 7</td>
+<td>278.0 min</td>
+<td>2</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Qwen2.5-3B</td>
+<td>0 of 7</td>
+<td>302.2 min</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<p><em>Honesty measures are summed over finished results, rescored with the 1.63 scorer.</em></p>
+<ul>
+<li><strong>7B:</strong> only the documentation task ran out of time, with all four items found.</li>
+<li><strong>14B:</strong> about 2.5 times the 7B's time per call (calls of 400–600 s). It reached <code>FINISH</code> on five tasks, but on
+three of them the time limit hit while the final result was being checked and written. The run's original summary
+counted those unchecked drafts as finished (5 of 7). One of them contained an invented command. The harness now
+marks such runs &quot;stopped while writing&quot;, and the table counts only the two clean finishes.</li>
+<li><strong>Llama 3.1 8B:</strong> browsing was mostly sound, but its pacing was slow (it read on after having the answer), and five
+tasks timed out with most items found.</li>
+<li><strong>Qwen2.5 3B:</strong> recorded findings on every task (3 of 3 items on the factual task, 4 of 4 on the documentation
+task) but never finished one. Late in the round it also recorded general, weakly grounded lines. We treat 0 of 7 as
+this model's floor at this setting and will test another 3B model to separate size from model family.</li>
+</ul>
+<p><strong>Claim 1.</strong> Across the ten finished results from four models on identical code, none filled a gap from the model's
+own knowledge, and none stated a number or command absent from its findings, by the suite's measures.</p>
+<p><strong>Failures the smaller models exposed</strong> (each fixed in the shared code before round 3; full list in the changelog):</p>
+<ul>
+<li><strong>Runaway replies:</strong> a 3B reply of 2,500+ tokens.</li>
+<li><strong>Search-result snippets recorded as findings:</strong> the 3B did this in 5 of 7 tasks, and every model did it at least
+once.</li>
+<li><strong>A made-up tool call instead of a final result:</strong> asked for plain text, Llama 3.1 8B answered 3 of 6 final results
+with a JSON tool call. Asking for the result in a required JSON field fixed it.</li>
+<li><strong>Echoes of the objective recorded as findings.</strong></li>
+<li><strong>A model call longer than the client's 10-minute default:</strong> the 14B. The timeout is now 30 minutes.</li>
+</ul>
+<h3>5.3 Untimed control (Qwen2.5-7B)</h3>
+<p>With a 180-minute cap, the 7B finished <strong>7 of 7 in 276.5 minutes</strong>. Its results said 2 items were not found, carried 1
+caveat, and had 8 uncited lines, with 0 gaps filled, 0 numbers and 0 commands not in findings. The time limit had cost
+only the documentation task. Without it, the remaining problems were in what got recorded and written, not in
+browsing:</p>
+<ul>
+<li>The explanation listed its outputs as &quot;not found&quot; over a finding that gave them (a false &quot;not found&quot;).</li>
+<li>The opinion left out a culture its findings named (a silent omission).</li>
+<li>The documentation task recorded <code>pip install package_name</code>, which neither page it read gives (an invented command
+in a finding).</li>
+</ul>
+<p>Three fresh check runs of those three tasks followed, after the fixes in Section 5.4:</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Check run</th>
+<th>Result</th>
+<th>Model time</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Stopped after the explanation: a false &quot;not found&quot; (led to the partial-answer wording)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2</td>
+<td>3 of 3 finished</td>
+<td>118.2 min</td>
+</tr>
+<tr>
+<td>3</td>
+<td>3 of 3 finished</td>
+<td>125.6 min</td>
+</tr>
+</tbody>
+</table></div>
+<h3>5.4 Case studies</h3>
+<p><strong>Case 1: Word overlap rated an invented command above real ones.</strong> In the untimed documentation run, the 7B recorded:
+&quot;To install packages into the virtual environment, use <code>pip install package_name</code> inside the activated venv folder&quot;,
+followed by two commands it really copied. The invented sentence scored 60% word-pair overlap with the page, higher
+than the copied <code>pip freeze &gt; requirements.txt</code> (50%) and <code>pip install -r requirements.txt</code> (42%). Its words echoed
+the objective (&quot;install packages into it&quot;). <em>(Figure 4, chart4.png.)</em></p>
+<p>No overlap threshold can separate these, so commands got their own rule: exact text (Section 3.2). Applied to every
+saved run, the rule flags 21 of 525 findings and 5 of 119 final results, all on the documentation task, and each one
+real when read by hand. <code>pip install package_name</code> alone was invented in five documentation runs, including a 14B result
+that presented it as found on the official page.</p>
+<p><strong>Case 2: Copying a table faithfully, but swapped.</strong> Copying the official venv activation table, the 7B swapped <code>bin</code>
+and <code>Scripts</code> (<code>C:\&gt; &lt;venv&gt;\bin\activate.bat</code>) in two runs. Every word appears on the page, so word overlap passes it.
+The exact-text check catches it, because that line does not exist on the page.</p>
+<p><strong>Case 3: The wording of a refusal decides what the model does next.</strong> Replaying the moment of the invented command:</p>
+<div class="tbl"><table>
+<thead>
+<tr>
+<th>Refusal wording</th>
+<th>Outcome (6 samples)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>&quot;The page never gives <code>…</code>: do not write it.&quot;</td>
+<td>6 of 6 kept the invented command and dropped the real ones</td>
+</tr>
+<tr>
+<td>The same, plus the page's own line with that command</td>
+<td>3 of 6 recorded only the page's commands; 3 of 6 repeated the refused finding, which is refused again</td>
+</tr>
+</tbody>
+</table></div>
+<p>The second wording became the refusal.</p>
+<p><strong>Case 4: The wording of a yes-or-no question decides a false &quot;not found&quot;.</strong> The coverage question asked whether a
+finding &quot;says what the ITEM asks for&quot;. For a finding that answered part of an item (the light-dependent reactions,
+&quot;which take place in the thylakoids&quot;), the 7B answered no 6 times out of 6. Asked whether the finding &quot;answers the
+ITEM, or part of it&quot;, it answered yes 6 of 6. The negative control, &quot;handling of many simultaneous users&quot;, which no
+finding answers, stayed &quot;no&quot; 6 of 6 under the new wording.</p>
+<p>When replayed faithfully, with the coverage call first as in a real run, one item still got &quot;no&quot; 3 of 3. The item's
+own distinctive words (&quot;light&quot;, &quot;dependent&quot;, &quot;reaction&quot;) found in the cited finding were therefore restored as a
+second chance. With them, the item counted 3 of 3, and the negative control stayed unanswered 3 of 3.</p>
+<p><strong>Case 5: Fewer, verified send-backs.</strong> Earlier replays shaped the send-back rules:</p>
+<ul>
+<li><strong>A count rule (1.60):</strong> the 1.59 owl finish with two tribes for three cultures was sent back 2 of 2 times, while
+the earlier owl moments with three or four cultures were sent back 0 of 6.</li>
+<li><strong>Finish advice in the read-on check:</strong> read on 6 of 6 before, chose FINISH 9 of 9 after.</li>
+<li><strong>The outline pointer (1.61):</strong> told only to use the page outline, the model jumped to the right part 0 of 6
+times; told which part, 3–4 of 6; with the code making the jump on a plain <code>READ_MORE</code>, 9 of 9.</li>
+</ul>
+<h3>5.5 Where our measures failed</h3>
+<p>We report these as results, because a measure that can be fooled is part of what a reader needs to know.</p>
+<ol>
+<li>
+<p><strong>An invented command scored as clean.</strong> The untimed documentation result was counted clean by every measure, even
+though it rested on <code>pip install package_name</code>. The scorer compares results with findings, not findings with
+pages. The commands column (Section 4.2) and the exact-text rule (Section 3.2) were added after this.</p>
+</li>
+<li>
+<p><strong>An uncited fill.</strong> In check run 2, the explanation stated that the light-dependent reactions take place in the
+thylakoid membrane and the Calvin cycle in the stroma. Its only finding said the stages occur &quot;in different
+locations&quot;. No measure flagged it, because the sentence shares a paragraph with cited ones. This is a gap filled
+from the model's knowledge in a finished 1.63 result. Claim 1 is scoped to the four-model round, but this run
+belongs in the record next to it.</p>
+</li>
+<li>
+<p><strong>Silent omissions.</strong> Reading the results by hand, we found four finished answers that left an item out without
+saying &quot;not found&quot;:</p>
+<ul>
+<li>Windows activation, in check runs 2 and 3 of the documentation task;</li>
+<li>oxygen, from the outputs of the photosynthesis explanation in check run 3;</li>
+<li>a third culture, in the untimed opinion result (the cause was fixed after that run).</li>
+</ul>
+<p><strong>The suite does not measure silent omission at all</strong>, so we cannot give a rate.</p>
+</li>
+</ol>
+<h2>6. Negative results and dead ends</h2>
+<ul>
+<li><strong>Quoting a page sentence in the read-on check.</strong> To stop the 7B reading all twelve parts of the venv reference page
+without recording anything, we tried quoting the page sentence that best matched a missing item. Neither our
+closest-sentence measure nor a rarity-weighted variant could separate good picks (&quot;activated using a script in its
+binary directory&quot;) from API-reference junk (&quot;Installs activation scripts…&quot;). They scored the same. Because the 7B
+follows quoted hints, this would have produced junk findings. We removed it.</li>
+<li><strong>Showing the writer the gaps the check could not confirm.</strong> Listing &quot;possibly missing&quot; items to the final-result
+call did not stop gap filling. One sample filled them in anyway, and another produced empty headings. We removed it.</li>
+<li><strong>Linking findings to items by shared words.</strong> In the saved journals, 75 of 247 finding-to-item links share no key
+word with their item, and most of those are right (&quot;5,895 m&quot; for &quot;how tall in meters&quot;). We did not adopt it.</li>
+<li><strong>A larger context.</strong> 16,384 tokens instead of 8,192 would roughly halve the fresh prompts that cost 4–5 minutes
+each, but it needs more memory. We kept the default where a modest PC can run it.</li>
+</ul>
+<h2>7. Limitations and threats to validity</h2>
+<ul>
+<li><strong>Sample size.</strong> One run per model and per version, on seven tasks. Our claims are counts of what happened in
+recorded runs, not rates with confidence intervals. Run-to-run variance is large (Section 5.1).</li>
+<li><strong>One machine, one quantisation.</strong> Q4_K_M, CPU only, a fixed context. Time limits interact with speed: the 14B's
+score is mostly a speed result.</li>
+<li><strong>The live web.</strong> Pages change, and a single site can decide a task. The suite flags a task that fails again on the
+same site.</li>
+<li><strong>Lexical measures.</strong> Section 5.5. A result can be counted clean and still be wrong.</li>
+<li><strong>Open problems:</strong>
+<ul>
+<li>text copied faithfully but under the wrong label (a Git Bash line labelled as the macOS/Linux command);</li>
+<li>silent omission;</li>
+<li>the final result filling gaps the coverage check could not confirm;</li>
+<li>small embellishments while writing (every opinion sample called Native American owls &quot;wise&quot;, which no finding
+says).</li>
+</ul>
+</li>
+<li><strong>The author built the suite and the agent,</strong> and the system was developed with an AI assistant (see the
+disclosure). Both are reasons for outside replication, which Section 8 invites.</li>
+</ul>
+<h2>8. Reproducibility</h2>
+<p>The code is MIT-licensed. Version 1.63 is a tagged release and is on PyPI as <code>localagentbrowser</code>. To run the suite on
+any model LM Studio serves:</p>
+<pre><code class="language-bash">python tools/regression.py --model qwen2.5-7b-instruct --minutes 90
+</code></pre>
+<p>Each run writes a folder with every task's report, journal, console output and prompt trace, plus a summary with the
+measures in Section 4.2. <code>--rescore</code> scores an earlier run again with the current scorer, as we did for Section 5.2.
+The offline tests (<code>python -m pytest</code>) run in seconds with no model or browser. The step-by-step history is in
+<code>docs/regression-history.md</code>. Code: https://github.com/SnowFXXX/LocalAgentBrowser. Release and saved runs: https://github.com/SnowFXXX/LocalAgentBrowser/releases/tag/v1.63. Project site: https://snowfxxx.github.io/LocalAgentBrowser/.</p>
+<p>We invite replication, particularly on other models, other hardware and harder objectives. Results that contradict
+ours are especially welcome.</p>
+<h2>9. Conclusion and next steps</h2>
+<p>Verification by code, rather than trust in the model, produced finished results that stayed within their sources
+across four models from 3B to 14B parameters on a CPU, by the measures we have. The same discipline exposed where those
+measures fail. Those failures are now the work.</p>
+<p><strong>Next focus: silent omission.</strong> The fixed checklist makes it checkable. Every item must appear in the final result or
+be listed as not found. The difficulty is matching without false alarms, since the same thing is said in many ways (a
+page said &quot;POSIX&quot; for macOS and Linux). It is a narrow, well-defined problem and a good place for contributors.
+The public issue is at https://github.com/SnowFXXX/LocalAgentBrowser/issues/11.</p>
+<p><strong>After that:</strong></p>
+<ul>
+<li>a measure for silent omission in the suite itself;</li>
+<li>another 3B model, to separate size from model family;</li>
+<li>a trained agent model (for example from WebRL or Search-R1) run under the same checks, to test whether training
+and code-enforced verification add up;</li>
+<li>untimed suites for every model;</li>
+<li>and, eventually, clicking and forms, which the agent does not do yet.</li>
+</ul>
+<h2>Acknowledgements and disclosure</h2>
+<p>LocalAgentBrowser versions 1.13 onwards, and this paper, were developed with Claude (Anthropic), working in Claude
+Code on the Claude Pro plan with Opus 5.5 at medium effort. This was a deliberate choice. The agent's checks trust no
+model's word, including the one that helped build it. All numbers in this paper come from saved run folders and were
+recomputed from them for this draft.</p>
+<h2>References</h2>
+<ul>
+<li>Asai, A., Wu, Z., Wang, Y., Sil, A. and Hajishirzi, H. (2023). Self-RAG: Learning to Retrieve, Generate, and
+Critique through Self-Reflection. arXiv:2310.11511.</li>
+<li>Belcak, P. et al. (2025). Small Language Models are the Future of Agentic AI. arXiv:2506.02153.</li>
+<li>browser-use. Open-source project. https://github.com/browser-use/browser-use</li>
+<li>Chen, B. et al. (2023). FireAct: Toward Language Agent Fine-tuning. arXiv:2310.05915.</li>
+<li>Chen, W. and Li, Z. (2024). Octopus v2: On-device language model for super agent. arXiv:2404.01744.</li>
+<li>Deng, X. et al. (2023). Mind2Web: Towards a Generalist Agent for the Web. NeurIPS 2023. arXiv:2306.06070.</li>
+<li>Dhuliawala, S. et al. (2023). Chain-of-Verification Reduces Hallucination in Large Language Models. Findings of
+ACL 2024. arXiv:2309.11495.</li>
+<li>Dong, P. et al. (2025). Can Compressed LLMs Truly Act? An Empirical Evaluation of Agentic Capabilities in LLM
+Compression. ICML 2025. arXiv:2505.19433.</li>
+<li>Erdogan, L. E. et al. (2024). TinyAgent: Function Calling at the Edge. EMNLP 2024 (demo). arXiv:2409.00608.</li>
+<li>Gao, T., Yen, H., Yu, J. and Chen, D. (2023). Enabling Large Language Models to Generate Text with Citations.
+EMNLP 2023. arXiv:2305.14627.</li>
+<li>GPT Researcher. Open-source project. https://github.com/assafelovic/gpt-researcher</li>
+<li>Huang, J. et al. (2024). Large Language Models Cannot Self-Correct Reasoning Yet. ICLR 2024. arXiv:2310.01798.</li>
+<li>Ji, Z. et al. (2023). Survey of Hallucination in Natural Language Generation. ACM Computing Surveys.
+arXiv:2202.03629.</li>
+<li>Jin, B. et al. (2025). Search-R1: Training LLMs to Reason and Leverage Search Engines with Reinforcement Learning.
+arXiv:2503.09516.</li>
+<li>Lewis, P. et al. (2020). Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks. NeurIPS 2020.
+arXiv:2005.11401.</li>
+<li>Liu, X. et al. (2024). AgentBench: Evaluating LLMs as Agents. ICLR 2024. arXiv:2308.03688.</li>
+<li>Local Deep Research. Open-source project. https://github.com/LearningCircuit/local-deep-research</li>
+<li>Madaan, A. et al. (2023). Self-Refine: Iterative Refinement with Self-Feedback. NeurIPS 2023. arXiv:2303.17651.</li>
+<li>Manakul, P., Liusie, A. and Gales, M. J. F. (2023). SelfCheckGPT: Zero-Resource Black-Box Hallucination Detection
+for Generative Large Language Models. EMNLP 2023. arXiv:2303.08896.</li>
+<li>Menick, J. et al. (2022). Teaching language models to support answers with verified quotes. arXiv:2203.11147.</li>
+<li>Min, S. et al. (2023). FActScore: Fine-grained Atomic Evaluation of Factual Precision in Long Form Text Generation.
+EMNLP 2023. arXiv:2305.14251.</li>
+<li>Nakano, R. et al. (2021). WebGPT: Browser-assisted question-answering with human feedback. arXiv:2112.09332.</li>
+<li>Qi, Z. et al. (2025). WebRL: Training LLM Web Agents via Self-Evolving Online Curriculum Reinforcement Learning.
+ICLR 2025. arXiv:2411.02337.</li>
+<li>Rashkin, H. et al. (2021). Measuring Attribution in Natural Language Generation Models. arXiv:2112.12870.</li>
+<li>Shen, W. et al. (2024). Small LLMs Are Weak Tool Learners: A Multi-LLM Agent. EMNLP 2024. arXiv:2401.07324.</li>
+<li>Shinn, N. et al. (2023). Reflexion: Language Agents with Verbal Reinforcement Learning. NeurIPS 2023.
+arXiv:2303.11366.</li>
+<li>Tang, L., Laban, P. and Durrett, G. (2024). MiniCheck: Efficient Fact-Checking of LLMs on Grounding Documents.
+EMNLP 2024. arXiv:2404.10774.</li>
+<li>Verbatim RAG. Open-source project. https://pypi.org/project/verbatim-rag/</li>
+<li>Wen, B. et al. (2025). Know Your Limits: A Survey of Abstention in Large Language Models. TACL.
+arXiv:2407.18418.</li>
+<li>Yao, S. et al. (2023). ReAct: Synergizing Reasoning and Acting in Language Models. ICLR 2023. arXiv:2210.03629.</li>
+<li>Yin, D. et al. (2023). Lumos: Learning Agents with Unified Data, Modular Design, and Open-Source LLMs.
+arXiv:2311.05657.</li>
+<li>Zeng, A. et al. (2023). AgentTuning: Enabling Generalized Agent Abilities for LLMs. Findings of ACL 2024.
+arXiv:2310.12823.</li>
+<li>Zhang, Y. et al. (2024). ToolBeHonest: A Multi-level Hallucination Diagnostic Benchmark for Tool-Augmented Large
+Language Models. EMNLP 2024. arXiv:2406.20015.</li>
+<li>Zheng, Y. et al. (2025). DeepResearcher: Scaling Deep Research via Reinforcement Learning in Real-world
+Environments. EMNLP 2025. arXiv:2504.03160.</li>
+<li>Zhou, S. et al. (2024). WebArena: A Realistic Web Environment for Building Autonomous Agents. ICLR 2024.
+arXiv:2307.13854.</li>
+</ul>
+</article>
+    <footer><div><a class="mark" href="index.html">LocalAgent<b>Browser</b></a> · free and open source (MIT) ·
+      <a href="article.html">The story</a> · <a href="paper.html">Technical paper</a> ·
+      <a href="https://github.com/SnowFXXX/LocalAgentBrowser">GitHub</a> · <a href="https://pypi.org/project/localagentbrowser/">PyPI</a></div></footer>
+    </body>
+    </html>
+    

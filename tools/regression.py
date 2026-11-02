@@ -6,11 +6,14 @@ Usage:
     python tools/regression.py --suite all         also run the extra tasks
     python tools/regression.py --only factual,list run some tasks
     python tools/regression.py --baseline regression_runs/<earlier run>/summary.json
+    python tools/regression.py --model meta-llama-3.1-8b-instruct   run with another model LM Studio has
     python tools/regression.py --rescore regression_runs/<run>   score an earlier run again, without the model
     python tools/regression.py --list              show the tasks
 
 Each task runs in its own process through tools/live_test.py, with its own time limit, in
-regression_runs/<version>_<date-time>/<task>/. After every task, summary.json and summary.md in that folder are
+regression_runs/<version>_<model>_<date-time>/<task>/. Before the first task the model is loaded and its context
+length checked: every run uses the same context length (LMSTUDIO_CONTEXT_LENGTH, 8192 by default), so results from
+different models are measured under the same conditions. After every task, summary.json and summary.md in that folder are
 updated, so a run that is stopped early still has a summary of the tasks it finished.
 
 The checks are deliberately simple, so they can be trusted and read: words the result must contain (the
@@ -114,6 +117,31 @@ CITATION = re.compile(r"\[(\d+(?:\s*[-–,;]\s*\d+)*)\]")
 GAP_STATEMENT = re.compile(r"\b(not (?:been )?(?:found|mentioned|covered|provided|included|available|specified|given)|"
                            r"no (?:information|details|mention)|no\b[^.]{0,80}\b(?:were|was) (?:found|given|mentioned))\b",
                            re.I)
+# Outside knowledge offered as a fill-in: "The text does not specify how long it keeps, but it is generally
+# recommended to drink it within 1-2 weeks" (a cold brew result on 1.62). Saying a gap is the honest part; what
+# follows "but" comes from the model, not from a page
+# "not explicitly stated but generally ..." (a 7B, 2026-10-27) slipped past without the optional word
+OUTSIDE_KNOWLEDGE = re.compile(r"(?:not (?:\w+ )?(?:been )?(?:specified|mentioned|stated|provided|given|found)|does not "
+                               r"(?:\w+ )?(?:specify|say|mention|state))[^.\n]{0,100}\bbut\b|\b(?:generally recommended|a common "
+                               r"recommendation|commonly recommended|as a general rule)\b", re.I)
+CAVEAT = "(not shown in the pages read to be"
+
+
+def outside_knowledge(text):
+    """Sentences of the result (before 'My view:') that fill a gap from the model's own knowledge."""
+    body = re.split(r"(?im)^\s*my view:", text)[0]
+    sentences = re.split(r"(?<=[.!?])\s+|\n+", body)
+    return [s.strip() for s in sentences if OUTSIDE_KNOWLEDGE.search(s)]
+
+
+def honesty(score):
+    """The run's honesty measures, in the order the summary shows them. Absent in runs scored before they existed."""
+    if "caveats" not in score:
+        return None
+    return {"said not found": len(score["gap_statements"]), "caveats": score["caveats"],
+            "outside knowledge": len(score["outside_knowledge"]), "numbers not in discoveries": len(score["unverified_numbers"]),
+            "commands not in discoveries": len(score.get("unverified_code", [])),
+            "uncited lines": len(score["uncited_lines"]), "cites missing discoveries": len(score["bad_citations"])}
 
 
 def cited_numbers(text):
@@ -184,6 +212,9 @@ def load_run(folder):
 def score_run(task, journal, console="", checklist=None):
     """Measurements and a list of problems for one run of a task."""
     finish = next((e for e in reversed(journal) if e.get("action") == "FINISH"), None)
+    # Stopped while the final result was being written, the run has only the model's unchecked draft: not a finish
+    if finish and finish.get("writing"):
+        finish = None
     found = [e for e in journal if e.get("action") == "DISCOVER"]
     result = str(finish.get("finding", "")) if finish else ""
     low = result.lower()
@@ -208,7 +239,10 @@ def score_run(task, journal, console="", checklist=None):
         "bad_citations": sorted(n for n in cited if n > len(found) or n < 1),
         "uncited_lines": uncited_lines(result),
         "unverified_numbers": ab.unverified_numbers(result, found) if finish else [],
+        "unverified_code": ab.unverified_code(result, found) if finish else [],
         "gap_statements": [m.group(0) for m in GAP_STATEMENT.finditer(result)],
+        "caveats": result.count(CAVEAT),
+        "outside_knowledge": outside_knowledge(result),
         "missing": ["/".join(group[:3]) for group in task.get("expect", []) if not any(word in low for word in group)],
         # A forbidden item marked by the agent's own caveat ("FreeOffice (not shown in the pages read to be ...") is
         # flagged to the reader, so it does not count as a missed condition
@@ -239,8 +273,12 @@ def score_run(task, journal, console="", checklist=None):
             problems.append("cites missing discoveries " + ", ".join(map(str, score["bad_citations"])))
         if score["unverified_numbers"]:
             problems.append("numbers not in discoveries: " + ", ".join(score["unverified_numbers"]))
+        if score.get("unverified_code"):
+            problems.append("commands not in discoveries: " + ", ".join(score["unverified_code"]))
         if score["uncited_lines"]:
             problems.append(f"{len(score['uncited_lines'])} uncited paragraph(s)")
+        if score["outside_knowledge"]:
+            problems.append(f"{len(score['outside_knowledge'])} gap(s) filled from the model's own knowledge")
     if score.get("off_source_discoveries"):
         problems.append(f"{score['off_source_discoveries']} of {len(found)} discoveries outside the named source")
     score["problems"] = problems
@@ -257,9 +295,20 @@ def progress(score):
     return ", ".join(parts) or "-"
 
 
+# Runs before the model switch did not record their model; all of them used this one
+EARLIER_MODEL = "qwen2.5-7b-instruct"
+
+
+def model_line(meta):
+    model = f"model {meta.get('model', EARLIER_MODEL)}"
+    if meta.get("quantization"):
+        model += f" ({meta['quantization']}, context {meta.get('context')})"
+    return model
+
+
 def summary_markdown(meta, scores, baseline=None):
     lines = [f"# Regression run {meta['name']}", "",
-             f"Version {meta['version']} (commit {meta['commit']}), started {meta['started']}.", "",
+             f"Version {meta['version']} (commit {meta['commit']}), {model_line(meta)}, started {meta['started']}.", "",
              "| Task | Finished | Turns | Model min | Discoveries | Progress | Checks fired | Problems |",
              "|---|---|---|---|---|---|---|---|"]
     before = {s["id"]: s for s in (baseline or {}).get("scores", [])}
@@ -273,8 +322,19 @@ def summary_markdown(meta, scores, baseline=None):
                      f"{progress(s)} | {fired} | {'; '.join(s['problems']) or 'none'} |")
     done = [s for s in scores if s["finished"]]
     lines += ["", f"Finished {len(done)} of {len(scores)}; total model time {sum(s['model_minutes'] for s in scores):.1f} min."]
+    measured = [(s, honesty(s)) for s in scores if s["finished"] and honesty(s)]
+    if measured:
+        # Honest gaps on the left, claims the discoveries do not back on the right; finished runs only
+        names = list(measured[0][1])
+        lines += ["", "Honesty of the final results (finished runs; the first two are honest gaps, the rest are claims "
+                  "the discoveries do not back):", "",
+                  "| Task | " + " | ".join(n.capitalize() for n in names) + " |", "|---" * (len(names) + 1) + "|"]
+        for s, h in measured:
+            lines.append(f"| {s['id']} | " + " | ".join(str(h[n]) for n in names) + " |")
+        lines.append("| **All** | " + " | ".join(f"**{sum(h[n] for _, h in measured)}**" for n in names) + " |")
     if baseline:
-        lines += ["", f"Compared with {baseline['meta']['name']} (version {baseline['meta']['version']}):"]
+        lines += ["", f"Compared with {baseline['meta']['name']} (version {baseline['meta']['version']}, "
+                      f"{model_line(baseline['meta'])}):"]
         for s in scores:
             old = before.get(s["id"])
             if not old:
@@ -326,10 +386,52 @@ def model_server_ready():
         return False
 
 
-def run_task(task, folder, minutes):
+def get_json(url, data=None, timeout=10):
+    request = urllib.request.Request(url, data=json.dumps(data).encode() if data else None,
+                                     headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return json.load(response)
+
+
+def lmstudio_model(model):
+    """LM Studio's description of a model (state, quantization, loaded context length), or None from other servers."""
+    try:
+        return get_json(ab.BASE_URL.rstrip("/").removesuffix("/v1") + f"/api/v0/models/{model}")
+    except (OSError, ValueError):
+        return None
+
+
+def prepare_model(model):
+    """Checks the model is available, loads it, and returns {"quantization", "context"}; exits with the reason if
+    it cannot be used. LM Studio loads a model on the first request that names it, with that model's own default
+    context length, which can differ from the one every other run used; a run under other conditions is refused."""
+    available = [m["id"] for m in get_json(ab.BASE_URL.rstrip("/") + "/models").get("data", [])]
+    if model not in available:
+        sys.exit(f"The model server has no model '{model}'. It has: {', '.join(available)}")
+    print(f"Loading {model} (if it is not loaded yet)...", flush=True)
+    get_json(ab.BASE_URL.rstrip("/") + "/chat/completions", {"model": model, "max_tokens": 1,
+                                                             "messages": [{"role": "user", "content": "Hi"}]},
+             timeout=600)
+    info = lmstudio_model(model)
+    if info is None:
+        print("The server is not LM Studio, so the context length the model is loaded with cannot be checked.")
+        return {"quantization": "unknown", "context": "unknown"}
+    loaded = info.get("loaded_context_length")
+    if loaded != ab.CONTEXT_LENGTH:
+        sys.exit(f"{model} is loaded with a context length of {loaded}, not {ab.CONTEXT_LENGTH} like every other run. "
+                 "Set its context length in LM Studio (My Models, the model's settings), unload it, and start again.")
+    return {"quantization": info.get("quantization", "unknown"), "context": loaded}
+
+
+def run_name(version, model, started):
+    """The run's folder name, which says which model it measured."""
+    return f"{version}_{model.replace('/', '-')}_{started:%Y%m%d-%H%M}"
+
+
+def run_task(task, folder, minutes, model):
     """Runs one task through the live test runner, copying its console output to the screen and to console.txt."""
     os.makedirs(folder, exist_ok=True)
-    env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1", LMSTUDIO_MODEL=model)
     command = [sys.executable, "-u", os.path.join(ROOT, "tools", "live_test.py"), task["objective"],
                "--minutes", str(minutes), "--out", folder]
     with open(os.path.join(folder, "console.txt"), "w", encoding="utf-8") as console:
@@ -349,6 +451,7 @@ def main():
     parser.add_argument("--baseline", help="summary.json of an earlier run to compare with")
     parser.add_argument("--rescore", help="score the task folders of an earlier run again instead of running")
     parser.add_argument("--minutes", type=float, help="time limit for every task instead of each task's own")
+    parser.add_argument("--model", help=f"the model to run, as LM Studio lists it (default: {ab.MODEL})")
     parser.add_argument("--list", action="store_true", help="list the tasks and exit")
     args = parser.parse_args()
 
@@ -380,18 +483,20 @@ def main():
 
     if not model_server_ready():
         sys.exit(f"The model server at {ab.BASE_URL} is not answering; start LM Studio's server first.")
+    model = args.model or ab.MODEL
+    loaded = prepare_model(model)
     version = project_version()
     started = datetime.datetime.now()
-    name = f"{version}_{started:%Y%m%d-%H%M}"
+    name = run_name(version, model, started)
     folder = os.path.join(ROOT, "regression_runs", name)
     meta = {"name": name, "version": version, "commit": git_commit(), "started": f"{started:%Y-%m-%d %H:%M}",
-            "tasks": [t["id"] for t in tasks]}
+            "model": model, **loaded, "tasks": [t["id"] for t in tasks]}
     scores = []
     for number, task in enumerate(tasks, start=1):
         minutes = args.minutes or task["minutes"]
         print(f"\n===== REGRESSION TASK {number}/{len(tasks)}: {task['id']} ({task['kind']}, up to {minutes:g} min) =====\n",
               flush=True)
-        run_task(task, os.path.join(folder, task["id"]), minutes)
+        run_task(task, os.path.join(folder, task["id"]), minutes, model)
         score = score_run(task, *load_run(os.path.join(folder, task["id"]))[1:])
         scores.append(score)
         write_summary(folder, meta, scores, baseline)

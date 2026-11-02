@@ -26,7 +26,7 @@ python -m playwright install chromium   # only needed for real runs, not for the
 ## Before opening a pull request
 
 ```bash
-python -m pytest        # about a second; no LM Studio or browser needed
+python -m pytest        # a few seconds; no LM Studio or browser needed
 python -m ruff check .
 ```
 

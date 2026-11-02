@@ -2,10 +2,11 @@
 caveats), and the report file."""
 import json
 import re
-from .config import COMPOSE_MAX_TOKENS, JOURNAL_BATCH, MAX_JOURNAL_DETAIL_CHARS, MAX_JOURNAL_REASON_CHARS, MAX_THOUGHT_CHARS, MODEL, REPORT_FILE, VIEW_MAX_TOKENS
-from .prompts import COMPOSE_SYSTEM
-from .text import OPINION_REQUEST, extract_message_content, shorten
+from .config import COMPOSE_MAX_TOKENS, JOURNAL_BATCH, MAX_EVIDENCE_CHARS, MAX_JOURNAL_DETAIL_CHARS, MAX_JOURNAL_REASON_CHARS, MAX_THOUGHT_CHARS, MODEL, REPORT_FILE, VIEW_MAX_TOKENS
+from .prompts import COMPOSE_SYSTEM, NO_RESULT, RESULT_FORMAT, RESULT_REPLY, RESULT_RETRY
+from .text import OPINION_REQUEST, extract_message_content, shorten, word_pairs
 from .pages import normalize_url
+from .grounding import code_text, invented_code
 from .checklist import checklist_lines
 
 def compact_journal(journal):
@@ -82,6 +83,37 @@ def unverified_numbers(text, discoveries):
             unverified.append(number)
     return unverified
 
+def unverified_code(text, discoveries):
+    """Backticked commands or code in the final result that none of the discoveries contain."""
+    return invented_code(str(text), [e["extracted_data"] for e in discoveries])
+
+def without_invented_code(text, discoveries):
+    """The final result with each sentence giving a command no discovery contains cut, and those commands named.
+
+    The 14B's venv result told Windows users to run "<venv>/Scripts/activate", in none of its discoveries, and a 7B
+    result ended in a code block holding "pip install package_name", which no discovery gave either: a command is
+    exact text, so one written from memory is either right by luck or wrong, and a reader would run it.
+    """
+    invented = unverified_code(text, discoveries)
+    if not invented:
+        return text
+    found = [e["extracted_data"] for e in discoveries]
+    known = code_text(" ".join(found))
+    kept, fenced = [], False
+    for line in str(text).split("\n"):
+        if line.strip().startswith("```"):
+            fenced = not fenced
+            kept.append(line)
+        elif fenced:
+            # A line of a code block is code whatever it looks like
+            kept.append(line if not line.strip() or code_text(line.strip()) in known else "")
+        else:
+            kept.append(" ".join(s for s in re.split(r"(?<=[.!?])\s+", line) if not invented_code(s, found)))
+    note = ("Left out, because no discovery gives them (the pages read may still have them): "
+            + ", ".join(f"`{c}`" for c in invented) + ".")
+    text = re.sub(r"```[^\n]*\n\s*```\n?", "", "\n".join(kept))  # A code block left empty
+    return re.sub(r"\n{3,}", "\n\n", text).strip() + "\n\n" + note
+
 def write_report(objective, journal, checklist=None):
     """A readable report with the final result and every discovery, so nothing depends on the model's
     summary being complete. Written however the run ends."""
@@ -89,13 +121,21 @@ def write_report(objective, journal, checklist=None):
     found = [e for e in journal if e.get("action") == "DISCOVER"]
     last_turn = journal[-1].get("turn", 0) if journal else 0
     lines = ["# Research report", "", f"**Objective:** {objective}", ""]
-    if finish:
+    if finish and finish.get("writing"):
+        lines += [f"**Status:** stopped while the final result was being checked and written (turn {finish.get('turn')})",
+                  "", "## Final result", "", "_(Not written. The agent's unchecked draft, which the checks before the "
+                  "final result did not finish with:)_", "", str(finish.get("finding") or "")]
+    elif finish:
         final = finish.get("finding") or "_(The agent finished without writing a final result.)_"
         lines += [f"**Status:** finished by the agent on turn {finish.get('turn')}", "", "## Final result", "", final]
         unchecked = unverified_numbers(final, found)
         if unchecked:
             lines += ["", f"> ⚠️ Numbers not found in the recorded discoveries: {', '.join(unchecked)}. "
                           "Check them before relying on this result."]
+        code = unverified_code(final, found)
+        if code:
+            lines += ["", f"> ⚠️ Commands not found in the recorded discoveries: {', '.join(f'`{c}`' for c in code)}. "
+                          "Check them before running them."]
     else:
         lines += [f"**Status:** stopped before the agent finished (after turn {last_turn})", "", "## Final result", "",
                   "_(The agent did not finish; see the discoveries below.)_"]
@@ -108,7 +148,8 @@ def write_report(objective, journal, checklist=None):
     with open(REPORT_FILE, "w", encoding="utf-8") as report:
         report.write("\n".join(lines) + "\n")
 
-async def compose_final_result(client, objective, journal, checklist=None, not_found=(), unproven=()):
+async def compose_final_result(client, objective, journal, checklist=None, not_found=(), unproven=(), no_amounts=(),
+                               evidence=None):
     """Writes the final result in a model call whose only job is writing.
 
     Deciding what to browse and writing the deliverable compete for a small model's attention: in a live run
@@ -132,6 +173,18 @@ async def compose_final_result(client, objective, journal, checklist=None, not_f
     if unfound:
         parts += ("### NOT FOUND (no discovery answers these; they are reported after your result)\n"
                   + "\n".join(f"- {text}" for text in unfound) + "\n\n")
+    # Where the coverage check found an item answered, with words checked against the discoveries: a result said "the
+    # discoveries do not specify what goes into photosynthesis" over a discovery naming water, sunlight and CO2
+    answered = [(checklist[n - 1]["text"], quote) for n, quote in sorted((evidence or {}).items())
+                if checklist and 0 < n <= len(checklist) and n not in not_found]
+    if answered:
+        parts += ("### WHERE THE DISCOVERIES ANSWER THESE (words checked against the discoveries: use them, and do not "
+                  "say these were not found)\n" + "\n".join(f"- {text}: \"{shorten(quote, MAX_EVIDENCE_CHARS)}\""
+                                                            for text, quote in answered) + "\n\n")
+    amountless = [checklist[n - 1]["text"] for n in no_amounts if checklist and 0 < n <= len(checklist)]
+    if amountless:
+        parts += ("### NO AMOUNTS FOUND (the discoveries for these give no amounts, numbers or times: say so, and do "
+                  "not supply any)\n" + "\n".join(f"- {text}" for text in amountless) + "\n\n")
     if unproven:
         parts += ("### NOT SHOWN TO MEET THE CONDITIONS (the discoveries do not show these meet them; if you list one, "
                   "say so right after it)\n" + "\n".join(f"- {name}: not shown to be {cond}" for name, cond in unproven)
@@ -155,36 +208,85 @@ async def compose_final_result(client, objective, journal, checklist=None, not_f
                "recommendation; if it does, give it in a paragraph that starts with 'My view:'.\n"
                + ("6. Cover every CHECKLIST item; for an item no discovery supports, say plainly that it was not found. "
                   "Write nothing about the NOT FOUND items.\n"
-                  "7. Write plain text, not JSON." if parts else "6. Write plain text, not JSON."))
+                  "7. " if parts else "6. ") + RESULT_REPLY)
     # A fresh prompt with only the discoveries, not the browsing conversation: continuing that conversation let
     # the model use page text it had read but not recorded, and cite discovery numbers that did not say it
     messages = [{"role": "system", "content": COMPOSE_SYSTEM}, {"role": "user", "content": request}]
     response = await client.chat.completions.create(model=MODEL, messages=messages, temperature=0.3,
-                                                    max_tokens=COMPOSE_MAX_TOKENS)
-    text = extract_message_content(response)
-    if text.startswith("{"):  # Habit from every earlier turn: unwrap a JSON reply instead of reporting it raw
-        try:
-            reply = json.loads(text)
-            text = str(reply.get("parameter") or reply.get("thought_process") or text)
-        except (json.JSONDecodeError, AttributeError):
-            pass
-    text = text.strip()
+                                                    max_tokens=COMPOSE_MAX_TOKENS, response_format=RESULT_FORMAT)
+    text = result_text(extract_message_content(response))
+    # Asked once more when the reply is not a result: a 3B model "finished" a how-to with its own prompt repeated
+    # back (the objective, the checklist and the discoveries), and a result still in JSON is not one either
+    if not usable_result(text):
+        retry = messages + [{"role": "assistant", "content": extract_message_content(response)},
+                            {"role": "user", "content": RESULT_RETRY}]
+        response = await client.chat.completions.create(model=MODEL, messages=retry, temperature=0.3,
+                                                        max_tokens=COMPOSE_MAX_TOKENS, response_format=RESULT_FORMAT)
+        text = result_text(extract_message_content(response))
+        if not usable_result(text):
+            text = NO_RESULT
     # Asked to "give your own opinion" about owls, the result listed the traditions and ended without one,
     # although rule 6 asks for a 'My view:' paragraph whenever the objective wants a view. A short second call
     # writes only that paragraph, from the result just written
-    if OPINION_REQUEST.search(objective) and "my view:" not in text.lower():
-        view = await client.chat.completions.create(model=MODEL, temperature=0.3, max_tokens=VIEW_MAX_TOKENS, messages=[
-            {"role": "system", "content": COMPOSE_SYSTEM},
-            {"role": "user", "content": f"### OBJECTIVE\n{objective}\n\n### RESULT\n{text}\n\nThe OBJECTIVE asks for your "
-                                        "own view, opinion or recommendation, and the RESULT does not give it yet. Write "
-                                        "only that, as one short paragraph that starts with 'My view:', based on the "
-                                        "RESULT. Plain text."}])
-        paragraph = extract_message_content(view).strip()
-        if paragraph:
+    if OPINION_REQUEST.search(objective) and "my view:" not in text.lower() and text != NO_RESULT:
+        view = await client.chat.completions.create(
+            model=MODEL, temperature=0.3, max_tokens=VIEW_MAX_TOKENS, response_format=RESULT_FORMAT, messages=[
+                {"role": "system", "content": COMPOSE_SYSTEM},
+                {"role": "user", "content": f"### OBJECTIVE\n{objective}\n\n### RESULT\n{text}\n\nThe OBJECTIVE asks for "
+                                            "your own view, opinion or recommendation, and the RESULT does not give it "
+                                            "yet. Write only that, as one short paragraph that starts with 'My view:', "
+                                            "based on the RESULT. " + RESULT_REPLY}])
+        paragraph = result_text(extract_message_content(view))
+        # Asked for its view after a result that already recommended SQLite ("I recommend using SQLite"), Llama
+        # wrote the whole result again under "My view:"; a paragraph mostly repeating the result is left out
+        mine = word_pairs(paragraph.lower()) if paragraph else set()
+        repeated = bool(mine) and len(mine & word_pairs(text.lower())) >= 0.5 * len(mine)
+        if paragraph and usable_result(paragraph) and not repeated:
             text += "\n\n" + (paragraph if paragraph.lower().startswith("my view:") else f"My view: {paragraph}")
-    if unfound:
-        text += "\n\nNot found in the pages read:\n" + "\n".join(f"- {t}" for t in unfound)
-    return with_caveats(text, unproven)
+    # Reported by the code as well, whatever the result says
+    unfound_lines = [f"- {t}" for t in unfound] + [f"- {t}: the amounts it asks for" for t in amountless]
+    if unfound_lines:
+        text += "\n\nNot found in the pages read:\n" + "\n".join(unfound_lines)
+    return with_caveats(without_invented_code(without_filled_gaps(text), found), unproven)
+
+# "X is not specified ..., but <a claim>": every such sentence in the suite's finished results filled the gap from the
+# model's own knowledge ("not explicitly stated but generally, it can be stored for several weeks", while the page
+# said three days; "not specified in the text, but a common recommendation is 1 part coffee to 4 parts water")
+FILLED_GAP = re.compile(r"((?:not (?:\w+ )?(?:been )?(?:specified|mentioned|stated|provided|given|found)|does not (?:\w+ )?"
+                        r"(?:specify|say|mention|state))[^.\n]{0,100}?),?\s+but\b[^\n]*?(?:\.(?=\s+[A-Z]|\s*$)|(?=\n)|$)",
+                        re.I)  # The sentence ends at a period before a capital or the end ("e.g., 1 cup" stays inside it)
+
+def without_filled_gaps(text):
+    """The final result with what follows "not stated ..., but" cut: the gap stays reported, the filling goes."""
+    return FILLED_GAP.sub(lambda m: m.group(1).rstrip(" ,") + ".", text)
+
+def result_text(raw):
+    """The text of a final-result reply: the "result" field, read leniently (a server may ignore the format, and a
+    reply cut off at the token limit is not valid JSON)."""
+    raw = str(raw or "").strip()
+    if not raw.startswith("{"):
+        return raw
+    for candidate in (raw, raw + '"}', raw + '}'):
+        try:
+            reply = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(reply, dict):
+            # Also the browsing format, a habit from every earlier turn
+            found = reply.get("result") or reply.get("parameter") or reply.get("thought_process")
+            if isinstance(found, str) and found.strip():
+                return found.strip()
+        return raw
+    return raw
+
+def usable_result(text):
+    """False for a reply that is not a final result: still JSON (a made-up tool call such as
+    {"name": "get_mountain_info", ...}), or the prompt's own sections repeated back."""
+    return bool(text) and not text.lstrip().startswith("{") and not re.search(
+        r"^#+\s*(OBJECTIVE|DISCOVERIES|CHECKLIST)\b", text, re.M)
+
+GENERIC_NAME_WORDS = {"office", "docs", "suite", "free", "open", "source", "open-source", "edition", "community",
+                      "online", "desktop", "apache", "microsoft"}
 
 def with_caveats(text, unproven):
     """The final result with each thing not shown to meet a condition marked where it is first named.
@@ -197,6 +299,12 @@ def with_caveats(text, unproven):
     for name, condition in unproven:
         note = f"(not shown in the pages read to be {condition})"
         match = re.search(re.escape(name) + r"(\*\*)?", text, re.I)
+        # The check named "ONLYOFFICE Docs" and the result "ONLYOFFICE", which then went unmarked: failing the full
+        # name, its distinctive word is looked for (not a generic one such as "Office" or "Docs")
+        for word in [w for w in name.split() if len(w) > 3 and w.lower() not in GENERIC_NAME_WORDS] if not match else []:
+            match = re.search(r"\b" + re.escape(word) + r"\b(\*\*)?", text, re.I)
+            if match:
+                break
         if not match:
             unnamed.append(f"- {name}: {note[1:-1]}")
         # Only a note right after this name counts as already there: checked against the whole text, the note added

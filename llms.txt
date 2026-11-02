@@ -1,0 +1,36 @@
+# LocalAgentBrowser
+
+> An autonomous web research agent driven by a local language model (LM Studio) and Playwright. Give it an
+> objective; it searches the web, reads pages, records findings with their sources and writes a cited report, all
+> on your own computer. Built for a small 7B model on a CPU; no GPU, cloud AI or API key needed.
+
+Key facts:
+
+- Install: `pip install localagentbrowser`, then `python -m playwright install chromium`; run `localagentbrowser`.
+  Needs Python 3.10 or later and LM Studio running a model (developed with Qwen2.5-7B-Instruct, 8,192-token context).
+- Good goals: questions you would research by reading pages. Facts, lists with conditions, comparisons with a
+  recommendation, how-tos, explanations, views from several sources, lookups in official documentation.
+- Not yet: anything behind a form, a login or a button. It reads pages only; it does not click, fill in forms or
+  sign in, so flight or hotel prices, shopping and booking sites won't work.
+- Speed: on a CPU a run takes about 10 to 45 minutes, and a 7B model sometimes returns thin findings.
+- Honesty by design: rules in code check the model's claims. Findings must be on the page shown. Before finishing,
+  each part of the objective is checked against the findings. What was not found is reported as not found, and
+  things the pages didn't prove are marked ("not shown in the pages read to be open-source").
+- Privacy: searches, written from your objective, go to DuckDuckGo, and pages are read from the web like any browser;
+  the objective itself, the model and the report stay on your computer.
+- License: MIT.
+
+## Docs
+
+- [README](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/README.md): what it does, quick start, how it works, settings, limitations
+- [Example reports](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/examples/README.md): two unedited reports from a test run, with what each got right and wrong
+- [Changelog](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/CHANGELOG.md): every version and why it changed
+- [Regression history](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md): each version measured on seven kinds of task
+- [Technical paper](https://snowfxxx.github.io/LocalAgentBrowser/paper.html): Verification over Trust; the design, a four-model evaluation and where the measures failed
+
+## Optional
+
+- [Project site](https://snowfxxx.github.io/LocalAgentBrowser/): findings, quick start and the challenge
+- [PyPI](https://pypi.org/project/localagentbrowser/): the package
+- [Article](https://snowfxxx.github.io/LocalAgentBrowser/article.html): We Can Do Better: A Small AI That Can't Cover Up
+- [Article](https://dev.to/snowfxxx/teaching-a-7b-model-on-a-cpu-to-finish-what-it-starts-1amc): Teaching a 7B model on a CPU to finish what it starts

@@ -49,6 +49,12 @@ def extract_message_content(response):
         return msg.get("content", "").strip() if isinstance(msg, dict) else msg.content.strip()
     return first_choice.get("message", {}).get("content", "").strip()
 
+def was_cut_off(response):
+    """True when the reply stopped at its max_tokens limit instead of ending by itself."""
+    choices = getattr(response, "choices", None) or []
+    first_choice = choices[0] if choices else None
+    return getattr(first_choice, "finish_reason", None) == "length"
+
 def shorten(text, limit):
     text = " ".join(str(text).split())
     return text if len(text) <= limit else text[:limit].rstrip() + "..."

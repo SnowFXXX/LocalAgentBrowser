@@ -8,6 +8,15 @@ from .pages import normalize_url
 
 QUOTE_STYLES = str.maketrans({"‘": "'", "’": "'", "“": "'", "”": "'", '"': "'", "`": "'"})
 
+DESCRIBES_PAGE = re.compile(r"\b(?:contains|provides|includes|offers|gives|has|covers)\s+(?:a\s+)?(?:list of|information|"
+                            r"details|instructions|step-by-step|an overview|a guide|guidance)|\binformation (?:on|about)\b"
+                            r"|\b(?:this|the) (?:page|article|guide|site|website|source)\b"
+                            # A page announcing what it will cover ("This comprehensive guide will compare SQLite and
+                            # PostgreSQL across ... scalability") was recorded and then counted as the 7B's evidence for
+                            # "many simultaneous users"; in 397 suite discoveries this wording appeared only there
+                            r"|\b(?:this|our)\s+(?:\w+\s+){0,2}(?:guide|article|page|post|tutorial|comparison|review)\s+"
+                            r"(?:will|covers|compares|explains|shows|looks at|walks|breaks down)\b", re.I)
+
 def discovery_lines(text):
     # Case, spacing and quote style (curly, straight, single, double) do not make a line new
     text = unicodedata.normalize("NFKC", str(text)).translate(QUOTE_STYLES)
@@ -17,6 +26,56 @@ def grounded_share(text, parts):
     """The share of a discovery's consecutive word pairs that also appear in the given page parts."""
     mine = word_pairs(str(text).lower())
     return len(mine & word_pairs(" ".join(parts).lower())) / len(mine) if mine else 1.0
+
+def code_text(text):
+    # Case, spacing, quote style and placeholder brackets ("<venv>/bin/activate") do not make code different
+    return " ".join(re.sub(r"[<>\[\]{}]", "", str(text).lower().translate(QUOTE_STYLES)).split())
+
+def invented_code(parameter, parts):
+    """The backticked commands or code in a DISCOVER that none of the parts shown contain."""
+    # Word pairs cannot catch these: on a venv guide a 7B model's "use `pip install package_name` inside the activated
+    # venv folder" scored 60% against the page, above its two copied sentences (50% and 42%), since its words echo
+    # the objective, and was recorded; the page gave "pip freeze > requirements.txt" and "pip install -r
+    # requirements.txt" but never that command. Asked to use the page's wording, the model had also rewritten the
+    # page's "venv\Scripts\activate" as "myenv\Scripts\activate". A command is exact text, so one the page lacks is
+    # invented
+    page = code_text(" ".join(parts))
+    # Paired by run length: the 14B wrote commands inline in triple backticks ("run ```<venv>/Scripts/activate```")
+    # Each line of a fenced block as well: the 7B's venv result ended in a block holding "pip install package_name",
+    # which no discovery gave, under "simply use pip as usual:"
+    fences = re.compile(r"```[^\n]*\n(.*?)```", re.S)
+    spans = [line.strip() for block in fences.findall(parameter) for line in block.split("\n") if line.strip()]
+    parameter = fences.sub(" ", parameter)
+    ticks = re.compile(r"(`+)([^`\n]+?)\1(?!`)")
+    spans += [m.group(2).strip() for m in ticks.finditer(parameter)]
+    # Paths outside backticks too: copying the official activation table, the 7B swapped its "bin" and "Scripts"
+    # ("C:\> <venv>\bin\activate.bat", where the page has "<venv>\Scripts\activate.bat"), in two runs, and wrote
+    # "<venv>/bin/pip install <package_name>", which the page never gives; word pairs cannot see a swapped path
+    spans += path_tokens(ticks.sub(" ", parameter))
+    # A literal "\n" copied from a table cell ("POSIX\nbash/zsh") stands for the page's line break
+    return [s for s in dict.fromkeys(spans) if code_text(s)
+            and code_text(s) not in page and code_text(s.replace("\\n", " ")) not in page]
+
+def path_tokens(text):
+    """Words that are paths or placeholders: a backslash, a <placeholder>, or two slashes, but not a web address."""
+    tokens = []
+    for word in str(text).split():
+        word = word.strip("'\"(),;.:")
+        if "://" in word or re.match(r"(?i)www\.|[\w-]+(?:\.[\w-]+)+/", word) or not re.search(r"[A-Za-z]", word):
+            continue
+        if "\\" in word or re.search(r"<[\w-]+>", word) or word.count("/") >= 2:
+            tokens.append(word)
+    return tokens
+
+def command_lines(commands, parts):
+    """Up to two page lines using the first two words of an invented command ("pip install"), or the last part of an
+    invented path ("activate.bat" for "<venv>\\bin\\activate.bat", which finds the page's "<venv>\\Scripts\\activate.bat"),
+    in page order."""
+    lines = [line.strip() for part in parts for line in part.split("\n") if 2 <= len(line.split()) <= 40]
+    heads = [" ".join(c.lower().split()[:2]) if len(c.split()) > 1 else re.split(r"[\\/]", c.lower())[-1].strip("<>")
+             for c in commands]
+    heads = [h for h in heads if len(h) > 3]
+    return [shorten(line, MAX_CLOSEST_CHARS) for line in dict.fromkeys(x for x in lines if any(h in x.lower() for h in heads))][:2]
 
 def grounding_check(parameter, page_state, current_url, objective=""):
     # Shown part 2 of a guide, which ended "Just follow these 6 easy steps", the model recorded six steps it
@@ -30,6 +89,17 @@ def grounding_check(parameter, page_state, current_url, objective=""):
     # The objective's wording counts as well: "Mount Kilimanjaro is the tallest mountain in Africa..." echoed the
     # question's "tallest" where the page says "highest", and was sent back although it was accurate
     shown = [parts[i] for i in sorted(page_state.get("seen_parts", {0})) if i < len(parts)] + [objective]
+    invented = invented_code(parameter, shown[:-1])
+    if invented:
+        # Told only to leave out what the page does not give, the 7B dropped its two copied commands and sent the
+        # invented one alone, 6 times out of 6; with the page's own lines for the same command quoted, 3 of 6 replies
+        # recorded only those, and the rest repeated the DISCOVER, which this check refuses again
+        uses = command_lines(invented, shown[:-1])
+        said = (", and what the parts shown do say with it: " + " / ".join(f'"{u}"' for u in uses)) if uses else ""
+        return "BLOCKED_CODE_NOT_ON_PAGE", (f"The page never gives {', '.join(f'`{c}`' for c in invented[:3])}: do not "
+                                            f"write it. Commands are copied exactly as the page writes them{said}. "
+                                            "DISCOVER that in the page's own words, or READ_MORE if a later part gives "
+                                            "the command.")
     long_enough = len(word_pairs(parameter)) >= MIN_GROUNDING_PAIRS
     whole = grounded_share(parameter, shown) if long_enough else 1.0
     # An invented sentence can hide behind copied ones: an opinion task's discovery was 75% copied, but its last
@@ -65,8 +135,18 @@ def closest_sentence(text, parts):
     """The page sentence sharing the most content words (4+ letters) with a text, or None below two."""
     mine = {w for w in plain_words(text) if len(w) > 3}
     # In page order, so equal scores always pick the same sentence (max keeps the first)
+    # Only sentences or lines with a number: refusing a 3B model's search words, a hint quoted the page's title
+    # ("The Right Way to Make Cold Brew Coffee, According to the Pros"), which holds no fact to record
     sentences = list(dict.fromkeys(s.strip() for part in parts for s in re.split(r"(?<=[.!?])\s+|\n+", part)
-                                   if len(s.split()) >= 4))
+                                   if len(s.split()) >= 4 and (re.search(r"[.!?]$|\d", s.strip()))
+                                   # Nor a page announcing what it covers: a 7B model refused for its own venv commands
+                                   # was quoted "This complete guide shows you exactly how to create a virtual
+                                   # environment...", which DESCRIBES_PAGE refuses when recorded, over the page's
+                                   # "source venv/bin/activate on macOS/Linux, venv\Scripts\activate on Windows."
+                                   and not DESCRIBES_PAGE.search(s)
+                                   # Nor a question: refusing a DISCOVER that only asked questions, a hint quoted
+                                   # Britannica's "What is the basic formula for photosynthesis?"
+                                   and not s.strip().endswith("?")))
     score, best = max(((len(mine & {w for w in plain_words(s) if len(w) > 3}), s) for s in sentences),
                       key=lambda pair: pair[0], default=(0, None))
     return best if score >= 2 else None

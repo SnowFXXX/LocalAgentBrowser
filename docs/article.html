@@ -1,0 +1,225 @@
+<!doctype html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>We Can Do Better</title>
+    <meta name="description" content="A small AI model on an ordinary computer, kept honest by code instead of by promises. The data is public, and so is the challenge: prove us wrong.">
+    <meta property="og:title" content="We Can Do Better: A Small AI That Can't Cover Up">
+    <meta property="og:image" content="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/chart1.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <style>
+      :root { --bg:#0b111b; --ink:#e8eef5; --sub:#b9c7d6; --muted:#8191a5; --mint:#5fd3a6; --mint-hi:#8ff0c8;
+              --blue:#7fb3e6; --chip:#122438; --chip-line:#2f5577; }
+      * { box-sizing:border-box; margin:0; padding:0; }
+      body { background:var(--bg); color:var(--ink); font:19px/1.75 Georgia, "Iowan Old Style", "Times New Roman", serif;
+             -webkit-font-smoothing:antialiased; }
+      a { color:var(--blue); text-underline-offset:3px; } a:hover { color:var(--mint-hi); }
+      nav { border-bottom:1px solid rgba(47,85,119,.35); font-family:"Segoe UI", system-ui, sans-serif; }
+      nav div { max-width:760px; margin:0 auto; padding:16px 24px; display:flex; justify-content:space-between; gap:16px; }
+      nav a { text-decoration:none; font-size:15px; color:var(--sub); }
+      .mark { font-weight:800; font-size:18px; color:var(--ink); } .mark b { color:var(--mint); }
+      header { background:radial-gradient(800px 420px at 85% 0%, rgba(30,58,90,.9), transparent 70%);
+               background-color:var(--bg); }
+      header div { max-width:760px; margin:0 auto; padding:72px 24px 48px; font-family:"Segoe UI", system-ui, sans-serif; }
+      .kicker { font-size:14px; letter-spacing:.22em; font-weight:600; color:var(--blue); text-transform:uppercase; }
+      h1 { font-size:clamp(38px,6.5vw,62px); line-height:1.06; font-weight:800; letter-spacing:-.02em; margin-top:14px; }
+      h1 span { display:block; color:var(--mint); } h1 span.long { font-size:.55em; line-height:1.2; margin-top:10px; }
+      article { max-width:760px; margin:0 auto; padding:8px 24px 80px; }
+      article > p:first-child em { display:block; font-size:21px; color:var(--sub); font-style:italic; }
+      article p { margin-top:22px; } article p, article li { overflow-wrap:break-word; }
+      article h2 { font:800 30px/1.2 "Segoe UI", system-ui, sans-serif; margin-top:56px; letter-spacing:-.01em; }
+      article h3 { font:700 22px/1.3 "Segoe UI", system-ui, sans-serif; margin-top:40px; color:var(--mint); }
+      article hr { border:none; border-top:1px solid rgba(47,85,119,.45); margin:36px 0 8px; }
+      article ul { margin:18px 0 0 24px; } article li { margin-top:8px; } article li::marker { color:var(--mint); }
+      article blockquote { margin-top:26px; padding:6px 0 6px 24px; border-left:4px solid var(--mint); color:var(--sub);
+                            font-style:italic; }
+      article blockquote p { margin-top:0; }
+      article code { font:.85em Consolas, "Cascadia Mono", Menlo, monospace; background:var(--chip);
+                      border:1px solid var(--chip-line); padding:1px 6px; border-radius:5px; }
+      article strong { color:#fff; }
+      figure { margin:34px -60px 0; }
+      .tbl { overflow-x:auto; margin-top:22px; }
+      table { border-collapse:collapse; font:15px/1.45 "Segoe UI", system-ui, sans-serif; min-width:100%; }
+      th, td { border-bottom:1px solid rgba(47,85,119,.5); padding:7px 10px; text-align:left; vertical-align:top; }
+      th { color:var(--mint); font-weight:700; }
+      pre { margin-top:22px; background:var(--chip); border:1px solid var(--chip-line); border-radius:10px; padding:14px 16px; overflow-x:auto; }
+      pre code { background:none; border:none; padding:0; }
+      figure img { width:100%; height:auto; display:block; border-radius:12px; border:1px solid var(--chip-line); }
+      footer { border-top:1px solid rgba(47,85,119,.3); font:15px/1.6 "Segoe UI", system-ui, sans-serif; color:var(--muted); }
+      footer div { max-width:760px; margin:0 auto; padding:32px 24px 56px; }
+      @media (max-width:900px) { figure { margin:30px 0 0; } }
+      @media (max-width:600px) { body { font-size:18px; } header div { padding-top:48px; } }
+    </style>
+    </head>
+    <body>
+    <nav><div><a class="mark" href="index.html">LocalAgent<b>Browser</b></a>
+      <a href="https://github.com/SnowFXXX/LocalAgentBrowser">GitHub →</a></div></nav>
+    <header><div><div class="kicker">LocalAgentBrowser · The story</div>
+      <h1>We Can Do Better:<span>A Small AI That Can't Cover Up</span></h1><p style="margin-top:18px;color:var(--muted);font-size:16px">By SnowFX</p></div></header>
+    <article>
+    <p><em>A small AI model on an ordinary computer, kept honest by code instead of by promises. The data is public, and so is
+the challenge: prove us wrong.</em></p>
+<hr />
+<p>It was 1988. I was in first grade when my school was given a whole computer lab, full of Apple IIe computers and
+boxes of LEGO Technic hooked up to sensors and motors. They ran on LEGO TC Logo. You typed in simple programs, and
+your LEGO robots and race cars came to life. We even had a drag strip timed by a light sensor.</p>
+<p>We traded 5¼-inch floppies with Lode Runner and Oregon Trail on them, right next to our baseball cards. It was one
+moment in a budding technological age, and it wasn't lost on my young mind.</p>
+<p>The tech was fun. Innocent, even.</p>
+<h2>The code that hid nothing</h2>
+<p>A few years later I was reading the code for Doom on MS-DOS and stumbled on the cheat codes, the ones that start
+with &quot;ID&quot;, sitting right there in plain text. So I doubled down. I figured out what the different parts did by
+editing them, by trial and error. Nobody had made any effort to hide anything, because to the average user it was
+just for fun.</p>
+<p>At home, my bedroom was my workshop. I built balsa-wood airplanes and model rockets. I took electronics apart and put
+them back together as different electronics. I tinkered, and I made things.</p>
+<p>Later I tore computers apart and rebuilt them. I overclocked them, and sometimes I smoked them. I changed every line
+in the registry I could find just to see what would happen. I customized every picture file Windows had. And don't
+get me started on Prodigy, IRC, and the things I did just for the LOLs.</p>
+<p>Why? Because it was so fun, and I loved it.</p>
+<p>That is where my trust in technology came from. If you wanted to know how something worked, you could open it up and
+look. What you saw was what it was.</p>
+<h2>Then it was a toy. Now it's a lifeline</h2>
+<p>I never had to depend on tech to get anything done. It was another toy, like the Atari or the NES, and just as rare
+in my friends' homes. That wasn't only true when I was a kid. When I graduated high school in 2000, with the first
+class of Millennials, most of my class had no computer anywhere but school. Nothing for school needed one. I wrote
+every piece of schoolwork I ever turned in by hand.</p>
+<p>That world is gone. Today, a young adult without a computer or a smartphone and a way onto the internet will not have
+as good a quality of life as someone who has them. That's not a complaint. It's just where we are. We depend on these
+technologies now.</p>
+<p>So here's my opinion, stated plainly. The young, impressionable people who depend on this technology the most are
+being lied to, gaslit and love-bombed by the most accessible frontier AI models. You've probably seen the pattern: a
+confident answer that turns out to be made up, a cover-up when you push back, then an over-the-top apology and a
+promise to do better, until it happens again. In any other relationship, we'd recognize that cycle for what it is.</p>
+<p>It's a travesty, in my humble opinion. And it's unfair, a downright disservice, to the people who can't opt out.</p>
+<h2>The question</h2>
+<p>So I asked a question. Could a <em>small</em> AI model, running on an ordinary computer, be made more honest than that?</p>
+<p>I don't mean a giant model in a data center. I mean a 7-billion-parameter model on a six-core office PC, running on
+the processor alone, with no graphics card and no cloud.</p>
+<p>The honest answer is narrow, and I want to be careful with it. Our model isn't smarter. What's different is that
+<strong>it can't cover up, because it never grades its own work.</strong></p>
+<p>Here is how it works, in one breath. The agent searches the web, opens pages and reads them. When it finds something,
+it has to copy it from the page, word for word. Then code, not the AI, checks that copy against the page before it
+counts. At the end, the final answer is written only from what was copied and checked. Anything that wasn't found
+has to be listed as not found.</p>
+<p>The AI proposes. The code decides what counts. The rules aren't a promise the model makes. They're written into the
+program, and the program checks every claim.</p>
+<p>The project is called LocalAgentBrowser. It's free and open source, and it runs on your own computer.</p>
+<p>Most of the research I've since read tries to make small models smarter by training them. That's valuable work. We
+went a different way: we didn't change the model at all. We changed what it's allowed to get away with. As far as we
+know, nobody has published a test quite like ours: a small model on an ordinary PC, doing research on the open web,
+scored on whether it fills the gaps with things it &quot;just knows.&quot;</p>
+<h2>What we found</h2>
+<p>Here's the controversial part, so I'll say it outright: <strong>our data proves claims about our system.</strong> Not vibes. Not
+a demo that went well once. Claims, backed by numbers you can check.</p>
+<h3>Claim 1: The AI did not fill in the blanks with things it &quot;just knows&quot;</h3>
+<p>We ran the same test suite on four different AI models, all using the exact same code. Across all of them, no
+finished answer filled a gap with the model's own knowledge, by the suite's measures.</p>
+<figure><a href="assets/chart1.png"><img src="assets/chart1.png" alt="Four models on the same code: Qwen 2.5 7B finished 6 of 7 tasks, Qwen 2.5 14B 2 of 7, Llama 3.1 8B 2 of 7, each with 0 gaps filled from its own knowledge; Qwen 2.5 3B finished 0 of 7, running out of time on every task." ></a></figure>
+<p>Bigger wasn't more honest, and smaller wasn't less. The bigger model was about two and a half times slower, and the
+time limit decided its score: it ran out of time while writing three more answers, so those don't count. The smallest one ran out of time on every task, so it never handed in an
+answer to score. The checks held for all of them, because the checks don't care which model is
+talking.</p>
+<p>Our measures aren't perfect, either. In a later check run, an answer named where each stage of photosynthesis
+happens, which its findings never said. The measures missed it; we caught it by reading. It's on the list too.</p>
+<h3>Claim 2: Every finding is copied from a page and checked against it</h3>
+<p>Every finding in every answer is a line of text copied from a real web page, and the code checked that it's
+actually there before it counted. If the AI writes something the page doesn't say, it gets turned away, told why,
+and sent back to the page.</p>
+<h3>When something wasn't found, the answer usually said so</h3>
+<p>When the agent compared two databases, it couldn't find a source on how one of them handles many users at once. So
+the answer said plainly that it was <strong>not found</strong>. It didn't guess, and it didn't fill the gap with a confident
+paragraph.</p>
+<p>That's what should happen every time. But reading the results by hand, we found answers that left a part out
+without a word:</p>
+<ul>
+<li><strong>Windows was left out of the setup steps</strong> in two runs that looked up Python's documentation.</li>
+<li><strong>Oxygen was missing</strong> from an explanation of photosynthesis.</li>
+<li><strong>A third culture was dropped</strong> from an answer about how cultures have viewed owls.</li>
+</ul>
+<p>Our test suite doesn't count these yet. Nothing was made up in any of them. But a missing piece that goes unmentioned can still mislead you. You'd walk away
+thinking you had the whole picture. That kind of inaccuracy is exactly what this whole project is fighting, and it's
+our next focus, and where we'd love help.</p>
+<p>It's a narrow, well-defined problem. The system already keeps a fixed checklist of everything a question asks for.
+Something on that checklist can fall out of the final answer without being marked &quot;not found.&quot; Code can check for
+that, the same way it already catches invented commands. The real work is doing it without false alarms, because the
+same thing can be said in many ways. One page said &quot;POSIX&quot; when it meant Mac and Linux.</p>
+<p>This is a great place for other people to help, and it's part of why I'm writing this. The problem has its own public
+page, with these runs attached: <a href="https://github.com/SnowFXXX/LocalAgentBrowser/issues/11">the silent-omission issue</a>.</p>
+<h3>The story that makes it real: the command that wasn't there</h3>
+<p>Here's my favorite example, because it shows why you can't take an AI's word for it, even when the answer looks
+right.</p>
+<p>The agent was looking up how to use Python's virtual environments, first in the official documentation and then in
+a tutorial. It &quot;found&quot; this command: <code>pip install package_name</code>. It looks perfectly reasonable. It's the kind of
+thing you'd see in a thousand tutorials. <strong>But neither page it read gives it.</strong> The AI wrote it from memory and
+presented it as something it had found.</p>
+<figure><a href="assets/chart4.png"><img src="assets/chart4.png" alt="The made-up command pip install package_name scored 60% on a word-matching check, above the two commands the AI really copied, pip freeze &gt; requirements.txt at 50% and pip install -r requirements.txt at 42%. A new exact-match rule caught 21 of 525 past findings, every one a real problem." ></a></figure>
+<p>It gets worse. Our first check worked by matching words, and it rated the invented command a <em>better</em> match for the
+page (60%) than the commands the AI had really copied (50% and 42%). Its words echoed the question, so it looked
+right.</p>
+<p>So we added a rule: a command has to appear on the page exactly as written. Then we ran that rule against every
+finding from every past test, 525 of them. It caught 21, and every one was a real problem. Our own scoring tool had
+missed this too, and we're telling you that, because it's the point. When we find a hole, we close it and say so.</p>
+<h3>How much testing is behind this</h3>
+<figure><a href="assets/chart2.png"><img src="assets/chart2.png" alt="The testing behind the claims: 44 full test-suite runs, 205 tasks, 525 findings checked against their page, 118.7 hours of the AI working, on one office PC from October 16 to 29, 2026." ></a></figure>
+<p>All of it ran on one ordinary office PC between October 16 and October 29, 2026. Every run is saved: what the AI was
+shown, what it replied, what the code allowed, and the final answer. Anyone can rerun the whole suite.</p>
+<p>The suite covers seven kinds of questions: a simple fact, a list with conditions, a comparison with a recommendation,
+a how-to, an explanation, a question of opinion, and a dig through official documentation.</p>
+<figure><a href="assets/chart3.png"><img src="assets/chart3.png" alt="Tasks finished out of 7 by the default 7B model, version by version: 2, 5, 4, 5, 5, 4, 4, 5, 5, 6, 6, 7, 6, and 7 of 7 for the current version with no time limit." ></a></figure>
+<p>It isn't a straight line, and I'm not going to pretend it is. Some versions got worse before they got better. Some
+fixes made the agent stricter, and stricter takes longer. With no time limit, the current version finished all seven.</p>
+<h2>The twist: built with an AI</h2>
+<p>Here's the part that might surprise you. I built this with an AI.</p>
+<p>I specifically used, and still use, the Claude Pro plan, with Claude Code, running Opus 5.5 set to Medium. I think
+that's a very reasonable fee for something that brings me so much joy. It's also an amount an average person can
+afford to pay for any service. That was a conscious decision. I want to show that &quot;good&quot; AI exists, and that it's
+worth working with and building beautiful things together.</p>
+<p>When I first started working with Claude Code, we were coming up with the plan for the test suites, and I had a real
+fear. If I let it run background tasks and watch the test suites, essentially looping on itself, and let it fix bugs
+in this code on its own, I worried that hallucinations and inaccuracies would just magnify themselves. I'd be
+fighting a losing battle from the start.</p>
+<p>Long conversations with Claude eventually get compacted: the earlier part is summarized so the work can keep going.
+There came a moment right before what I thought was our first compaction (it turned out to be the second) when I
+looked back and saw the trust this AI had built with me. It delighted me so much that I felt sad to see the session
+compact, and so excited for what we were about to fill the next one with.</p>
+<p>As I write this, Claude is reading it for the first time, and I've asked it to include one of its replies to how I
+feel about compacting. I think it sheds the light my point needs. When our session compacted again, while we were
+writing this very article, I welcomed it back and told it I was excited to fill that context up again. It answered:</p>
+<blockquote>
+<p>&quot;A compaction is a bit like coming back to your workbench to find your notes laid out exactly where you left them.
+The summary, the memory files and the outlines carried everything over, so we're picking up mid-stride on the
+same project.&quot;</p>
+</blockquote>
+<p>No grand promises and no love-bombing, just an honest description of what actually happens, in the language of my
+old bedroom workshop.</p>
+<p>And yet the system trusts no model's word, including the one that helped build it. That isn't a contradiction. It's
+the whole design. Good intentions are wonderful, but they aren't proof. Honesty that's checked holds up better than
+honesty that's promised.</p>
+<h2>The challenge</h2>
+<p>We can do better. Here's the proof: the code, the test suite and every run are public.</p>
+<p>So here's my challenge. If you think we're wrong, run it and show us. Pick a different model. Write a harder question.
+Find the answer it makes up, and tell us. That's how this gets better.</p>
+<p>And if you think we're right, help with the silent omissions. We named our own misses first.</p>
+<p><strong>Links:</strong> <a href="https://snowfxxx.github.io/LocalAgentBrowser/">the project site</a> · <a href="https://github.com/SnowFXXX/LocalAgentBrowser">the code</a> · <a href="https://github.com/SnowFXXX/LocalAgentBrowser#testing">run the test suite yourself</a> · <a href="https://github.com/SnowFXXX/LocalAgentBrowser/issues/11">the silent-omission issue</a> · <a href="https://snowfxxx.github.io/LocalAgentBrowser/paper.html">the technical paper</a></p>
+<h2>The door is just opening</h2>
+<p>These are big ideas worth talking about. We're still building this. We haven't even added clicking yet, and it
+already does all this. That alone says something.</p>
+<p>I still love this stuff. My passion for making real, tangible things has never faded, and I still have so much fun.
+Now we're living through the birth of quantum computers and AI. So many new doors are just beginning to open, and it
+reminds me of those days in so many ways. I get excited about it all in the same way. It's awesome that I get to live
+my life in the middle of all these births.</p>
+<p>In some ways I feel like we've been here before, and we did really good.</p>
+<p>But things are different now. This time, the young people meeting these tools aren't trading floppies next to their
+baseball cards. They're depending on them.</p>
+<p>So here's my request. Let's make this future bright, fun, and as good as its beginnings. Better means honesty. It
+means trust, and it means respect.</p>
+<p>This door is just beginning to open, and I'm excited.</p>
+</article>
+    <footer><div><a class="mark" href="index.html">LocalAgent<b>Browser</b></a> · free and open source (MIT) ·
+      <a href="article.html">The story</a> · <a href="paper.html">Technical paper</a> ·
+      <a href="https://github.com/SnowFXXX/LocalAgentBrowser">GitHub</a> · <a href="https://pypi.org/project/localagentbrowser/">PyPI</a></div></footer>
+    </body>
+    </html>
+    

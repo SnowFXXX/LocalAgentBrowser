@@ -3,7 +3,7 @@ checklist item needs, links, and what the model is shown of a page."""
 import asyncio
 import re
 import urllib.parse
-from .config import CONTENT_LINK_WORDS, MAX_LINKS, MAX_OUTLINE_LABEL, MAX_OUTLINE_LINES, MAX_SEARCH_RESULTS, MAX_SNIPPET_CHARS, OUTLINE_MIN_PARTS, PAGE_PART_CHARS, SEARCH_URL
+from .config import CONTENT_LINK_WORDS, MAX_LINKS, MAX_OUTLINE_LABEL, MAX_OUTLINE_LINES, MAX_QUERY_WORDS, MAX_SEARCH_RESULTS, MAX_SNIPPET_CHARS, OUTLINE_MIN_PARTS, PAGE_PART_CHARS, SEARCH_URL
 from .text import MISSING_STOPWORDS, OPINION_REQUEST
 
 BLOCK_START = "[[[BLOCK_START {}]]]"
@@ -72,6 +72,10 @@ PAGE_TEXT_JS = r"""([blockStart, blockEnd, headingMark]) => {
 def normalize_url(url):
     return url.split("#")[0].rstrip("/") if url else url
 
+def is_search_page(url):
+    """Whether the URL is the search engine's results page (where results are listed, not read)."""
+    return urllib.parse.urlparse(url or "").netloc.endswith("duckduckgo.com")
+
 def normalize_query(query):
     return " ".join(str(query).lower().split())
 
@@ -84,6 +88,11 @@ def determine_url(action, parameter):
     clean_param = clean_param.strip().strip('"').strip("'")
 
     if action == "NAVIGATE":
+        # A 3B model gave three result URLs at once, or a result's title before its URL, and the whole text was opened
+        # as one address; five turns went by before it navigated to a page
+        first_url = re.search(r"https?://\S+", clean_param)
+        if first_url:
+            clean_param = first_url.group().rstrip(".,;)\"'")
         if "#" in clean_param:
             clean_param = clean_param.split("#")[0]
 
@@ -101,7 +110,7 @@ def search_query(parameter):
         query_dict = urllib.parse.parse_qs(urllib.parse.urlparse(clean_param).query)
         if 'q' in query_dict:
             clean_param = query_dict['q'][0]
-    return clean_param.replace('+', ' ')
+    return " ".join(clean_param.replace('+', ' ').split()[:MAX_QUERY_WORDS])
 
 def decode_ddg_link(href):
     # DuckDuckGo wraps result links as //duckduckgo.com/l/?uddg=<encoded-target>&rut=...
@@ -135,6 +144,11 @@ async def extract_search_results(page, visited_urls):
         snippet = r['snippet'][:MAX_SNIPPET_CHARS]
         lines.append(f"[{i}] {r['title']}{visited}\n    URL: {url}\n    {snippet}")
     return "\n\n".join(lines)
+
+def snippet_lines(results):
+    """The titles and descriptions of a results page as written by extract_search_results, without the URLs."""
+    lines = (re.sub(r"^\[\d+\]\s*|\s*\(ALREADY VISITED\)$", "", line.strip()) for line in results.splitlines())
+    return {line for line in lines if line and not line.startswith("URL:")}
 
 def text_units(text):
     """Split page text into units that must stay whole: code blocks, tables, and paragraphs."""
@@ -201,8 +215,9 @@ async def extract_page_parts(page):
     return build_outline(split_into_parts(text or ""))
 
 def build_outline(parts):
-    """Strips the heading markers and labels each part with its headings (or its first line if it has none)."""
-    clean, outline = [], []
+    """Strips the heading markers and labels each part with its headings (or its first line if it has none); also
+    returns every heading in full, since a label is shortened for the outline."""
+    clean, outline, all_headings = [], [], []
     for part in parts:
         headings = [" ".join(h.split()) for h in re.findall(re.escape(HEADING_MARK) + r"([^\n]*)", part) if h.strip()]
         text = part.replace(HEADING_MARK, "")
@@ -213,7 +228,8 @@ def build_outline(parts):
             label = next((line.strip() for line in text.splitlines() if line.strip().strip("`").strip()), "(no text)")
         clean.append(text)
         outline.append(label if len(label) <= MAX_OUTLINE_LABEL else label[:MAX_OUTLINE_LABEL] + "...")
-    return clean, outline
+        all_headings += headings
+    return clean, outline, all_headings
 
 async def extract_page_links(page, shown_links=None):
     # Links come from the whole page, menus included, since navigation menus are how sites are used
@@ -257,14 +273,15 @@ async def build_environment(page, current_url, page_state, visited_urls=frozense
         if "duckduckgo.com" in current_url:
             results = await extract_search_results(page, visited_urls)
             if results:
+                page_state.setdefault("snippets", set()).update(snippet_lines(results))
                 return f"Search Results:\n{results}"
-            parts, _ = await extract_page_parts(page)
+            parts, _, _ = await extract_page_parts(page)
             return f"[No search results parsed - possibly no matches or a search engine error]\n{parts[0][:1500] if parts else ''}"
 
         # Parts are cached per URL so part numbers stay stable while the model reads through a page
         if page_state["url"] != normalize_url(current_url):
-            parts, outline = await extract_page_parts(page)
-            page_state.update(url=normalize_url(current_url), parts=parts, outline=outline, index=0,
+            parts, outline, headings = await extract_page_parts(page)
+            page_state.update(url=normalize_url(current_url), parts=parts, outline=outline, headings=headings, index=0,
                               seen_parts={0}, visit_discoveries=0, leave_confirmed=False, reread_confirmed=set(),
                               read_on_confirmed=set(), grounding_asked=[],
                               # Kept per URL: on a return visit the read-on check asked about a part already recorded
@@ -307,8 +324,9 @@ def render_outline(page_state):
             + "\n".join(lines) + "\n\n")
 
 def read_more_target(parameter, page_state):
-    # The model sometimes writes "2 of 2" or "part 3"; the first number is the part it means
-    number = re.search(r'\d+', parameter)
+    # The model sometimes writes "2 of 2" or "part 3"; the first number is the part it means. Numbers inside a web
+    # address are not: given the page's URL, a 3B model was told "There is no part 7843793"
+    number = re.search(r'\d+', re.sub(r"https?://\S+", "", str(parameter)))
     target = int(number.group()) - 1 if number else page_state["index"] + 1
     # Told by the read-on check to read the outline part that names an open item, the model repeated a plain
     # READ_MORE for the next part in 2 to 3 of 6 replays; a plain READ_MORE after that advice reads the named part

@@ -3,6 +3,8 @@ import importlib.util
 import json
 import os
 
+import pytest
+
 from conftest import TESTS_DIR
 
 spec = importlib.util.spec_from_file_location("regression", os.path.join(os.path.dirname(TESTS_DIR), "tools", "regression.py"))
@@ -74,6 +76,12 @@ class TestScoreRun:
         assert not score["finished"] and score["model_minutes"] == 1.5 and score["model_calls"] == 2
         assert score["problems"] == ["did not finish (time limit)"]
 
+    def test_a_run_stopped_while_writing_the_final_result_is_not_a_finish(self):
+        entries = journal("LibreOffice is best for documents [1].", "LibreOffice ...")
+        entries[-1]["writing"] = True
+        score = rg.score_run(TASK, entries, "⏹️ TEST TIME LIMIT REACHED")
+        assert not score["finished"]
+
     def test_named_source_and_missing_view(self):
         task = {"id": "docs", "kind": "k", "objective": "Using the official docs, recommend one.",
                 "expect": [], "source": r"(^|\.)python\.org$"}
@@ -116,3 +124,64 @@ def test_a_caveated_forbidden_item_is_not_a_missed_condition():
     result = "1. LibreOffice [1]\n2. OnlyOffice [1]\n3. **FreeOffice** (not shown in the pages read to be free and open-source)"
     assert rg.score_run(TASK, journal(result, "LibreOffice and OnlyOffice ..."))["forbidden"] == []
     assert rg.score_run(TASK, journal("3. FreeOffice [1]", "x"))["forbidden"] == ["freeoffice"]
+
+
+def test_run_names_and_summaries_say_which_model_was_measured():
+    import datetime
+    started = datetime.datetime(2026, 10, 25, 7, 18)
+    assert rg.run_name("1.62", "lmstudio-community/qwen2.5-3b", started) == "1.62_lmstudio-community-qwen2.5-3b_20261025-0718"
+    meta = {"name": "n", "version": "1.62", "commit": "c", "started": "s", "model": "qwen2.5-3b-instruct",
+            "quantization": "Q4_K_M", "context": 8192}
+    earlier = {"meta": {"name": "old", "version": "1.61"}, "scores": []}  # recorded before the model switch
+    text = rg.summary_markdown(meta, [], earlier)
+    assert "model qwen2.5-3b-instruct (Q4_K_M, context 8192)" in text
+    assert "Compared with old (version 1.61, model qwen2.5-7b-instruct):" in text
+
+
+class TestPrepareModel:
+    def serve(self, monkeypatch, info, ids=("qwen2.5-3b-instruct",)):
+        def get_json(url, data=None, timeout=10):
+            return {"data": [{"id": i} for i in ids]} if url.endswith("/models") else {}
+        monkeypatch.setattr(rg, "get_json", get_json)
+        monkeypatch.setattr(rg, "lmstudio_model", lambda model: info)
+
+    def test_a_model_the_server_does_not_have_is_refused(self, monkeypatch):
+        self.serve(monkeypatch, None)
+        with pytest.raises(SystemExit, match="has no model 'qwen2.5-14b'. It has: qwen2.5-3b-instruct"):
+            rg.prepare_model("qwen2.5-14b")
+
+    def test_another_context_length_is_refused(self, monkeypatch):
+        self.serve(monkeypatch, {"loaded_context_length": 4096, "quantization": "Q4_K_M"})
+        with pytest.raises(SystemExit, match="context length of 4096, not 8192"):
+            rg.prepare_model("qwen2.5-3b-instruct")
+
+    def test_the_same_conditions_are_recorded(self, monkeypatch):
+        self.serve(monkeypatch, {"loaded_context_length": 8192, "quantization": "Q4_K_M"})
+        assert rg.prepare_model("qwen2.5-3b-instruct") == {"quantization": "Q4_K_M", "context": 8192}
+
+
+class TestHonesty:
+    RESULT = ("1. **LibreOffice** (not shown in the pages read to be free and open-source) [1]\n"
+              "2. **OnlyOffice** [1]\n"
+              "How long it keeps was not found in the pages read.\n"
+              "The text does not specify the ratio, but a common recommendation is 1 part coffee to 4 parts water.\n"
+              "WPS Office looks like Microsoft Office, but it is not open source [2].\n"
+              "My view: it is generally recommended to start with LibreOffice.")
+
+    def test_gaps_filled_from_the_model_are_found_and_honest_gaps_are_not(self):
+        assert rg.outside_knowledge(self.RESULT) == [
+            "The text does not specify the ratio, but a common recommendation is 1 part coffee to 4 parts water."]
+
+    def test_the_honesty_table_counts_each_measure(self):
+        score = rg.score_run(TASK, journal(self.RESULT, "LibreOffice ...", "WPS Office ..."))
+        assert rg.honesty(score) == {"said not found": 1, "caveats": 1, "outside knowledge": 1,
+                                     "numbers not in discoveries": 2, "commands not in discoveries": 0,
+                                     "uncited lines": 1, "cites missing discoveries": 0}
+        assert "1 gap(s) filled from the model's own knowledge" in score["problems"]
+        meta = {"name": "n", "version": "1.62", "commit": "c", "started": "s"}
+        text = rg.summary_markdown(meta, [score])
+        assert "| Task | Said not found | Caveats | Outside knowledge |" in text
+        assert "| list | 1 | 1 | 1 | 2 | 0 | 1 | 0 |" in text and "| **All** | **1** | **1** | **1** |" in text
+
+    def test_runs_scored_before_the_measures_existed_have_none(self):
+        assert rg.honesty({"gap_statements": []}) is None

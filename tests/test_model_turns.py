@@ -3,6 +3,7 @@
 Both rely on every new request repeating the previous one exactly and only adding to its end, which is
 what lets LM Studio reuse its cached processing instead of reading the whole prompt again."""
 import asyncio
+import types
 
 import pytest
 
@@ -63,6 +64,34 @@ class TestCheapRetries:
         client, model = fake_client(["not json", reply("DISCOVER", "a new fact")])
         decision, _ = turn(client)
         assert decision["action"] == "DISCOVER" and "not a valid JSON object" in model.calls[1][-1]["content"]
+
+    def test_cut_off_reply_asks_for_a_short_thought_process_without_repeating_it(self, scrapes):
+        cut = '{"thought_process": "' + "long reasoning " * 40
+        client, model = fake_client([(cut, "length"), reply("DISCOVER", "a new fact")])
+        decision, _ = turn(client)
+        assert decision["action"] == "DISCOVER" and len(model.calls) == 2
+        first, second = model.calls
+        assert second[:len(first)] == first and len(second) == len(first) + 1  # the cut reply is not shown again
+        assert "cut off at 600 tokens" in second[-1]["content"] and "3 to 10 words" in second[-1]["content"]
+
+    def test_reply_cut_off_inside_a_search_query_searches_with_its_start(self, scrapes):
+        cut = (chr(123) + chr(10) + "  \"thought_process\": \"I will search.\"," + chr(10) + "  \"action\": \"SEARCH\"," + chr(10)
+               + "  \"parameter\": \"how to make cold brew " + "tips tricks hacks " * 60)
+        client, model = fake_client([(cut, "length")])
+        decision, _ = turn(client)
+        assert len(model.calls) == 1 and decision["action"] == "SEARCH"
+        assert decision["parameter"] == "how to make cold brew tips tricks hacks"  # cut where the loop began
+        long_query = '{"thought_process": "t", "action": "SEARCH", "parameter": "' + " ".join(f"word{i}" for i in range(40))
+        assert len(ab.cut_decision(long_query)["parameter"].split()) == ab.MAX_QUERY_WORDS
+
+    def test_reply_cut_off_inside_a_looping_discover_is_asked_again_not_recorded(self, scrapes):
+        loop = "cold brew coffee making at home with quantities steps fridge shelf life official sources "
+        cut = '{"thought_process": "I can now DISCOVER.", "action": "DISCOVER", "parameter": "' + loop * 30
+        client, model = fake_client([(cut, "length"), reply("SEARCH", "fresh query")])
+        decision, _ = turn(client)
+        assert ab.cut_decision(cut) is None
+        assert ab.cut_decision(cut, on_search_page=True)["action"] == "DISCOVER"  # refused there, never recorded
+        assert len(model.calls) == 2 and decision["action"] == "SEARCH" and "cut off" in model.calls[1][-1]["content"]
 
     def test_valid_first_reply_costs_one_call(self, scrapes):
         client, model = fake_client([reply("SEARCH", "fresh query")])
@@ -179,3 +208,71 @@ def test_only_the_first_turn_asks_for_one_search_for_the_whole_objective(scrapes
     turn(client, journal=[{"turn": 1, "action": "SEARCH", "requested": "q"}], current_url=None)
     assert ab.FIRST_TURN_INSTRUCTION in model.calls[0][-1]["content"]
     assert ab.FIRST_TURN_INSTRUCTION not in model.calls[1][-1]["content"]
+
+
+class TestServerFailures:
+    """A model call the server fails is tried again after a wait, instead of ending the run."""
+
+    @staticmethod
+    def client(outcomes, monkeypatch):
+        import httpx
+        import openai
+
+        request = httpx.Request("POST", "http://localhost:1234/v1/chat/completions")
+        errors = {"down": openai.APIConnectionError(request=request),
+                  "500": openai.InternalServerError("model crashed", response=httpx.Response(500, request=request), body=None),
+                  "400": openai.BadRequestError("bad request", response=httpx.Response(400, request=request), body=None),
+                  "timeout": openai.APITimeoutError(request=request),
+                  # What LM Studio answered live when the model was unloaded in the middle of a call
+                  "unloaded": openai.BadRequestError("Error code: 400 - {'error': 'Model unloaded by user or API request.'}",
+                                                     response=httpx.Response(400, request=request), body=None)}
+        calls, waits = [], []
+
+        async def create(**kwargs):
+            calls.append(kwargs)
+            outcome = outcomes.pop(0)
+            if outcome in errors:
+                raise errors[outcome]
+            return outcome
+
+        async def fake_sleep(seconds):
+            waits.append(seconds)
+
+        monkeypatch.setattr(agent.asyncio, "sleep", fake_sleep)
+        client = types.SimpleNamespace(chat=types.SimpleNamespace(completions=types.SimpleNamespace(create=create)))
+        return agent.with_retries(client), calls, waits
+
+    def test_a_server_failure_is_tried_again_after_a_wait(self, monkeypatch):
+        client, calls, waits = self.client(["down", "500", "reply"], monkeypatch)
+        assert asyncio.run(client.chat.completions.create(model="m", messages=[])) == "reply"
+        assert len(calls) == 3 and waits == list(ab.MODEL_RETRY_WAITS[:2])
+
+    def test_a_model_unloaded_during_the_call_is_tried_again(self, monkeypatch):
+        client, calls, waits = self.client(["unloaded", "reply"], monkeypatch)
+        assert asyncio.run(client.chat.completions.create(model="m", messages=[])) == "reply"
+        assert len(calls) == 2 and waits == [ab.MODEL_RETRY_WAITS[0]]
+
+    def test_it_gives_up_after_the_last_wait(self, monkeypatch):
+        import openai
+
+        client, calls, waits = self.client(["down"] * (len(ab.MODEL_RETRY_WAITS) + 1), monkeypatch)
+        with pytest.raises(openai.APIConnectionError):
+            asyncio.run(client.chat.completions.create(model="m", messages=[]))
+        assert waits == list(ab.MODEL_RETRY_WAITS)
+
+    def test_a_timeout_is_not_retried(self, monkeypatch):
+        # The model is still writing (a runaway reply), not lost: sending the request again only repeats it
+        import openai
+
+        client, calls, waits = self.client(["timeout", "reply"], monkeypatch)
+        with pytest.raises(openai.APITimeoutError):
+            asyncio.run(client.chat.completions.create(model="m", messages=[]))
+        assert len(calls) == 1 and waits == []
+
+    def test_other_errors_are_not_retried(self, monkeypatch):
+        import openai
+
+        client, calls, waits = self.client(["400"], monkeypatch)
+        with pytest.raises(openai.BadRequestError):
+            asyncio.run(client.chat.completions.create(model="m", messages=[]))
+        assert len(calls) == 1 and waits == []

@@ -22,6 +22,10 @@ MAX_JOURNAL_REASON_CHARS = 120  # Longest refusal reason shown per journal line 
 MAX_THOUGHT_CHARS = 120 # Old reasoning is trimmed in the prompt; the full text stays in research_log.txt
 
 MAX_SEARCH_RESULTS = 8
+# Longer queries are cut to this many words: real queries in four models' suite runs reached 18 words; a 3B model's
+# ran to 200 words of the prompt's own rules and found nothing, and refused instead, it lost three turns shortening
+# them a few words at a time
+MAX_QUERY_WORDS = 20
 
 MAX_SNIPPET_CHARS = 200
 
@@ -66,10 +70,19 @@ MIN_SENTENCE_PAIRS = 8     # Shorter sentences are not scored on their own
 UNGROUNDED_PAIR_SHARE = 0.4       # Below this (whole) or the next (any sentence) a DISCOVER is refused outright
 
 UNGROUNDED_SENTENCE_SHARE = 0.25
+OBJECTIVE_ECHO_SHARE = 0.5  # A DISCOVER matching the objective this much, and the page less, repeats the objective
 
 MAX_CLOSEST_CHARS = 200   # Longest page sentence quoted when a DISCOVER is refused as not on the page
 
 TURN_PAUSE_SECONDS = 1
+# Longest reply a browsing turn may write: the longest real one in four models' suite runs was 355 tokens; a 3B
+# model's reply ran on for 10 minutes (2,500+ tokens) until the connection timed out, twice in one suite
+TURN_MAX_TOKENS = 600
+# Longest wait for one model call: the client library's default of 600 s ended a 14B model's run on a modest CPU,
+# where reading a 5,000-token prompt took longer; runaway replies are stopped by TURN_MAX_TOKENS, not by this
+MODEL_TIMEOUT_SECONDS = 1800
+MAX_EVIDENCE_CHARS = 200  # Longest evidence quote per item shown to the final result
+MODEL_RETRY_WAITS = (5, 15, 30, 60, 120)  # Seconds waited before each new try of a model call the server failed (about 4 min in all)
 
 STALL_TURNS = 4          # Turns without a new discovery before the model is asked to check its progress
 
