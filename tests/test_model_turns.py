@@ -215,8 +215,11 @@ class TestServerFailures:
 
     @staticmethod
     def client(outcomes, monkeypatch):
-        import httpx
         import openai
+        try:  # openai 3 is built on httpx2, openai 2 on httpx
+            import httpx2 as httpx
+        except ImportError:
+            import httpx
 
         request = httpx.Request("POST", "http://localhost:1234/v1/chat/completions")
         errors = {"down": openai.APIConnectionError(request=request),
