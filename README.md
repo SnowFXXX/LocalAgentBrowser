@@ -155,42 +155,56 @@ open-source alternatives to Photoshop"), a comparison, a how-to, an explanation,
 
 ## What a run looks like
 
-A real run (1.40, with the timing lines the [test runner](#testing) adds; repetitive lines left out). Objective:
-*"What is the tallest mountain in Africa, and how tall is it in meters and in feet?"*
+A real run of 1.64 with the default model on a CPU (with the timing lines the [test runner](#testing) adds;
+repetitive lines left out). Objective: *"What is the tallest mountain in Africa, and how tall is it in meters and in
+feet?"*
 
 ```text
+📋 Splitting the objective into a checklist...
+   (model call 117.4s, prompt=778 tok, completion=30 tok)
+📋 Objective checklist:
+1. What is the tallest mountain in Africa? (discoveries for it: none yet)
+2. How tall is it in meters? (discoveries for it: none yet)
+3. How tall is it in feet? (discoveries for it: none yet)
+
 🧠 [TURN 1/100] Active reasoning cycle executing...
-   (model call 38.6s, prompt=676 tok, completion=54 tok)
-🎬 Chosen Action: [SEARCH] -> Parameter: tallest mountain in Africa
+   (model call 59.5s, prompt=926 tok, completion=78 tok)
+🎬 Chosen Action: [SEARCH] -> Parameter: tallest mountain in Africa height in meters and feet
 
 🧠 [TURN 2/100] Active reasoning cycle executing...
-💡 Agent Thoughts: From the search results, I can see that Mount Kilimanjaro is mentioned as the tallest
-   mountain in Africa ... I will navigate to one of these pages to find the exact height in meters and feet.
+♻️ Cheap retry 1/2: [DISCOVER] refused. That is the search results page: its short descriptions are summaries
+   written to be clicked, not sources. NAVIGATE to the result that looks right and DISCOVER from the page itself.
 🎬 Chosen Action: [NAVIGATE] -> Parameter: https://en.wikipedia.org/wiki/Mount_Kilimanjaro
 
 🧠 [TURN 3/100] Active reasoning cycle executing...
-🎬 Chosen Action: [DISCOVER] -> Parameter: Mount Kilimanjaro is the highest mountain in Africa, with an
-   elevation of 5,895 m (19,341 ft) above sea level.
+🎬 Chosen Action: [DISCOVER] -> Parameter: Mount Kilimanjaro is the highest mountain in Africa, rising to
+   5,895 m (19,341 ft) at Uhuru Peak.
 
 🧠 [TURN 4/100] Active reasoning cycle executing...
 ♻️ Cheap retry 1/2: [FINISH] refused. Your only discovery comes from
    https://en.wikipedia.org/wiki/Mount_Kilimanjaro. Consider whether the objective needs more. ...
-   Before finishing, split the OBJECTIVE into its separate parts and, in thought_process, write each
-   part followed by the discovery that covers it, or 'not covered'. ...
-💡 Agent Thoughts: The objective has two parts: the name of the tallest mountain in Africa and its height
-   in meters and feet. Both are covered by the discovery from Mount Kilimanjaro's Wikipedia page.
-🎬 Chosen Action: [FINISH] -> Parameter: The tallest mountain in Africa is Mount Kilimanjaro ...
+   Before finishing, go through the OBJECTIVE CHECKLIST below ... and in thought_process write each item's
+   number followed by the number of the discovery that covers it ...
+💡 Agent Thoughts: 1: [1], 2: [1], 3: [1]
+🎬 Chosen Action: [FINISH] -> Parameter: The tallest mountain in Africa is Mount Kilimanjaro, which stands at
+   5,895 meters (19,341 feet) tall.
+🔎 Checking each checklist item against the discoveries before finishing...
 🎯 Agent has signaled mission complete. Writing the final result...
 ```
 
-Four turns and 11.8 minutes of model time. The report it wrote:
+Four turns and 17.2 minutes of model time. The report it wrote:
 
-> **Final result:** The tallest mountain in Africa is Mount Kilimanjaro [1], and its elevation is 5,895 meters
-> (19,341 feet) above sea level [1].
+> **Final result:** The tallest mountain in Africa is Mount Kilimanjaro [1]. It rises to 5,895 m (19,341 ft) at
+> Uhuru Peak. The height in feet was found to be 19,341 ft [1].
+>
+> **Checklist**
+> 1. What is the tallest mountain in Africa? (discoveries for it: [1])
+> 2. How tall is it in meters? (discoveries for it: [1])
+> 3. How tall is it in feet? (discoveries for it: [1])
 >
 > **Discoveries (1)**
 > 1. Turn 3, from https://en.wikipedia.org/wiki/Mount_Kilimanjaro: *Mount Kilimanjaro is the highest mountain
->    in Africa, with an elevation of 5,895 m (19,341 ft) above sea level.*
+>    in Africa, rising to 5,895 m (19,341 ft) at Uhuru Peak.*
 
 ## How it works
 
@@ -201,7 +215,7 @@ answers with one JSON action:
 |---|---|
 | `SEARCH` | Searches DuckDuckGo and shows the results with their real addresses |
 | `NAVIGATE` | Opens an address from the results or the current page's links |
-| `READ_MORE` | Shows the next part of a long page, or the part whose outline names what's still missing |
+| `READ_MORE` | Shows the next part of a long page (pages are read in parts of about 2,500 characters), or the unread part whose outline label names an item still missing |
 | `DISCOVER` | Records something from the current page as a finding |
 | `FINISH` | Ends the run, after each part of the objective is checked; the answer is then written in a separate step |
 
@@ -224,7 +238,7 @@ The model proposes; code checks before anything is accepted:
   nothing answers, fewer things than asked for, missing amounts, a concrete missing term such as "O2".
 - **The answer is written separately,** from the findings only. Names, numbers and commands no finding gives are cut
   and named, and parts nothing answers are listed as "Not found in the pages read".
-- **Built for a CPU:** it reuses LM Studio's prompt cache, so most turns only process what changed.
+- **Made to run on a CPU:** it reuses LM Studio's prompt cache, so most turns only process what changed.
 
 The full details, code layout, timings and known limits:
 [docs/how-it-works.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/how-it-works.md).
@@ -245,10 +259,10 @@ The Windows installer writes the model you chose, and the cloud setting if you t
 
 ## FAQ
 
-**Does it need a GPU?** No. It was developed entirely on a CPU; a GPU makes each turn faster, and so does a cloud
-model.
+**Does it need a GPU?** No. It was developed and tested entirely on a CPU. A GPU makes each turn faster. With cloud
+models turned on, the model runs on the provider's computers instead of yours.
 
-**Why does a turn take minutes?** On a CPU the model reads the prompt slowly (about 8 tokens a second on the
+**Why does a turn take minutes with no GPU, or Cloud API?** On a CPU the model reads the prompt slowly (about 8 tokens a second on the
 development PC), so a turn that brings in a new page takes a few minutes. Most other turns reuse LM Studio's cache.
 
 **Is anything sent to the internet?** By default no AI service is involved and nothing about your run is uploaded.
@@ -267,12 +281,13 @@ content is shared); to turn that off, delete the `LMSTUDIO_EXTRA_HEADERS` line i
 **Can I use another OpenAI-compatible server?** Probably: point `LMSTUDIO_BASE_URL` at it. The speed tricks rely
 on the server reusing cached prompt prefixes (llama.cpp-based servers do).
 
-**Where are the results?** `research_report.md` (the answer and every finding with its source) and
+**Where are the results?** When a run started from the Windows shortcut or the installed app ends, the report opens
+in your browser by itself. The files are `research_report.md` (the answer and every finding with its source) and
 `research_log.txt` (every action and reason), in the run's folder.
 
 ## Limitations
 
-- **Judging whether a finding really answers a part is the weakest area.** The model can credit a finding about the
+- **Whether a finding really answers a part is judged by the model, and it can be wrong.** The model can credit a finding about the
   right topic to the wrong part (a "create" command for "activate"), or put the wrong number on a citation. Check
   claims against the listed findings.
 - **Reading only:** it doesn't click, fill in forms or sign in, and some sites refuse automated browsers.
@@ -312,7 +327,7 @@ To try the real agent with a fixed objective and a time limit, logging every mod
 python tools/live_test.py "Your objective here" --minutes 25
 ```
 
-To measure a change on all seven kinds of task (several hours on a CPU), on any model LM Studio has:
+To measure a change on all seven kinds of task (several hours on a CPU), on any model you load into LM Studio:
 
 ```bash
 python tools/regression.py --model qwen2.5-7b-instruct --baseline regression_runs/<earlier run>/summary.json

@@ -6,7 +6,7 @@ Usage:
     python tools/regression.py --suite all         also run the extra tasks
     python tools/regression.py --only factual,list run some tasks
     python tools/regression.py --baseline regression_runs/<earlier run>/summary.json
-    python tools/regression.py --model meta-llama-3.1-8b-instruct   run with another model LM Studio has
+    python tools/regression.py --model meta-llama-3.1-8b-instruct   run with any other model loaded into LM Studio
     python tools/regression.py --rescore regression_runs/<run>   score an earlier run again, without the model
     python tools/regression.py --list              show the tasks
 

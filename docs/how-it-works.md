@@ -137,7 +137,7 @@ and the explanation 13 to 59. A whole suite of seven tasks took 171 to 272 minut
   research, an opinion from several sources, a factual question, a comparison, a how-to, a list and an
   explanation of a topic. Each one
   exposed something that did not generalise and was fixed; other kinds of tasks may expose more.
-- **Judging whether a finding covers an item is the weakest area.** The model's verdict is unreliable both ways:
+- **Whether a finding covers an item is judged by the model, and it can be wrong.** Its verdict is unreliable both ways:
   on 1.53 the explanation finished from one overview paragraph without oxygen or water, and in the regression runs
   since 1.54 about half of the coverage check's send-backs were for gaps that were not real ("missing official
   documentation" on a comparison that did not ask for it, "H2O, O2" already recorded). Since 1.58 the agent is sent
