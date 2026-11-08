@@ -56,7 +56,7 @@
     <nav><div><a class="mark" href="index.html">LocalAgent<b>Browser</b></a>
       <a href="https://github.com/SnowFXXX/LocalAgentBrowser">GitHub →</a></div></nav>
     <header><div><div class="kicker">LocalAgentBrowser · The story</div>
-      <h1>We Can Do Better:<span>A Small AI That Can't Cover Up</span></h1><p style="margin-top:18px;color:var(--muted);font-size:16px">By SnowFX</p></div></header>
+      <h1>We Can Do Better:<span>A Small AI That Can't Cover Up</span></h1><p style="margin-top:18px;color:var(--muted);font-size:16px">By SnowFX</p><div style="margin:22px 0 0;padding:14px 18px;border-left:4px solid var(--mint);background:rgba(18,49,43,.45);border-radius:0 10px 10px 0;font-size:16px;color:var(--sub)"><strong style="color:var(--ink)">Update, November 8, 2026:</strong> this article describes version 1.63 and the tests up to October 29. In version 1.64 the same four models finished more tasks on identical code: Qwen 2.5 7B 6 of 7, Llama 3.1 8B 7 of 7, Qwen 2.5 14B 5 of 7 and Qwen 2.5 3B 3 of 7, again with no gaps filled from their own knowledge. The latest results are on the <a href="index.html#models">project site</a> and in the <a href="https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md">regression history</a>.</div></div></header>
     <article>
     <p><em>A small AI model on an ordinary computer, kept honest by code instead of by promises. The data is public, and so is
 the challenge: prove us wrong.</em></p>
@@ -116,7 +116,7 @@ a demo that went well once. Claims, backed by numbers you can check.</p>
 <h3>Claim 1: The AI did not fill in the blanks with things it &quot;just knows&quot;</h3>
 <p>We ran the same test suite on four different AI models, all using the exact same code. Across all of them, no
 finished answer filled a gap with the model's own knowledge, by the suite's measures.</p>
-<figure><a href="assets/chart1.png"><img src="assets/chart1.png" alt="Four models on the same code: Qwen 2.5 7B finished 6 of 7 tasks, Qwen 2.5 14B 2 of 7, Llama 3.1 8B 2 of 7, each with 0 gaps filled from its own knowledge; Qwen 2.5 3B finished 0 of 7, running out of time on every task." ></a></figure>
+<figure><a href="assets/2026-10-chart1.png"><img src="assets/2026-10-chart1.png" alt="Four models on the same code: Qwen 2.5 7B finished 6 of 7 tasks, Qwen 2.5 14B 2 of 7, Llama 3.1 8B 2 of 7, each with 0 gaps filled from its own knowledge; Qwen 2.5 3B finished 0 of 7, running out of time on every task." ></a></figure>
 <p>Bigger wasn't more honest, and smaller wasn't less. The bigger model was about two and a half times slower, and the
 time limit decided its score: it ran out of time while writing three more answers, so those don't count. The smallest one ran out of time on every task, so it never handed in an
 answer to score. The checks held for all of them, because the checks don't care which model is
@@ -162,12 +162,12 @@ right.</p>
 finding from every past test, 525 of them. It caught 21, and every one was a real problem. Our own scoring tool had
 missed this too, and we're telling you that, because it's the point. When we find a hole, we close it and say so.</p>
 <h3>How much testing is behind this</h3>
-<figure><a href="assets/chart2.png"><img src="assets/chart2.png" alt="The testing behind the claims: 44 full test-suite runs, 205 tasks, 525 findings checked against their page, 118.7 hours of the AI working, on one office PC from October 16 to 29, 2026." ></a></figure>
+<figure><a href="assets/2026-10-chart2.png"><img src="assets/2026-10-chart2.png" alt="The testing behind the claims: 44 full test-suite runs, 205 tasks, 525 findings checked against their page, 118.7 hours of the AI working, on one office PC from October 16 to 29, 2026." ></a></figure>
 <p>All of it ran on one ordinary office PC between October 16 and October 29, 2026. Every run is saved: what the AI was
 shown, what it replied, what the code allowed, and the final answer. Anyone can rerun the whole suite.</p>
 <p>The suite covers seven kinds of questions: a simple fact, a list with conditions, a comparison with a recommendation,
 a how-to, an explanation, a question of opinion, and a dig through official documentation.</p>
-<figure><a href="assets/chart3.png"><img src="assets/chart3.png" alt="Tasks finished out of 7 by the default 7B model, version by version: 2, 5, 4, 5, 5, 4, 4, 5, 5, 6, 6, 7, 6, and 7 of 7 for the current version with no time limit." ></a></figure>
+<figure><a href="assets/2026-10-chart3.png"><img src="assets/2026-10-chart3.png" alt="Tasks finished out of 7 by the default 7B model, version by version: 2, 5, 4, 5, 5, 4, 4, 5, 5, 6, 6, 7, 6, and 7 of 7 for the current version with no time limit." ></a></figure>
 <p>It isn't a straight line, and I'm not going to pretend it is. Some versions got worse before they got better. Some
 fixes made the agent stricter, and stricter takes longer. With no time limit, the current version finished all seven.</p>
 <h2>The twist: built with an AI</h2>

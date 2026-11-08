@@ -330,7 +330,15 @@ improving with better wording.
 - **A site can decide a task.** The repotting guide could not answer one part of the objective in any run; the suite
   now flags a task that fails again on the same site.
 
-## Next step (after 1.61)
+## Next steps (after 1.64)
+
+- **Count silent omissions** in the suite: a part with findings linked to it but no cited line and no "Not found"
+  line, so [issue #11](https://github.com/SnowFXXX/LocalAgentBrowser/issues/11) can close on a number.
+- **Right topic, wrong part:** decide in code whether a finding answers the part it is credited to (a "create"
+  command credited to "activate on Windows"); rewording the model's yes/no question stopped helping.
+- **Citations on the neighbouring finding,** and false "not found" lines next to cited answers (Llama, 1.64).
+
+### Still open from earlier steps
 
 - **Fresh prompts lose the finish advice.** A fresh prompt does not carry "every item has the discoveries it asks
   for: choose FINISH now"; the documentation task read on after one on 1.61.

@@ -1,6 +1,6 @@
 # Results by kind of task
 
-Live runs on the development machine (CPU only, Qwen2.5-7B), from the README before 1.65. Every step since 1.53, on all models, is in [regression-history.md](regression-history.md).
+Live runs on the development machine (CPU only, Qwen2.5-7B), from the README before 1.64.1. Every step since 1.53, on all models, is in [regression-history.md](regression-history.md).
 
 ## Single runs, by kind of task
 

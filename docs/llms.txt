@@ -2,7 +2,7 @@
 
 > An autonomous web research agent driven by a local language model (LM Studio) and Playwright. Give it an
 > objective; it searches the web, reads pages, records findings with their sources and writes a cited report, all
-> on your own computer. Built for a small 7B model on a CPU; no GPU, cloud AI or API key needed.
+> on your own computer. Built for small models on a CPU (four tested); no GPU, cloud AI or API key needed.
 
 Key facts:
 

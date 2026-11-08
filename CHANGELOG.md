@@ -6,6 +6,14 @@ measured on the regression suite and released as part of 1.57 and 1.61 (see
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.64.2] - 2026-11-08
+Documentation only; the code is unchanged from 1.64, as measured. A full check of everything public:
+- The README's top image (also the link preview) redrawn from the website's hero: "four models tested on a CPU"
+  instead of "7B model on a CPU".
+- The article keeps its October charts, which its text describes, and gets a dated note with the 1.64 results; the
+  paper gets the same note.
+- llms.txt, CONTRIBUTING, docs/how-it-works.md and the regression history's next steps brought up to 1.64.
+
 ## [1.64.1] - 2026-11-08
 Documentation only; the code is unchanged from 1.64, as measured.
 - **README revamped,** so PyPI's page shows it too: the four models tested near the top, with download size, RAM and
