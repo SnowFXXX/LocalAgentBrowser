@@ -11,7 +11,7 @@ find.**
 ![Runs locally](https://img.shields.io/badge/LLM-local%20(LM%20Studio)-green.svg)
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/social-preview.png" alt="LocalAgentBrowser: SEARCH, NAVIGATE, READ_MORE, DISCOVER, FINISH. No cloud AI, 7B model on a CPU, LM Studio and Playwright." width="820">
+  <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/social-preview.png" alt="LocalAgentBrowser: a small AI that can't cover up. SEARCH, NAVIGATE, READ_MORE, DISCOVER, FINISH. No cloud AI, four models tested on a CPU, Windows shortcuts, free and open source, LM Studio and Playwright." width="820">
 </p>
 
 A local language model served by [LM Studio](https://lmstudio.ai) decides what to do next, and
