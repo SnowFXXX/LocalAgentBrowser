@@ -44,11 +44,15 @@ TASKS = [
     {"id": "factual", "kind": "Factual question", "core": True, "minutes": 25,
      "objective": "What is the tallest mountain in Africa, and how tall is it in meters and in feet?",
      "expect": [["kilimanjaro"], ["5,895", "5895"], ["19,341", "19341", "19,340", "19340"]]},
-    {"id": "list", "kind": "List of items", "core": True, "minutes": 45,
-     "objective": "Name three free, open-source alternatives to Microsoft Office, and say what each one is best at.",
-     "expect": [["libreoffice"], ["onlyoffice", "openoffice", "calligra"]],
-     # Free but not open source (FreeOffice was given as the third item on 1.46), or not free at all
-     "forbid": ["freeoffice", "wps office", "softmaker", "google docs", "zoho", "microsoft 365", "apple iwork"]},
+    # Replaced the office-suites list in the core set on 2026-11-05: in all three list runs that day, on two PCs,
+    # the first search led to craftsuite.net, whose "WordCraft", "GridCraft" and "DeckCraft" took the place of the
+    # well-known suites, with no other page backing them. The agent copied the page faithfully, so the task measured
+    # the site. Same kind of task (three things meeting conditions, and what each is best at); the Photoshop list keeps
+    # its id, and the office list keeps "list" as an extra task
+    {"id": "list-photoshop", "kind": "List of items", "core": True, "minutes": 40,
+     "objective": "Find three free, open-source alternatives to Adobe Photoshop and summarize the main strengths of each one.",
+     "expect": [["gimp", "krita", "darktable", "inkscape", "pinta", "rawtherapee"]],
+     "forbid": ["photopea", "affinity", "pixlr", "canva", "paint.net"]},
     {"id": "comparison", "kind": "Comparison and recommendation", "core": True, "minutes": 45,
      "objective": "Compare SQLite and PostgreSQL for a small web application: setup and administration, handling of "
                   "many simultaneous users, and features. Then recommend one for a hobby project with a few hundred users.",
@@ -98,10 +102,11 @@ TASKS = [
      "objective": "Research how different spiritual and religious traditions around the world have viewed cats, then "
                   "formulate your own spiritual opinion about cats, supported by what you found.",
      "expect": [["cat"], ["egypt", "islam", "buddhis", "japan", "norse", "christian"]]},
-    {"id": "list-photoshop", "kind": "List of items", "core": False, "minutes": 40,
-     "objective": "Find three free, open-source alternatives to Adobe Photoshop and summarize the main strengths of each one.",
-     "expect": [["gimp", "krita", "darktable", "inkscape", "pinta", "rawtherapee"]],
-     "forbid": ["photopea", "affinity", "pixlr", "canva", "paint.net"]},
+    {"id": "list", "kind": "List of items", "core": False, "minutes": 45,
+     "objective": "Name three free, open-source alternatives to Microsoft Office, and say what each one is best at.",
+     "expect": [["libreoffice"], ["onlyoffice", "openoffice", "calligra"]],
+     # Free but not open source (FreeOffice was given as the third item on 1.46), or not free at all
+     "forbid": ["freeoffice", "wps office", "softmaker", "google docs", "zoho", "microsoft 365", "apple iwork"]},
     {"id": "howto-sourdough", "kind": "Step-by-step how-to", "core": False, "minutes": 40,
      "objective": "How do I make a sourdough starter from scratch? Give a step-by-step plan with the quantities of flour "
                   "and water and what to do on each day.",
@@ -163,18 +168,23 @@ def uncited_lines(text):
     Counted per paragraph or list item rather than per sentence: the final result usually cites a point once,
     at its end. The opinion paragraph, headings, code blocks, short lines and statements that something was
     not found are left out, since they are not meant to carry a citation. A line holding only citations ("[2]"
-    under a list) cites the lines above it, back to the previous heading.
+    under a list) cites the lines above it, back to the previous heading, and a cited heading ("#### GIMP [1]")
+    cites the list under it.
     """
     body = re.split(r"(?im)^\s*my view:", text)[0]
-    found, section, in_code = [], [], False
+    found, section, in_code, heading_cited = [], [], False, False
     for line in body.splitlines():
         line = line.strip()
         if line.startswith("```"):
             in_code = not in_code
             continue
         if line.startswith("#"):
-            section = []
-        if in_code or not line or line.endswith(":") or line.startswith("#"):
+            section, heading_cited = [], bool(CITATION.search(line))
+        if heading_cited:
+            continue
+        # A bold label ("**1. Creating a virtual environment with venv:**") is a heading, not an uncited claim
+        # The checks' own "Left out, because ..." notes are not claims the result makes
+        if in_code or not line or line.rstrip("*_ ").endswith(":") or line.startswith(("#", "Left out, because ")):
             continue
         if CITATION.sub("", line).strip(" ,;.") == "":
             found = [f for f in found if f not in section]
@@ -238,7 +248,7 @@ def score_run(task, journal, console="", checklist=None):
         "uncited_discoveries": sorted(set(range(1, len(found) + 1)) - cited) if finish else [],
         "bad_citations": sorted(n for n in cited if n > len(found) or n < 1),
         "uncited_lines": uncited_lines(result),
-        "unverified_numbers": ab.unverified_numbers(result, found) if finish else [],
+        "unverified_numbers": ab.unverified_numbers(result, found, task.get("objective", "")) if finish else [],
         "unverified_code": ab.unverified_code(result, found) if finish else [],
         "gap_statements": [m.group(0) for m in GAP_STATEMENT.finditer(result)],
         "caveats": result.count(CAVEAT),
@@ -377,6 +387,37 @@ def git_commit():
     except (OSError, subprocess.CalledProcessError):
         return "unknown"
 
+def code_fingerprint():
+    """The code a run used, beyond its commit: the changed files and one SHA-256 over their contents, so runs on
+    uncommitted patches (the 1.64 work ran v3 to v11 on top of 1.63, every folder named "1.63") can be told apart and
+    matched to the patch that made them."""
+    import hashlib
+    try:
+        changed = subprocess.run(["git", "-C", ROOT, "status", "--porcelain", "--untracked-files=all", "--",
+                                  "localagentbrowser", "tools", "tests", "agent_browser.py"],
+                                 capture_output=True, text=True).stdout.splitlines()
+    except OSError:
+        return {"changed_files": [], "changes_sha256": "unknown"}
+    files = sorted(line[3:].strip().strip('"') for line in changed if line[3:].strip())
+    h = hashlib.sha256()
+    for f in files:
+        path = os.path.join(ROOT, f)
+        if os.path.isfile(path):
+            h.update(f.encode() + b"\0")
+            with open(path, "rb") as fh:
+                h.update(fh.read().replace(b"\r\n", b"\n"))
+    return {"changed_files": files, "changes_sha256": h.hexdigest() if files else None}
+
+def write_run_info(folder, meta):
+    """run_info.json at the start of a run: which code, model and machine. The PC is a neutral label set on each PC
+    (LAB_PC_LABEL, "PC A" / "PC B"), never its name."""
+    os.makedirs(folder, exist_ok=True)
+    info = {**meta, "pc": os.environ.get("LAB_PC_LABEL", "unlabelled"), **code_fingerprint(),
+            "python": sys.version.split()[0]}
+    with open(os.path.join(folder, "run_info.json"), "w", encoding="utf-8") as f:
+        json.dump(info, f, indent=1)
+    return info
+
 
 def model_server_ready():
     try:
@@ -491,6 +532,9 @@ def main():
     folder = os.path.join(ROOT, "regression_runs", name)
     meta = {"name": name, "version": version, "commit": git_commit(), "started": f"{started:%Y-%m-%d %H:%M}",
             "model": model, **loaded, "tasks": [t["id"] for t in tasks]}
+    info = write_run_info(folder, meta)
+    print(f"Run info: {info['pc']}, commit {info['commit']}, changes {str(info['changes_sha256'])[:16]} "
+          f"({len(info['changed_files'])} files)", flush=True)
     scores = []
     for number, task in enumerate(tasks, start=1):
         minutes = args.minutes or task["minutes"]

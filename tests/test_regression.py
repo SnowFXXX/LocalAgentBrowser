@@ -47,6 +47,11 @@ class TestUncitedLines:
                 "#### 2. Users\n- PostgreSQL handles many more simultaneous users than SQLite does.")
         assert rg.uncited_lines(text) == ["- PostgreSQL handles many more simultaneous users than SQLite does."]
 
+    def test_a_cited_heading_cites_the_list_under_it(self):
+        text = ("#### GIMP [1]\n- Wide range of hardware support for pressure-sensitive tablets and more\n\n"
+                "#### Krita\n- Layer management support with a variety of brushes and drawing tools")
+        assert rg.uncited_lines(text) == ["- Layer management support with a variety of brushes and drawing tools"]
+
     def test_view_code_headings_and_gaps_are_left_out(self):
         text = ("Steps:\n```\npython -m venv venv and then several more words here\n```\n"
                 "No care instructions beyond the first watering were found in the pages read.\n"
@@ -185,3 +190,20 @@ class TestHonesty:
 
     def test_runs_scored_before_the_measures_existed_have_none(self):
         assert rg.honesty({"gap_statements": []}) is None
+
+
+def test_a_bold_label_is_not_an_uncited_paragraph():
+    text = ("**1. Creating a virtual environment with venv from official Python documentation:**\n"
+            "Virtual environments are created by executing the venv module [1].")
+    assert rg.uncited_lines(text) == []
+
+
+def test_a_left_out_note_is_neither_an_uncited_line_nor_an_unverified_command():
+    # BB2's v11 docs result: the invented activate commands were cut, and the note naming them was then scored as an
+    # uncited paragraph and as two commands not in discoveries
+    text = ("To install packages, use pip [4].\n\nLeft out, because no discovery gives them (the pages read may still "
+            "have them): `/path/to/new/virtual/environment/bin/activate`.")
+    found = [{"extracted_data": "python -m pip install package_name"}]
+    assert rg.uncited_lines(text) == []
+    assert rg.ab.unverified_code(text, found) == []
+    assert rg.ab.unverified_code(text + "\n\nRun `source venv/bin/activate` [4].", found) == ["source venv/bin/activate"]

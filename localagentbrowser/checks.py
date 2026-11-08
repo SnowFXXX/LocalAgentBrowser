@@ -4,7 +4,7 @@ import re
 from .config import GAP_REFUSAL_LIMIT, LONG_PAGE_UNREAD, MAX_CHECK_DISCOVERY_CHARS, MAX_VISITS_PER_URL, OBJECTIVE_ECHO_SHARE
 from .prompts import FINAL_RESULT, GIVE_UP_RULE
 from .text import MISSING_STOPWORDS, shorten
-from .pages import determine_url, is_search_page, normalize_query, normalize_url, outline_pointer, read_more_target, search_query, where_you_are
+from .pages import blocked_site, determine_url, is_search_page, normalize_query, normalize_url, outline_pointer, read_more_target, search_query, where_you_are
 from .grounding import DESCRIBES_PAGE, discovery_lines, grounded_share, grounding_check, is_known_discovery, page_hint
 from .checklist import check_parts, every_item_has_discoveries, open_items
 
@@ -187,6 +187,17 @@ def check_decision(action, parameter, journal, tried, page_state, current_url, t
     elif action == "NAVIGATE":
         if not parameter.strip():
             return "BLOCKED_NAVIGATE", "NAVIGATE needs a full URL in the parameter."
+        # A list run on Box 1 NAVIGATEd to "discovered", then to sentences ("the size of their budget..."), each opened
+        # as https://<text> and failing: four turns lost. Text with spaces or without a dot is no address
+        address = parameter.strip().strip("\"'")
+        if not re.search(r"https?://\S", address) and not address.startswith("#") and (
+                re.search(r"\s", address) or "." not in address):
+            return "BLOCKED_NAVIGATE", (f"'{shorten(address, 60)}' is not a URL. NAVIGATE needs a full URL from a link "
+                                        "or a search result (such as https://example.org/page); to look something up, "
+                                        "use SEARCH.")
+        if blocked_site(determine_url(action, parameter)):
+            return "BLOCKED_NAVIGATE", ("That site is excluded for this run (LAB_BLOCKED_SITES). Find the answer on "
+                                        "another page: SEARCH, or NAVIGATE to a different result.")
         target = normalize_url(determine_url(action, parameter))
         # Shown a long page's outline, the model kept trying to jump to a section with a made-up anchor
         # ("NAVIGATE ...#sqlite-vs-postgresql", then "NAVIGATE #sqlite-vs-postgresql")
@@ -308,8 +319,12 @@ def check_decision(action, parameter, journal, tried, page_state, current_url, t
             return "BLOCKED_DISCOVER_SNIPPET", ("That DISCOVER is the search result's title and description, not what "
                                                 "this page says. DISCOVER the facts the page text shown gives for the "
                                                 "OBJECTIVE, in its own wording, or READ_MORE if they are further on.")
-        return grounding_check(parameter, page_state, current_url, tried.get("objective", ""))
+        return grounding_check(parameter, page_state, current_url, tried.get("objective", ""),
+                               tried.get("finish_drafts", ()))
     elif action == "FINISH":
+        # Kept whole (the journal keeps only 120 characters of a refused one): a refused FINISH's recommendation
+        # came back three turns later inside a DISCOVER, appended to a real page line, and was cited as a finding
+        tried.setdefault("finish_drafts", []).append(parameter)
         return finish_check(tried, journal, page_state, current_url) or gap_check(thought, tried)
     else:
         return f"UNKNOWN_{action}", f"'{action}' is not a valid action."

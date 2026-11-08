@@ -1,10 +1,66 @@
 # Changelog
 
-Every version of LocalAgentBrowser, newest first. Each released version is also a tagged commit (`v1.11` … `v1.62`); 1.54 to 1.56 and 1.58 to 1.60 were internal steps
+Every version of LocalAgentBrowser, newest first. Each released version is also a tagged commit (`v1.11` … `v1.63`); 1.54 to 1.56 and 1.58 to 1.60 were internal steps
 measured on the regression suite and released as part of 1.57 and 1.61 (see
 [docs/regression-history.md](docs/regression-history.md)).
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
+
+## [1.64] - 2026-11-08
+The theme is **silent omission** ([issue #11](https://github.com/SnowFXXX/LocalAgentBrowser/issues/11)): a part of
+the objective dropping out of the final answer without being marked "not found". It was measured on two PCs (PC A
+and PC B, both Intel i5-9500, no GPU) and then on four models with identical code.
+
+### Added
+- **Windows launcher and shortcuts.** `tools/windows/LocalAgentBrowser.cmd` checks that LM Studio is answering,
+  runs the agent in its own folder under `Documents\LocalAgentBrowser runs`, and opens the report when the run ends.
+  `tools/windows/make_shortcuts.ps1` adds Start-menu and desktop shortcuts with the project icon (from a clone of
+  the repository).
+- **The report opens by itself** when a launcher run ends: `research_report.md` is written next to it as a dark web
+  page, in the project site's colors, with the final result, checklist and discoveries in separate cards and
+  citations shown as tags (`tools/windows/show_report.py`, standard library only). Windows has no program for `.md`
+  files by default.
+- Regression suite: every run folder gets `run_info.json` (PC label from `LAB_PC_LABEL`, commit, and a fingerprint
+  of the uncommitted changes), so runs on several PCs can be tied to the exact code they ran.
+- Regression suite: `LAB_BLOCKED_SITES` makes NAVIGATE refuse given sites, for benchmark runs that must not read the
+  benchmark's own answer pages.
+
+### Fixed: parts of the objective dropping out of the answer
+- **The coverage check asks for the quote first.** "Does this discovery answer the item?" is now answered by first
+  copying the words that answer it, with a rule that words on the same topic but a different aspect don't count.
+  On 30 hand-labelled real cases, 25 right instead of 16 (no false "not found", 5 false "found" left).
+- **A part credited to several items only counts where the item's own words appear**, so one quote can't silently
+  cover three parts; such an item is sent back as unanswered.
+- **Missing amounts and concrete missing terms send the agent back.** When an item asks for amounts and no discovery
+  for it gives one, or the check names a concrete missing term ("O2") that no discovery contains, the agent is told
+  to find it, instead of finishing without it (an explanation once finished in 4 turns without oxygen).
+- **Each fact stays under its own part.** A discovery keeps the page heading it came from, including headings inside
+  a discovery that crosses page sections; a heading the discovery starts with isn't replaced by the one above;
+  bylines, very long "headings" (numbered sentences) and the prompt's own section names don't count as headings or
+  names.
+- **Names no discovery gives are cut,** with a note: a short cited heading's name is checked too, word forms need
+  an 80% shared start ("PhotoScape" over a PhotoSplice source), and words in a source's web address count as given.
+- **A sentence under one label copied from another subject's sentence is cut** (SQLite's sentence under
+  PostgreSQL).
+- **Numbers in words are checked like digits** ("two weeks" needs a 2 in a source, "one cup" equals "1 cup"), unit
+  abbreviations count as their words ("5,895 m (19,341 ft)" answers "in meters" and "in feet"), and a time needs
+  the same number as a time in a source ("2 weeks" was taken from a "2L jar").
+- **Citations:** citation lines on their own are joined to the line they cite; citations are moved out of code, and
+  unclosed code blocks closed, so correct commands aren't cut as invented.
+- A **"Recommendation" section is labelled as the model's view**, like "My view:".
+- **NAVIGATE refuses text that isn't a web address** (a run lost 5 turns on it).
+
+### Fixed: the regression suite's scoring
+- The code's own "Left out, because…" notes are no longer read as the result's claims (commands and uncited lines).
+  4 of 78 earlier run folders were over-counted.
+- A bold label ("**1. Creating a virtual environment:**") is a heading, not an uncited claim.
+
+### Measured
+- 7B on two PCs: 7 of 7 on both PCs with v11 (297.8 and 269.6 model minutes), with no outside knowledge, invented
+  numbers or invented commands in any finished result.
+- Four models, same code (v12, 90 minutes per task): Qwen2.5-7B 6 of 7, Llama 3.1 8B 7 of 7, Qwen2.5-14B 5 of 7,
+  Qwen2.5-3B 3 of 7. On 1.63 they were 6, 2, 2 and 0 of 7. No finished result used outside knowledge. Details in
+  docs/regression-history.md.
 
 ## [1.63] - 2026-11-01
 ### Added

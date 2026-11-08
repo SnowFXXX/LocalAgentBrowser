@@ -16,6 +16,9 @@ AMOUNT_ASKED = re.compile(r"\b(?:quantit(?:y|ies)|amounts?|how (?:much|many|long
 AMOUNT_GIVEN = re.compile(r"\d|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|twelve|half|quarter|dozen|"
                           r"minutes?|hours?|days?|weeks?|months?|years?|overnight)\b", re.I)
 
+AMOUNT_GAP = ("no discovery recorded for it gives the amounts it asks for; DISCOVER the words that give them, as the "
+              "page writes them")
+
 def amounts_not_found(checklist, journal, skip=()):
     """The checklist items that ask for amounts while no discovery linked to them gives one, decided in code."""
     found = [e for e in journal if e.get("action") == "DISCOVER"]
@@ -38,6 +41,16 @@ def quoted_from(quote, text):
     pairs = word_pairs(" ".join(plain_words(quote)))
     return bool(pairs) and len(pairs & word_pairs(" ".join(plain_words(text)))) >= 0.8 * len(pairs)
 
+def names_copied(quote, text, item):
+    """Whether a quote of short lines (a name per line: 'GIMP', 'carbohydrates') is copied from the text: each line
+    of one or two words is in the text, and at least one of them is not a word of the ITEM itself."""
+    lines = [plain_words(line) for line in str(quote).splitlines()]
+    lines = [words for words in lines if words]
+    if not lines or any(len(words) > 2 for words in lines):
+        return False
+    known, asked = set(plain_words(text)), set(plain_words(item))
+    return all(set(words) <= known for words in lines) and any(set(words) - asked for words in lines)
+
 async def cited_answer(client, item, cited):
     """Words from the cited discoveries that say what the item asks for, by a yes-or-no question about them alone;
     '' when the answer is no, the reply is not valid, or its words are not in what was cited."""
@@ -53,7 +66,8 @@ async def cited_answer(client, item, cited):
         return ""
     quote = str(reply.get("quote", ""))
     said = str(reply.get("answer", "")).strip().lower() == "yes"
-    return quote if said and re.search(r"\w", quote) and any(quoted_from(quote, c) for c in cited) else ""
+    return quote if said and re.search(r"\w", quote) and any(
+        quoted_from(quote, c) or names_copied(quote, c, item) for c in cited) else ""
 
 def item_words(text, checklist=()):
     """An item's own words: content words (s-stripped) that no other checklist item has."""
@@ -66,6 +80,17 @@ def is_bare_citation(evidence):
     """Whether evidence gives discovery numbers ("[1]", "[1], [3]") and no words."""
     evidence = str(evidence)
     return bool(re.search(r"\d", evidence)) and not re.sub(r"\[\d+\]|[\s,;.]|\band\b", "", evidence)
+
+CONFIRMED_MISSING = ": named by no discovery; DISCOVER it where a page gives it"
+
+def concrete_term(part):
+    """Whether a missing part is a concrete thing a word check can confirm: at most three words, one of them with a
+    digit, an all-capitals abbreviation, or a capital inside the phrase ("O2", "GA3P", "PowerShell activation
+    command"), not a description ("the specific steps of the Calvin cycle")."""
+    words = part.replace(",", " ").split()
+    return 0 < len(words) <= 3 and any(
+        re.search(r"\d", w) or re.fullmatch(r"[A-Z][A-Z0-9]+", w) or (i > 0 and re.search(r"[A-Z]", w))
+        for i, w in enumerate(words))
 
 def really_missing(missing, found):
     """The parts of a "missing" verdict that the discoveries do not already contain.
@@ -109,7 +134,7 @@ async def coverage_gaps(client, objective, checklist, journal, only=None, eviden
     found = [e for e in journal if e.get("action") == "DISCOVER"]
     listing = "\n\n".join(f"[{n}] {e['extracted_data']}" for n, e in enumerate(found, 1))
     items = "\n".join(f"{n}. {item['text']}" for n, item in enumerate(checklist, 1))
-    gaps, unanswered, unproven = [], [], []
+    gaps, unanswered, unproven, answered_with = [], [], [], {}
     for n, item in enumerate(checklist, 1):
         if OPINION_REQUEST.search(item["text"]) or (only is not None and n not in only):
             continue
@@ -177,7 +202,15 @@ async def coverage_gaps(client, objective, checklist, journal, only=None, eviden
             unanswered.append(n)
             gaps.append(f"Item {n} ({item['text']}): {UNANSWERED_GAP}")
         elif missing:
-            gaps.append(f"Item {n} ({item['text']}): missing {missing}")
+            # A concrete thing ("O2", "GA3P", "Step 3") the check says is missing, and no discovery names, is confirmed
+            # by the code, so it sends the agent back: an explanation finished in 4 turns from one overview paragraph,
+            # without oxygen, while the check said "missing O2". Vague verdicts ("the specific steps") stay soft: about
+            # half were wrong. Of 117 saved "missing" verdicts, 2 were concrete (this one and "Step 3")
+            concrete = [p for p in missing.split(", ") if concrete_term(p)]
+            gaps.append(f"Item {n} ({item['text']}): missing {missing}"
+                        + (f" ({', '.join(concrete)}{CONFIRMED_MISSING})" if concrete else ""))
+        if n not in unanswered:
+            answered_with[n] = re.sub(r"\[\d+\]", " ", str(verdict.get("evidence", "")))
         # Words the check copied for an answered item, kept where they really are in the discoveries: the final
         # result is shown them, as it said "the discoveries do not specify what goes into photosynthesis" over a
         # discovery that gave water, sunlight and carbon dioxide
@@ -210,7 +243,62 @@ async def coverage_gaps(client, objective, checklist, journal, only=None, eviden
                 unproven.append((str(thing["name"]).strip(), condition))
                 gaps.append(f"Item {n}: {thing['name']}: no words in DISCOVERIES SO FAR show it is {condition}. SEARCH "
                             f"for '{thing['name']} {condition}' to check it, or replace it with one that is")
+    for n in shared_evidence_items(answered_with, checklist):
+        unanswered.append(n)
+        gaps.append(shared_gap(n, checklist[n - 1]["text"]))
     return gaps, unanswered, unproven
+
+def shared_gap(n, text):
+    """The gap for an item whose only evidence was another item's words. It ends with UNANSWERED_GAP, the mark of a
+    gap that sends the agent back: with the reason after it, v9 found such items on Box 1's comparison but did not
+    send the agent back, and the final result filled all three items from memory."""
+    return (f"Item {n} ({text}): the words given for it are the same as for another item and say nothing of its own, "
+            f"so {UNANSWERED_GAP}")
+
+# Units as pages abbreviate them after a number, by the word an item asks with (in item_words' s-stripped form)
+UNIT_WORDS = {"m": "meter", "metres": "metre", "km": "kilometer", "cm": "centimeter", "mm": "millimeter",
+              "ft": "feet", "mi": "mile", "in": "inche", "kg": "kilogram", "g": "gram", "lb": "pound", "lbs": "pound",
+              "oz": "ounce", "l": "liter", "ml": "milliliter", "min": "minute", "h": "hour", "hr": "hour",
+              "hrs": "hour", "c": "celsiu", "f": "fahrenheit"}
+UNIT_AFTER_NUMBER = re.compile(r"\d\s*(" + "|".join(sorted(UNIT_WORDS, key=len, reverse=True)) + r")\b", re.I)
+
+def units_written(text):
+    """The unit words a text gives by abbreviation after a number: "5,895 m (19,341 ft)" gives meter and feet. A
+    Kilimanjaro sentence answering both "in meters" and "in feet" was dropped for both, as if it said neither."""
+    found = {UNIT_WORDS[m.group(1).lower()] for m in UNIT_AFTER_NUMBER.finditer(str(text))}
+    return found | ({"foot"} if "feet" in found else set())
+
+def shared_evidence_items(answered_with, checklist):
+    """Items whose only evidence is the same words given for other items, none of its own words in them.
+
+    A comparison finished from one sentence ("I'd pick SQLite for any single-server app under roughly 10,000 daily
+    active users, and PostgreSQL the moment concurrent writes ... enter the picture"), given as the evidence for
+    setup, many users and features alike, and pasted under all three. Of items sharing the same words, those whose
+    own words appear in them keep them; the others count as unanswered. Items about the same thing ("Compare SQLite
+    and PostgreSQL features", "Name three features PostgreSQL has") may share words: they share a word of their own,
+    one that no more than half of the checklist items have ("compare", "sqlite" and "postgresql" in 3 of 4 do not
+    count)."""
+    def words_of(text):
+        return {w.rstrip("s") for w in plain_words(text) if len(w) > 2} - MISSING_STOPWORDS - ITEM_VERBS
+    texts = {n: words_of(item["text"]) for n, item in enumerate(checklist, 1)}
+    common = {w for w in set().union(*texts.values()) if sum(w in t for t in texts.values()) > len(texts) / 2}
+    dropped = set()
+    for n, words in answered_with.items():
+        same = [m for m, other in answered_with.items()
+                if m != n and quoted_from(words, other) and quoted_from(other, words)]
+        if not same or any((texts[n] & texts[m]) - common for m in same):
+            continue
+        given = item_words(words) | units_written(words)
+        overlap = {m: len(item_words(checklist[m - 1]["text"], checklist) & given) for m in [n] + same}
+        if overlap[n] == 0 or overlap[n] < max(overlap.values()):
+            dropped.add(n)
+    return sorted(dropped)
+
+SHORT_COUNT = re.compile(r"^Item (\d+) \(.*\): only (\d+) of (\d+) found \(")
+
+def short_counts(gaps):
+    """{item number: (things found, things asked for)} from the coverage gaps."""
+    return {int(m.group(1)): (int(m.group(2)), int(m.group(3))) for m in map(SHORT_COUNT.match, gaps) if m}
 
 async def coverage_refusal(client, objective, tried, journal):
     # Once per run, so a noisy verdict costs one turn at most and a gap that cannot be filled never blocks finishing
@@ -222,9 +310,15 @@ async def coverage_refusal(client, objective, tried, journal):
         print("🔎 Checking each checklist item against the discoveries before finishing...")
         gaps, tried["unanswered"], unproven = await coverage_gaps(client, objective, checklist, journal,
                                                                     evidence=tried.setdefault("evidence", {}))
+        tried["short_counts"] = short_counts(gaps)
         # Items whose named things lacked proof of a condition are checked again before the final result
         tried["unproven_items"] = sorted({n for n, item in enumerate(checklist, 1) if any(
             g.startswith(f"Item {n}: ") and "no words in DISCOVERIES SO FAR show it is" in g for g in gaps)})
+        # Amounts asked for and given by no discovery of the item, decided in code: a cold brew run on Box 1 had the
+        # check's "missing quantities" (not sent back), its own FINISH drafts gave "1 cup (113 grams)", and the
+        # final result said the amounts were not found, because nothing made it record the card that gave them
+        gaps += [f"Item {n} ({checklist[n - 1]['text']}): {AMOUNT_GAP}"
+                 for n in amounts_not_found(checklist, journal, skip=set(tried["unanswered"]))]
     else:
         # A factual run finished with nothing recorded (its answer was refused as not on the page shown) and its
         # final result said nothing was found
@@ -235,7 +329,8 @@ async def coverage_refusal(client, objective, tried, journal):
     # four suite runs ("missing official documentation" on a comparison, "H2O, O2" already recorded, "free" on a
     # correct list of open-source suites) and cost a finish each; those verdicts now only shape the final result
     hard = [g for g in gaps if g.endswith(UNANSWERED_GAP) or re.search(r"\): only \d+ of \d+ found", g)
-            or g.startswith("Nothing has been recorded")]
+            or g.startswith("Nothing has been recorded") or g.endswith(AMOUNT_GAP)
+            or g.endswith(CONFIRMED_MISSING + ")")]
     if gaps:
         print("⚠️ Gaps found:\n" + "\n".join(f"   - {g}{'' if g in hard else ' (not sent back)'}" for g in gaps))
     gaps = hard
@@ -264,10 +359,14 @@ async def not_found_items(client, objective, tried, journal):
         return [], []
     candidates = sorted({n for n, item in enumerate(checklist, 1) if not item["discoveries"]
                          and not OPINION_REQUEST.search(item["text"])} | set(tried.get("unanswered") or []))
-    rechecked = sorted(set(candidates) | set(tried.get("unproven_items") or []))
+    # Items short of the number they ask for are counted again too: what the agent recorded after being sent back
+    # may complete them
+    short = tried.get("short_counts") or {}
+    rechecked = sorted(set(candidates) | set(tried.get("unproven_items") or []) | set(short))
     if not rechecked or not any(e.get("action") == "DISCOVER" for e in journal):
         return candidates, []
     print(f"🔎 Checking checklist item(s) {', '.join(map(str, rechecked))} once more before writing the final result...")
-    _, unanswered, unproven = await coverage_gaps(client, objective, checklist, journal, only=set(rechecked),
-                                                  evidence=tried.setdefault("evidence", {}))
+    gaps, unanswered, unproven = await coverage_gaps(client, objective, checklist, journal, only=set(rechecked),
+                                                     evidence=tried.setdefault("evidence", {}))
+    tried["short_counts"] = {n: count for n, count in short_counts(gaps).items() if n not in unanswered}
     return [n for n in unanswered if n in candidates or n in rechecked], unproven

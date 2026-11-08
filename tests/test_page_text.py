@@ -87,3 +87,79 @@ def test_links_with_a_few_words_come_before_menu_items():
     links = asyncio.run(ab.extract_page_links(FakeLinksPage("https://site.example/a", menu + article)))
     assert links.splitlines()[0] == "- How to repot a houseplant -> https://site.example/repot"
     assert links.count("->") == ab.MAX_LINKS
+
+
+def test_a_discovery_from_a_named_section_gets_its_heading():
+    # As on itsfoss.com: each tool's heading, then a repeated "Key Features:" heading, then the feature lines
+    part = ("The list is in no particular order of ranking.\n\n1. GIMP: The true Photoshop alternative\n\nKey Features:\n\n"
+            "Customizable Interface\nDigital Retouching\n\n2. Krita\n\nKey Features:\n\nLayer management support\n"
+            "Transformation tools")
+    state = {"parts": [part], "index": 0, "headings": ["1. GIMP: The true Photoshop alternative", "Key Features:",
+                                                       "2. Krita", "Key Features:"]}
+    assert ab.section_heading(state, "Customizable Interface, Digital Retouching") == "1. GIMP: The true Photoshop alternative"
+    assert ab.section_heading(state, "Layer management support, Transformation tools") == "2. Krita"
+    # Already named, not on the page, or before any heading: nothing to add
+    assert ab.section_heading(state, "Krita: Layer management support, Transformation tools") is None
+    assert ab.section_heading(state, "Something the page never says at all") is None
+    assert ab.section_heading(state, "The list is in no particular order") is None
+    # Copied from a heading on, it is its own section: not the heading above ("1. GIMP")
+    assert ab.section_heading(state, "Krita\nKey Features:\n- Layer management support") is None
+
+
+def test_a_discovery_running_into_the_next_section_gets_that_heading_too():
+    part = ("2. Krita\n\nKey Features:\n\nLayer management support, Transformation tools, Variety of brushes\n\n"
+            "3. Darktable\n\nKey Features:\n\nDevelop RAW images, Variety of Image formats supported\n")
+    state = {"parts": [part], "index": 0, "headings": ["2. Krita", "Key Features:", "3. Darktable", "Key Features:"]}
+    text = "Layer management support, Transformation tools, Variety of brushes\nDevelop RAW images, Variety of Image formats"
+    assert ab.with_inner_headings(state, text) == (
+        "Layer management support, Transformation tools, Variety of brushes\n"
+        '(Under the heading "3. Darktable") Develop RAW images, Variety of Image formats')
+    # Lines from one section, or a heading the line already names: unchanged
+    assert ab.with_inner_headings(state, "Develop RAW images\nVariety of Image formats supported") == (
+        "Develop RAW images\nVariety of Image formats supported")
+    assert ab.with_inner_headings(state, "Layer management support, Transformation tools\nDarktable: Develop RAW images"
+                                  ) == "Layer management support, Transformation tools\nDarktable: Develop RAW images"
+
+
+def test_the_heading_can_come_from_an_earlier_part():
+    state = {"parts": ["Intro.\n\nDarktable\n\nIt develops RAW", "images and manages photo collections well."],
+             "index": 1, "headings": ["Darktable"]}
+    assert ab.section_heading(state, "images and manages photo collections well") == "Darktable"
+
+
+def test_blocked_sites_match_their_subdomains_and_paths(monkeypatch):
+    from localagentbrowser import pages
+    monkeypatch.setattr(pages, "BLOCKED_SITES", ["huggingface.co/datasets", "github.com/openai/simple-evals"])
+    assert pages.blocked_site("https://huggingface.co/datasets/basicv8vc/SimpleQA")
+    assert pages.blocked_site("https://www.github.com/openai/simple-evals/blob/main/README.md")
+    assert not pages.blocked_site("https://huggingface.co/audiomagic/yamnet-onnx")
+    assert not pages.blocked_site("https://en.wikipedia.org/wiki/IEEE")
+    monkeypatch.setattr(pages, "BLOCKED_SITES", [])
+    assert not pages.blocked_site("https://huggingface.co/datasets/x")
+
+
+def test_a_byline_is_not_a_section_heading():
+    part = "Symbols of the Owl in Different Cultures\n\nBY ISABELLA HU\n\nIn Western culture owls stand for wisdom and learning."
+    state = {"parts": [part], "index": 0, "headings": ["Symbols of the Owl in Different Cultures", "BY ISABELLA HU"]}
+    assert ab.section_heading(state, "In Western culture owls stand for wisdom") == "Symbols of the Owl in Different Cultures"
+
+
+def test_a_discovery_s_lines_are_found_from_where_it_starts_not_in_an_earlier_section():
+    part = ("1. GIMP\n\nKey Features:\n\nLayer management support\nCustomizable Interface\n\n2. Krita\n\nKey Features:\n\n"
+            "Layer management support\nTransformation tools\nVariety of brushes and drawing tools\n\n3. Darktable\n\n"
+            "Key Features:\n\nDevelop RAW images\nVariety of Image formats supported\n")
+    state = {"parts": [part], "index": 0,
+             "headings": ["1. GIMP", "Key Features:", "2. Krita", "Key Features:", "3. Darktable", "Key Features:"]}
+    text = ("Krita\nKey Features:\n- Layer management support\n- Transformation tools\n- Variety of brushes and drawing "
+            "tools\n- Develop RAW images")
+    assert ab.with_inner_headings(state, text) == (
+        "Krita\nKey Features:\n- Layer management support\n- Transformation tools\n- Variety of brushes and drawing "
+        'tools\n(Under the heading "3. Darktable") - Develop RAW images')
+
+
+def test_a_sentence_marked_up_as_a_heading_is_not_a_section_heading():
+    long = ("3. The light-independent reactions (Calvin cycle) use stored chemical energy from ATP and NADPH to make "
+            "glucose from carbon dioxide.")
+    part = f"Photosynthesis Reactions\n\n{long}\n\nRuBisCO fixes carbon dioxide onto RuBP in the stroma."
+    state = {"parts": [part], "index": 0, "headings": ["Photosynthesis Reactions", long]}
+    assert ab.section_heading(state, "RuBisCO fixes carbon dioxide onto RuBP") == "Photosynthesis Reactions"

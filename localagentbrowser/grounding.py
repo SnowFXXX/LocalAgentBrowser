@@ -3,7 +3,7 @@ names never mentioned, quoted when one is refused."""
 import re
 import unicodedata
 from .config import GROUNDED_PAIR_SHARE, GROUNDED_SENTENCE_SHARE, KNOWN_LINE_THRESHOLD, MAX_CLOSEST_CHARS, MIN_GROUNDING_PAIRS, MIN_SENTENCE_PAIRS, UNGROUNDED_PAIR_SHARE, UNGROUNDED_SENTENCE_SHARE
-from .text import plain_words, shorten, word_pairs
+from .text import plain_words, shorten, with_digits, word_pairs
 from .pages import normalize_url
 
 QUOTE_STYLES = str.maketrans({"‘": "'", "’": "'", "“": "'", "”": "'", '"': "'", "`": "'"})
@@ -24,8 +24,9 @@ def discovery_lines(text):
 
 def grounded_share(text, parts):
     """The share of a discovery's consecutive word pairs that also appear in the given page parts."""
-    mine = word_pairs(str(text).lower())
-    return len(mine & word_pairs(" ".join(parts).lower())) / len(mine) if mine else 1.0
+    # "1 cup" and the page's "one cup" are the same words
+    mine = word_pairs(with_digits(text).lower())
+    return len(mine & word_pairs(with_digits(" ".join(parts)).lower())) / len(mine) if mine else 1.0
 
 def code_text(text):
     # Case, spacing, quote style and placeholder brackets ("<venv>/bin/activate") do not make code different
@@ -77,7 +78,31 @@ def command_lines(commands, parts):
     heads = [h for h in heads if len(h) > 3]
     return [shorten(line, MAX_CLOSEST_CHARS) for line in dict.fromkeys(x for x in lines if any(h in x.lower() for h in heads))][:2]
 
-def grounding_check(parameter, page_state, current_url, objective=""):
+OWN_DRAFT_SHARE = 0.6  # A DISCOVER sentence sharing this much of its word pairs with an earlier FINISH draft...
+OWN_PAGE_SHARE = 0.35  # ...and less than this with the page itself (without the objective) is the agent's own text
+
+
+def own_draft_sentence(parameter, page_parts, drafts):
+    """A sentence of the DISCOVER the agent wrote itself in an earlier FINISH, and the page does not give.
+
+    Its FINISH "For a hobby project with a few hundred users, PostgreSQL would be the recommended choice..." was
+    refused; three turns later that sentence came back appended to a real page line, as a DISCOVER, and the result
+    cited it for its recommendation. It scored as grounded because the objective counts as page text, and the
+    sentence is mostly the objective's own words; scored against the page alone, it is not there."""
+    if not drafts:
+        return None
+    mine = [word_pairs(" ".join(plain_words(d))) for d in drafts]
+    for s in re.split(r"(?<=[.!?])\s+|\n+", parameter):
+        pairs = word_pairs(" ".join(plain_words(s)))
+        if len(pairs) < MIN_SENTENCE_PAIRS:
+            continue
+        from_draft = any(len(pairs & d) >= OWN_DRAFT_SHARE * len(pairs) for d in mine)
+        if from_draft and grounded_share(s, page_parts) < OWN_PAGE_SHARE:
+            return s.strip()
+    return None
+
+
+def grounding_check(parameter, page_state, current_url, objective="", drafts=()):
     # Shown part 2 of a guide, which ended "Just follow these 6 easy steps", the model recorded six steps it
     # wrote itself (the real ones were in part 3), then a care routine the page never gave. Real discoveries
     # from earlier runs shared 64-100% of their word pairs with the page; these shared 11-44%, and a rerun's
@@ -100,6 +125,13 @@ def grounding_check(parameter, page_state, current_url, objective=""):
                                             f"write it. Commands are copied exactly as the page writes them{said}. "
                                             "DISCOVER that in the page's own words, or READ_MORE if a later part gives "
                                             "the command.")
+    # Refused outright, before the share checks: repeating it must not confirm it, since the agent wrote it
+    own = own_draft_sentence(parameter, shown[:-1], drafts)
+    if own:
+        return "BLOCKED_DISCOVER_OWN_WORDS", (f"\"{shorten(own, 160)}\" is what you wrote yourself when you tried to "
+                                              "FINISH, not what the page says. DISCOVER only the page's own words; your "
+                                              "conclusion or recommendation belongs in the final result, written at "
+                                              "FINISH.")
     long_enough = len(word_pairs(parameter)) >= MIN_GROUNDING_PAIRS
     whole = grounded_share(parameter, shown) if long_enough else 1.0
     # An invented sentence can hide behind copied ones: an opinion task's discovery was 75% copied, but its last

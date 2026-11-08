@@ -7,7 +7,7 @@ from playwright.async_api import async_playwright
 from .config import API_KEY, BASE_URL, MAX_CHEAP_RETRIES, MAX_CONVERSATION_TOKENS, MAX_DISCOVERY_PROMPT_CHARS, MAX_FOLLOWUPS, MAX_JSON_RETRIES, MAX_QUERY_WORDS, MAX_VISITS_PER_URL, MODEL, MODEL_RETRY_WAITS, MODEL_TIMEOUT_SECONDS, TURN_MAX_TOKENS, OBJECTIVE_CHECK_EVERY, REPORT_FILE, STALL_TURNS, TURN_PAUSE_SECONDS
 from .prompts import CUT_OFF, FINAL_RESULT, FIRST_TURN_INSTRUCTION, GIVE_UP_RULE, READ_FIRST, RESPONSE_FORMAT, SYSTEM_PROMPT, TURN_INSTRUCTIONS
 from .text import extract_message_content, was_cut_off
-from .pages import build_environment, count_search_results, determine_url, is_search_page, load_page, normalize_url, read_more_target, render_part, search_query, where_you_are
+from .pages import build_environment, count_search_results, determine_url, is_search_page, load_page, normalize_url, read_more_target, render_part, search_query, section_heading, where_you_are, with_inner_headings
 from .checklist import after_discovery_advice, check_parts, checklist_lines, link_discovery, split_objective
 from .coverage import amounts_not_found, coverage_refusal, not_found_items
 from .checks import check_decision, escalation_message, numbered_discoveries, numbered_lines, refusal_correction, source_note
@@ -319,7 +319,8 @@ async def main():
                         missing, unproven = await not_found_items(client, objective, tried, journal)
                         no_amounts = amounts_not_found(tried.get("checklist"), journal, skip=missing)
                         final = await compose_final_result(client, objective, journal, tried.get("checklist"), missing,
-                                                           unproven, no_amounts, tried.get("evidence"))
+                                                           unproven, no_amounts, tried.get("evidence"),
+                                                           tried.get("short_counts"))
                         if final:
                             finish_entry.update(draft=parameter, finding=final)
                     except Exception as err:
@@ -398,8 +399,13 @@ async def main():
                     print(f"📝 Logging critical discovery element: {parameter}")
                     number = sum(1 for e in journal if e.get("action") == "DISCOVER") + 1
                     linked = link_discovery(tried["checklist"], decision.get("checklist_items"), number)
+                    # Recorded with its section's heading when the copied text does not name it (the heading is page
+                    # text too): every later check and the final result then see what the lines are about
+                    heading = section_heading(page_state, parameter)
+                    inner = with_inner_headings(page_state, parameter)
+                    recorded = f'(Under the heading "{heading}") {inner}' if heading else inner
                     journal.append({"turn": turn_counter, "thought": thought, "action": "DISCOVER", "source": current_url,
-                                    "extracted_data": parameter, "checklist_items": linked})
+                                    "extracted_data": recorded, "checklist_items": linked})
                     page_state["visit_discoveries"] = page_state.get("visit_discoveries", 0) + 1
                     page_state.setdefault("recorded_parts", set()).add(page_state["index"])
                     # A discovery is when the objective can become complete; on a one-answer question the model

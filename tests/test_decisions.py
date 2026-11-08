@@ -36,6 +36,9 @@ def decide(action, parameter, page_state, current_url, queries=(), urls=(), jour
     ("NAVIGATE", DOCS + "#section", "BLOCKED_NAVIGATE"),
     ("NAVIGATE", "", "BLOCKED_NAVIGATE"),
     ("NAVIGATE", "https://example.com", None),
+    ("NAVIGATE", "example.org/page", None),
+    ("NAVIGATE", "discovered", "BLOCKED_NAVIGATE"),
+    ("NAVIGATE", "the size of their budget and team", "BLOCKED_NAVIGATE"),
     ("READ_MORE", "", "BLOCKED_READ_MORE"),
     ("READ_MORE", "1", None),
     ("READ_MORE", "9", "BLOCKED_READ_MORE"),
@@ -673,3 +676,26 @@ def test_a_number_next_to_a_headings_words_is_still_a_fact():
     page = recorded_page(DOCS, ["Mount Kilimanjaro\nIt is 5,895 metres high."])
     page["headings"] = ["Mount Kilimanjaro"]
     assert not ab.is_heading_discovery("Mount Kilimanjaro 5,895", page)
+
+
+def test_a_discovery_repeating_the_agents_own_refused_finish_is_refused():
+    # Box 1, 2026-11-06: the refused FINISH's recommendation came back appended to a real page line
+    page = "PostgreSQL is designed for large-scale, high-traffic applications with many concurrent writers."
+    state = {"url": "https://compare.example/a", "parts": [page], "index": 0, "seen_parts": {0}}
+    objective = ("Compare SQLite and PostgreSQL for a small web application, then recommend one for a hobby project "
+                 "with a few hundred users.")
+    draft = "For a hobby project with a few hundred users, PostgreSQL would be the recommended choice for its scalability."
+    discover = page + " " + draft
+    tried = {"objective": objective, "finish_drafts": [draft]}
+    refusal = ab.check_decision("DISCOVER", discover, [], tried, state, "https://compare.example/a")
+    assert refusal and refusal[0] == "BLOCKED_DISCOVER_OWN_WORDS" and "when you tried to FINISH" in refusal[1]
+    # The page's own sentence alone still goes through, as does the same draft text when the page really says it
+    assert ab.check_decision("DISCOVER", page, [], tried, state, "https://compare.example/a") is None
+    state["parts"] = [page + " " + draft]
+    assert ab.check_decision("DISCOVER", discover, [], tried, state, "https://compare.example/a") is None
+
+
+def test_a_finish_is_kept_whole_as_a_draft():
+    tried = {"objective": "o"}
+    ab.check_decision("FINISH", "A long draft answer " * 20, [], tried, {}, "")
+    assert tried["finish_drafts"] == ["A long draft answer " * 20]

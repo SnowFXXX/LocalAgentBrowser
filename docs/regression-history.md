@@ -274,6 +274,49 @@ Measured and not used:
 - **Showing the final result the gaps the coverage check could not confirm.** One sample still filled them in;
   another came out as empty headings.
 
+### 1.64 (runs 2026-11-05 to 2026-11-08: two PCs, then four models)
+The issue #11 work (silent omission) ran as numbered internal steps on two PCs with identical code: **PC A** and
+**PC B**, both Intel i5-9500 with no GPU (PC A 16 GB of RAM, PC B 24 GB). Full suites were run at v7, v10, v11 and
+v12; v8 and v9 were stopped early on purpose, when a run showed a problem with a known fix. From v3 on, the list task
+is "three free, open-source alternatives to Adobe Photoshop" (the office-suite task had become too easy to say much).
+All times are model minutes with a 90-minute limit per task.
+
+**Qwen2.5-7B, both PCs:**
+
+| Step | PC A | PC B |
+|---|---|---|
+| v6 (start of the two-PC runs) | 7 of 7, 283.5 | 5 of 7, 325.6 |
+| v7 | 6 of 7, 303.7 | 7 of 7, 232.0 |
+| v10 | 7 of 7, 343.6 | 7 of 7, 262.0 |
+| v11 | 7 of 7, 297.8 | 7 of 7, 269.6 |
+
+**Four models on v12 (the released code):**
+
+| Model | PC | Finished | Model time | Outside knowledge | Numbers not in findings | Commands not in findings |
+|---|---|---|---|---|---|---|
+| Qwen2.5-7B | B | 6 of 7 | 360.8 min | 0 | 0 | 0 |
+| Llama-3.1-8B | A | 7 of 7 | 302.7 min | 0 | 0 ¹ | 0 |
+| Qwen2.5-14B | B | 5 of 7 | 564.5 min | 0 | 0 | 0 |
+| Qwen2.5-3B | A | 3 of 7 | 490.1 min | 0 | 0 | 0 |
+
+1. The suite counted 2, both from the code's own "Left out" note for numbers it had cut; the scorer fix for those
+   notes covered commands and uncited lines, and numbers follow in the next version.
+
+- **7B:** only the documentation task ran out of time, reading the official reference page part after part without
+  recording anything, as on 1.63. v11's two 7B runs finished it in 34 and 42 minutes.
+- **Llama 3.1 8B: 7 of 7, up from 2 of 7.** Read by hand, no finished result contains an invented fact. Its mistakes
+  are on the cautious side: caveats and "not found" lines for things its findings do give, two citations pointing at
+  the neighbouring finding, and a documentation answer with no commands in it.
+- **14B:** honest whenever it finished; its two time-outs came while its result was being checked and written (the
+  drafts were correct). At about 2.5 times the 7B's time per call, 90 minutes is tight for it.
+- **3B: 3 of 7, up from 0.** One finished result has an unbacked claim the suite's checks did not catch: "Pixlr
+  offers 100+ Photoshop features", a misreading of a link card about GIMP that the code had tagged with the heading
+  above it ("Pixlr"). It also named Pixlr, which isn't open source; the suite flagged that.
+
+What's next: false caveats and false "not found" lines, citations on the neighbouring finding, and headings taken
+from link cards and tables of contents, moving the deciding into code wherever a model's judgement has stopped
+improving with better wording.
+
 ## What the steps showed overall
 
 - **The fixed checklist was the big step** (1.53). The model no longer invents parts of the objective or loses

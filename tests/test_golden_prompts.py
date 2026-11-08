@@ -71,6 +71,7 @@ LONG_SCRIPT = [
     reply("READ_MORE", "6"),            # sent back: the next turn starts from a fresh prompt
     reply("FINISH", "Use PostgreSQL."),  # the finish check again
     reply("FINISH", "Use PostgreSQL."),  # repeated: the coverage check ran once, so the final result is written
+    verdict("[2] " + FEATURES, things=[("JSON columns", "JSON columns"), ("window functions", "window functions")]),  # recounted: still 2 of 3
     "PostgreSQL has JSON columns and window functions [2]; SQLite needs no administration [1]. My view: PostgreSQL.",
 ] + [reply("FINISH", "Use PostgreSQL.")] * 4
 
