@@ -89,6 +89,21 @@
   .rule { margin-top: 30px; padding: 22px 26px; border-left: 4px solid var(--mint); background: rgba(18,49,43,.45);
           border-radius: 0 12px 12px 0; font-size: 19px; }
 
+  /* Four models */
+  .models { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-top: 40px; }
+  .model { background: rgba(18,36,56,.6); border: 1.5px solid var(--chip-line); border-radius: 14px; padding: 22px; }
+  .model.best { border-color: var(--mint-line); background: rgba(18,49,43,.55); }
+  .model .tag { font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--blue); }
+  .model.best .tag { color: var(--mint); }
+  .model h3 { margin: 8px 0 4px; }
+  .model .score { font-size: 40px; font-weight: 800; color: var(--mint); line-height: 1.1; }
+  .model .score small { font-size: 17px; color: var(--muted); font-weight: 600; }
+  .model dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin-top: 12px; font-size: 15px; }
+  .model dt { color: var(--muted); }
+  .model dd { color: var(--sub); }
+  .model p { color: var(--sub); font-size: 15px; margin-top: 12px; }
+  .note { font-size: 15px; color: var(--muted); margin-top: 16px; }
+
   /* Code blocks */
   pre { position: relative; font-family: var(--mono); font-size: 15px; line-height: 1.55; background: #070b12;
         border: 1px solid var(--chip-line); border-radius: 12px; padding: 18px 20px; overflow-x: auto; margin-top: 14px; }
@@ -115,11 +130,13 @@
   @media (max-width: 820px) {
     nav ul { display: none; }
     .cards, .two { grid-template-columns: 1fr; }
+    .models { grid-template-columns: 1fr 1fr; }
     .step { grid-template-columns: 1fr; gap: 4px; }
     section { padding: 64px 0; }
     header .wrap { padding-top: 56px; padding-bottom: 56px; }
     .flow i { display: none; }
   }
+  @media (max-width: 560px) { .models { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
@@ -129,8 +146,9 @@
     <a class="mark" href="#">LocalAgent<b>Browser</b></a>
     <ul>
       <li><a href="#claims">The claims</a></li>
+      <li><a href="#models">Four models</a></li>
       <li><a href="#how">How it works</a></li>
-      <li><a href="#start">Quick start</a></li>
+      <li><a href="#install">Install</a></li>
       <li><a href="#challenge">The challenge</a></li>
       <li><a href="https://github.com/SnowFXXX/LocalAgentBrowser">GitHub</a></li>
     </ul>
@@ -147,12 +165,14 @@
       <span>SEARCH</span><i>→</i><span>NAVIGATE</span><i>→</i><span>READ_MORE</span><i>→</i><span>DISCOVER</span><i>→</i><span class="end">FINISH</span>
     </div>
     <div class="ctas">
-      <a class="btn primary" href="#start">Get started</a>
+      <a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest">Download for Windows</a>
+      <a class="btn" href="#install">Other ways to install</a>
       <a class="btn" href="https://github.com/SnowFXXX/LocalAgentBrowser">View on GitHub</a>
       <a class="btn" href="#article">Read the article</a>
     </div>
     <div class="pills">
-      <span class="pill">No cloud AI</span><span class="pill">7B model on a CPU</span>
+      <span class="pill">Local by default</span><span class="pill">Four models tested on a CPU</span>
+      <span class="pill">Windows installer</span>
       <span class="pill">Free and open source (MIT)</span><span class="pill">LM Studio + Playwright</span>
     </div>
   </div>
@@ -185,7 +205,7 @@
       </div>
     </div>
     <figure>
-      <a href="assets/chart1.png"><img src="assets/chart1.png" alt="Four models on the same code: Qwen 2.5 7B finished 6 of 7 tasks, Qwen 2.5 14B 2 of 7, Llama 3.1 8B 2 of 7, each with 0 gaps filled from its own knowledge; Qwen 2.5 3B finished 0 of 7, running out of time on every task." width="2400" height="1350"></a>
+      <a href="assets/chart1.png"><img src="assets/chart1.png" alt="Four models on the same code (1.64): Qwen 2.5 7B finished 6 of 7 tasks, Llama 3.1 8B 7 of 7, Qwen 2.5 14B 5 of 7 and Qwen 2.5 3B 3 of 7, each with 0 gaps filled from its own knowledge." width="2400" height="1350"></a>
     </figure>
     <div class="two">
       <figure>
@@ -193,14 +213,55 @@
         <figcaption>Word matching rated an invented command above two real ones. Now commands must be on the page exactly.</figcaption>
       </figure>
       <figure>
-        <a href="assets/chart2.png"><img src="assets/chart2.png" alt="The testing behind the claims: 44 full test-suite runs, 205 tasks, 525 findings checked against their page, 118.7 hours of the AI working." width="2400" height="1350"></a>
+        <a href="assets/chart2.png"><img src="assets/chart2.png" alt="The testing behind the claims, on two PCs from October 16 to November 7: 67 test-suite runs, 361 tasks, 901 findings checked against their page, 215.7 hours of the AI working." width="2400" height="1350"></a>
         <figcaption>Every run is saved: what the AI was shown, what it replied, what the code allowed.</figcaption>
       </figure>
     </div>
   </div>
 </section>
 
-<section id="how" class="alt">
+<section id="models" class="alt">
+  <div class="wrap">
+    <div class="kicker">Tested on four models</div>
+    <h2>Pick the model that fits <em>your PC.</em></h2>
+    <p class="lead">The same seven tasks, the same code, 90 minutes per task, on an ordinary 6-core office PC with no
+      graphics card. None of them filled a gap in a finished answer from its own knowledge.</p>
+    <div class="models">
+      <div class="model best">
+        <div class="tag">The default</div>
+        <h3>Qwen 2.5 7B</h3>
+        <div class="score">6<small> of 7 finished</small></div>
+        <dl><dt>Download</dt><dd>4.7 GB</dd><dt>Memory</dt><dd>8 GB</dd><dt>All 7 tasks</dt><dd>about 6 h</dd></dl>
+        <p>The one it was built with. The right start for most PCs.</p>
+      </div>
+      <div class="model">
+        <div class="tag">Finished them all</div>
+        <h3>Llama 3.1 8B</h3>
+        <div class="score">7<small> of 7 finished</small></div>
+        <dl><dt>Download</dt><dd>4.9 GB</dd><dt>Memory</dt><dd>8 GB</dd><dt>All 7 tasks</dt><dd>about 5 h</dd></dl>
+        <p>No invented facts in any answer. When it errs, it errs cautious.</p>
+      </div>
+      <div class="model">
+        <div class="tag">The biggest</div>
+        <h3>Qwen 2.5 14B</h3>
+        <div class="score">5<small> of 7 finished</small></div>
+        <dl><dt>Download</dt><dd>9.0 GB</dd><dt>Memory</dt><dd>16 GB</dd><dt>All 7 tasks</dt><dd>about 9½ h</dd></dl>
+        <p>About 2.5 times slower on a CPU; its two time-outs came while a correct answer was being checked.</p>
+      </div>
+      <div class="model">
+        <div class="tag">The smallest</div>
+        <h3>Qwen 2.5 3B</h3>
+        <div class="score">3<small> of 7 finished</small></div>
+        <dl><dt>Download</dt><dd>1.9 GB</dd><dt>Memory</dt><dd>4 GB</dd><dt>All 7 tasks</dt><dd>about 8 h</dd></dl>
+        <p>For PCs with little memory. One finished answer has a claim the checks missed.</p>
+      </div>
+    </div>
+    <p class="note">On version 1.63 the same models finished 6, 2, 2 and 0 of 7.
+      <a href="https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md">Every run, measured.</a></p>
+  </div>
+</section>
+
+<section id="how">
   <div class="wrap">
     <div class="kicker">How it works</div>
     <h2>The AI proposes. <em>The code decides what counts.</em></h2>
@@ -218,22 +279,38 @@
   </div>
 </section>
 
-<section id="start">
+<section id="install" class="alt">
   <div class="wrap">
-    <div class="kicker">Quick start</div>
+    <div class="kicker">Install</div>
     <h2>Runs on the computer <em>you already have.</em></h2>
-    <p class="lead">Built for a 7B model on an ordinary CPU, no graphics card needed. A run takes from about 10
-      minutes to an hour, so start it and let it work.</p>
-    <ol class="start">
-      <li>Install <a href="https://lmstudio.ai">LM Studio</a>, download a model (developed with
-        <strong>Qwen2.5-7B-Instruct</strong>), load it and start the local server (Developer tab → Start Server).</li>
-      <li>Install the agent (Python 3.10 or later) and the browser it drives:
-        <pre><code>pip install localagentbrowser
-python -m playwright install chromium</code></pre></li>
-      <li>Run it and type your question:
-        <pre><code>localagentbrowser</code></pre>
-        When it finishes, read <code>research_report.md</code>: the answer, and every finding with the page it came from.</li>
-    </ol>
+    <p class="lead">No graphics card needed. A run takes from about 10 minutes to an hour on a CPU, so start it and
+      let it work. You'll need <a href="https://lmstudio.ai">LM Studio</a> (free), which runs the model.</p>
+    <div class="two">
+      <div>
+        <h3>Windows: the installer</h3>
+        <ol class="start">
+          <li>Install <a href="https://lmstudio.ai">LM Studio</a>.</li>
+          <li>Download <strong>LocalAgentBrowser-setup.exe</strong> from the latest release and run it. If Windows says
+            it protected your PC, click <strong>More info → Run anyway</strong>: the installer isn't code-signed yet.</li>
+          <li>Pick what to install and one of the four tested models; setup downloads it through LM Studio, and the
+            browser the agent uses. No administrator rights, no Python needed.</li>
+          <li>Open <strong>LocalAgentBrowser</strong> from the Start menu and type your question. The report opens in
+            your browser when it's done.</li>
+        </ol>
+        <div class="ctas"><a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest">Download for Windows</a></div>
+      </div>
+      <div>
+        <h3>Any system: pip</h3>
+        <p class="lead" style="font-size:16px">Python 3.10 or later, in a virtual environment:</p>
+        <pre><code>python -m venv venv
+venv\Scripts\activate
+pip install localagentbrowser
+python -m playwright install chromium
+localagentbrowser</code></pre>
+        <p class="lead" style="font-size:16px">On macOS or Linux, activate with <code>source venv/bin/activate</code>.
+          In LM Studio, load the model with a context length of 8192 and start the local server.</p>
+      </div>
+    </div>
     <div class="two">
       <div>
         <h3>Good for</h3>
@@ -251,8 +328,9 @@ python -m playwright install chromium</code></pre></li>
           <li>Anything behind a form, a login or a button. It reads pages; clicking is still to come.</li>
           <li>Fast answers. A small model on a CPU takes its time.</li>
         </ul>
-        <p class="lead" style="font-size:16px">Its searches, written from your question, go to DuckDuckGo, and it
-          reads pages like any browser. The model and the report stay on your computer.</p>
+        <p class="lead" style="font-size:16px">Local by default: searches go to DuckDuckGo and pages load like in any
+          browser, while the model and the report stay on your computer. Cloud models are an option you turn on
+          yourself, with your own key.</p>
       </div>
     </div>
     <p class="lead" style="margin-top:30px">See <a href="https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/examples/README.md">two
@@ -275,12 +353,12 @@ python tools/regression.py --model qwen2.5-7b-instruct --minutes 90</code></pre>
       <a class="btn" href="https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/CHANGELOG.md">Changelog</a>
     </div>
     <figure>
-      <a href="assets/chart3.png"><img src="assets/chart3.png" alt="Tasks finished out of 7 by the default 7B model, version by version: 2, 5, 4, 5, 5, 4, 4, 5, 5, 6, 6, 7, 6, and 7 of 7 for the current version with no time limit." width="2400" height="1350"></a>
+      <a href="assets/chart3.png"><img src="assets/chart3.png" alt="Tasks finished out of 7 by the default 7B model, version by version: 2, 5, 4, 5, 5, 4, 4, 5, 5, 6, 6, 7, 6, 6 for 1.64, and 7 of 7 for 1.63 with no time limit." width="2400" height="1350"></a>
     </figure>
   </div>
 </section>
 
-<section id="article" class="alt">
+<section id="article">
   <div class="wrap">
     <div class="kicker">The story</div>
     <h2>We Can Do Better: <em>A Small AI That Can't Cover Up</em></h2>
