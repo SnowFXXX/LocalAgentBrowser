@@ -11,6 +11,9 @@ API_KEY = os.environ.get("LMSTUDIO_API_KEY", "lm-studio")
 # Extra JSON fields sent with every model request, for servers other than LM Studio (empty by default). The cloud
 # mode sends OpenRouter's provider rules: only providers that honour the JSON format, and none that keep prompts.
 EXTRA_BODY = json.loads(os.environ.get("LMSTUDIO_EXTRA_BODY") or "{}")
+# Extra HTTP headers sent with every model request (empty by default). The cloud mode sends OpenRouter's app
+# attribution, so runs are listed under LocalAgentBrowser; remove LMSTUDIO_EXTRA_HEADERS to turn that off.
+EXTRA_HEADERS = json.loads(os.environ.get("LMSTUDIO_EXTRA_HEADERS") or "{}")
 
 CONTEXT_LENGTH = int(os.environ.get("LMSTUDIO_CONTEXT_LENGTH", "8192"))
 

@@ -175,13 +175,15 @@ begin
   end;
   if OptionalPage.Values[0] then
   begin
-    SetArrayLength(Lines, 6);
+    SetArrayLength(Lines, 8);
     Lines[0] := 'rem Written by setup: cloud models through OpenRouter, chosen at install. The key comes from your own';
     Lines[1] := 'rem OPENROUTER_API_KEY environment variable and is never stored here. Delete this file to use LM Studio again.';
     Lines[2] := 'set "LAB_CLOUD=1"';
     Lines[3] := 'set "LMSTUDIO_BASE_URL=https://openrouter.ai/api/v1"';
     Lines[4] := 'set "LMSTUDIO_MODEL=qwen/qwen-2.5-7b-instruct"';
     Lines[5] := 'set "LMSTUDIO_EXTRA_BODY={"provider": {"require_parameters": true, "data_collection": "deny"}}"';
+    Lines[6] := 'rem OpenRouter app attribution (lists runs under LocalAgentBrowser, no content shared); delete the next line to turn it off';
+    Lines[7] := 'set "LMSTUDIO_EXTRA_HEADERS={"HTTP-Referer": "https://snowfxxx.github.io/LocalAgentBrowser/", "X-OpenRouter-Title": "LocalAgentBrowser"}"';
     SaveStringsToFile(Dir + '\cloud.cmd', Lines, False);
   end;
 end;

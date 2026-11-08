@@ -422,6 +422,8 @@ def write_run_info(folder, meta):
 CLOUD_URL = "https://openrouter.ai/api/v1"
 # Only providers that honour the JSON format the agent asks for, and none that store or train on prompts
 CLOUD_RULES = {"provider": {"require_parameters": True, "data_collection": "deny"}}
+# OpenRouter's app attribution: cloud runs are listed under LocalAgentBrowser (no request content is shared)
+CLOUD_HEADERS = {"HTTP-Referer": "https://snowfxxx.github.io/LocalAgentBrowser/", "X-OpenRouter-Title": "LocalAgentBrowser"}
 
 
 def use_cloud():
@@ -430,7 +432,8 @@ def use_cloud():
     key = os.environ.get("OPENROUTER_API_KEY")
     if not key:
         sys.exit("Cloud mode needs the OPENROUTER_API_KEY environment variable (set it yourself, never in a file).")
-    os.environ.update(LMSTUDIO_BASE_URL=CLOUD_URL, LMSTUDIO_API_KEY=key, LMSTUDIO_EXTRA_BODY=json.dumps(CLOUD_RULES))
+    os.environ.update(LMSTUDIO_BASE_URL=CLOUD_URL, LMSTUDIO_API_KEY=key, LMSTUDIO_EXTRA_BODY=json.dumps(CLOUD_RULES),
+                      LMSTUDIO_EXTRA_HEADERS=json.dumps(CLOUD_HEADERS))
     ab.BASE_URL, ab.API_KEY = CLOUD_URL, key
 
 
@@ -443,7 +446,8 @@ def model_server_ready():
 
 
 def get_json(url, data=None, timeout=10):
-    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {ab.API_KEY}"}
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {ab.API_KEY}",
+               **json.loads(os.environ.get("LMSTUDIO_EXTRA_HEADERS") or "{}")}
     if data:
         data = {**data, **json.loads(os.environ.get("LMSTUDIO_EXTRA_BODY") or "{}")}
     request = urllib.request.Request(url, data=json.dumps(data).encode() if data else None, headers=headers)
