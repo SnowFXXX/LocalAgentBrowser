@@ -2,47 +2,48 @@
 
 **Objective:** Compare SQLite and PostgreSQL for a small web application: setup and administration, handling of many simultaneous users, and features. Then recommend one for a hobby project with a few hundred users.
 
-**Status:** finished by the agent on turn 8
+**Status:** finished by the agent on turn 9
 
 ## Final result
 
-### SQLite and PostgreSQL Comparison
+### SQLite vs PostgreSQL for a Small Web Application
 
-1. **Setup and Administration**
-   - **SQLite**: Setup is straightforward as it operates as a single file with simple command-line tools for administration [2].
-   - **PostgreSQL**: Offers advanced administrative capabilities through sophisticated command-line tools like `pgAdmin`, `psql`, `pg_dump`, and `pg_restore` [2].
+#### Setup and Administration
+- **PostgreSQL**: Offers advanced administrative capabilities such as sophisticated command-line tools, graphical admin tools, monitoring via admin views and statistics collectors, automated vacuuming, logging, backups, fine-grained access control, streaming replication for high-availability, load balancing, failover management for clusters, and extensive logging for auditing and debugging. [1]
+- **SQLite**: Administration is straightforward with single-file databases and no separate server process. [1]
 
-2. **Handling Many Simultaneous Users**
-   - No specific information was found regarding how SQLite or PostgreSQL handle many simultaneous users in the provided discoveries.
+#### Handling of Many Simultaneous Users
+- **PostgreSQL**: Designed for large-scale, high-traffic applications; scales well in terms of storage, complexity, concurrency, read/write performance, and can handle hundreds to thousands of concurrent users. [3]
+- **SQLite**: Best for single-machine, low-traffic applications with small databases (up to 100GB). [3]
 
-3. **Features**
-   - **PostgreSQL**: Features a comprehensive feature set including complex SQL support, advanced indexing, sophisticated transaction management, and replication capabilities [2].
-   - **SQLite**: Known for its simplicity with self-contained single-file databases and basic administrative tasks that can be handled via built-in SQL commands [2].
+#### Features
+- **PostgreSQL**: Provides a comprehensive set of features including support for complex SQL, advanced index types such as partial, expression, clustered, and covering indexes, table inheritance, table partitioning, materialized views, foreign data wrappers, replication, clustering, connection pooling, and other enterprise features. [2]
+- **SQLite**: Offers primary keys, foreign keys, joins, views, and transactions but lacks some advanced SQL features like partial indexes, check constraints, and triggers. [2]
 
-### Recommendation
-For a hobby project with a few hundred users, **PostgreSQL** is recommended. While SQLite offers simplicity in setup and administration, PostgreSQL's extensive feature set and advanced capabilities make it more suitable for handling the requirements of a small web application with a growing user base.
+### Recommendation for a Hobby Project with a Few Hundred Users
+Based on the discoveries, PostgreSQL would be more suitable for handling many simultaneous users and providing comprehensive features required by a hobby project with a few hundred users. SQLite is simpler to administer but may not scale as well or support all advanced SQL features needed.
 
-My view: For a hobby project with a few hundred users, PostgreSQL is recommended due to its advanced feature set and better scalability for handling many simultaneous users, despite the lack of specific information in our findings regarding concurrent user support.
+My view: PostgreSQL's robust feature set and scalability make it a better choice for a hobby project expecting hundreds of concurrent users.
 
 ## Checklist
 
 The parts of the objective, with the discoveries recorded for each:
 
-1. Compare SQLite and PostgreSQL setup and administration (discoveries for it: [1], [2])
-2. Compare SQLite and PostgreSQL handling of many simultaneous users (discoveries for it: [1], [2], [3])
-3. Compare SQLite and PostgreSQL features (discoveries for it: [1], [2])
+1. Compare SQLite and PostgreSQL setup and administration (discoveries for it: [1], [3])
+2. Compare SQLite and PostgreSQL handling of many simultaneous users (discoveries for it: [1], [3])
+3. Compare SQLite and PostgreSQL features (discoveries for it: [2])
 4. Recommend one database for a hobby project with a few hundred users (written by you at FINISH, not found on a page)
 
 ## Discoveries (3)
 
-### 1. Turn 3, from https://dev.to/sqldocs/sqlite-vs-postgresql-choose-the-right-database-for-your-app-4hch
+### 1. Turn 4, from https://www.datacamp.com/blog/sqlite-vs-postgresql-detailed-comparison
 
-administration
+PostgreSQL offers advanced administrative capabilities for enterprise database servers including sophisticated command-line tools, graphical admin tools, monitoring via admin views and statistics collectors, automated vacuuming, logging, backups, fine-grained access control, streaming replication for high-availability, load balancing, failover management for clusters, and extensive logging for auditing and debugging. SQLite databases are single files, making administration straightforward with no separate server process.
 
-### 2. Turn 5, from https://dev.to/sqldocs/sqlite-vs-postgresql-choose-the-right-database-for-your-app-4hch
+### 2. Turn 6, from https://www.datacamp.com/blog/sqlite-vs-postgresql-detailed-comparison
 
-PostgreSQL offers an extensive feature set on par with Oracle and SQL Server. Key capabilities include: Complex SQL support including triggers, stored procedures, recursive queries, etc. Advanced index types like partial, expression, clustered, covering indexes, etc. Sophisticated transaction support with savepoints Multi-version concurrency control (MVCC) for isolation Advanced data types like arrays, JSON/XML, geometric, and custom types Table inheritance, table partitioning, materialized views Foreign data wrappers to access external data sources Replication, clustering, connection pooling, and other enterprise features SQLite databases are self-contained single files, so administration is very simple. There is no separate database server process. You interact with the SQLite database file directly using a simple set of command-line administration tools. Some administrative tasks like altering tables, adding indices, importing/exporting data can be done using built-in SQL commands. Backup involves simply copying the database file. PostgreSQL has advanced administrative capabilities suitable for enterprise database servers. This includes: Sophisticated command-line tools like pgAdmin, psql, pg_dump, pg_restore etc. Graphical admin tools like pgAdmin Monitoring via admin views and statistics collectors Automated vacuuming, analyzation, logging, backups, etc. Fine-grained access control and security management Streaming replication setup for high-availability Load balancing, failover management for clusters Extensive logging for auditing and debugging
+PostgreSQL provides a comprehensive set of features including support for complex SQL, advanced index types such as partial, expression, clustered, and covering indexes, table inheritance, table partitioning, materialized views, foreign data wrappers, replication, clustering, connection pooling, and other enterprise features. SQLite offers primary keys, foreign keys, joins, views, and transactions but lacks some advanced SQL features like partial indexes, check constraints, and triggers.
 
-### 3. Turn 7, from https://dev.to/sqldocs/sqlite-vs-postgresql-choose-the-right-database-for-your-app-4hch
+### 3. Turn 8, from https://www.datacamp.com/blog/sqlite-vs-postgresql-detailed-comparison
 
-PostgreSQL supports comprehensive SQL capabilities and many advanced server features suitable for mission-critical enterprise systems.
+(Under the heading "Scalability") PostgreSQL is designed for large-scale, high-traffic applications. It scales well in terms of storage, complexity, concurrency, read/write performance, and can handle hundreds to thousands of concurrent users. SQLite is best for single-machine, low-traffic applications with small databases (up to 100GB).

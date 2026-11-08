@@ -13,6 +13,7 @@ Documentation only; the code is unchanged from 1.64, as measured. A full check o
 - The article keeps its October charts, which its text describes, and gets a dated note with the 1.64 results; the
   paper gets the same note.
 - llms.txt, CONTRIBUTING, docs/how-it-works.md and the regression history's next steps brought up to 1.64.
+- New example reports from the 1.64 test run (an explanation, a how-to and a comparison), replacing the 1.62 ones.
 
 ## [1.64.1] - 2026-11-08
 Documentation only; the code is unchanged from 1.64, as measured.
