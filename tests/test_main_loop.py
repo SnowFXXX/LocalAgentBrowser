@@ -19,6 +19,8 @@ SITE = FakeSite(
     results=[{"title": "Doc A", "href": "//duckduckgo.com/l/?uddg=" + urllib.parse.quote(A), "snippet": "about a"}],
 )
 COVERED = json.dumps({"evidence": "[1] Fact from page A", "missing": "", "conditions": [], "things": []})
+# The setup item quotes words of its own: the same words given for two items count for one only
+COVERED_SETUP = json.dumps({"evidence": "[1] The setup fact on page A", "missing": "", "conditions": [], "things": []})
 SCRIPT = [
     reply("SEARCH", "docs a"),         # turn 1: fresh prompt
     reply("NAVIGATE", A),              # turn 2: search results arrive as a follow-up note
@@ -32,8 +34,8 @@ SCRIPT = [
     reply("NAVIGATE", A),              #         repeated -> goes through (going back to A is allowed)
     reply("FINISH", "done"),           # turn 8: finish check
     reply("FINISH", "final answer"),   #         repeated with the final result -> finished
-    COVERED, COVERED,                  # the coverage check of each checklist item finds no gaps
-    COVERED, COVERED,                  # no item has a linked discovery, so both are checked once more before writing
+    COVERED_SETUP, COVERED,            # the coverage check of each checklist item finds no gaps
+    COVERED_SETUP, COVERED,            # no item has a linked discovery, so both are checked once more before writing
     "Composed final result citing [1].",  # the separate call that writes the final result (plain text)
 ]
 
@@ -150,7 +152,7 @@ def test_a_coverage_send_back_starts_the_next_turn_fresh(monkeypatch, tmp_path):
               reply("FINISH", "done"), reply("FINISH", "done"),  # finish check, then repeated
               gap, COVERED,                                       # coverage check: nothing answers item 1 -> sent back
               reply("FINISH", "done"), reply("FINISH", "done"),   # next turn, fresh prompt
-              COVERED, COVERED,                                   # nothing linked: both items checked once more
+              COVERED_SETUP, COVERED,                             # nothing linked: both items checked once more
               "Final [1]."]
     calls, journal = run_agent(monkeypatch, tmp_path, script=script)
     assert any(e["action"] == "BLOCKED_COVERAGE" for e in journal)

@@ -9,6 +9,15 @@ def word_pairs(text):
 
 NUMBER_WORDS = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
 
+# Small numbers written out, read as digits: a page's "one cup of beans steeped in four cups of water" was refused
+# when the model wrote it "1 cup ... 4 cups", the retry dropped the amounts, and the result said none were found.
+# "one of the best" is not an amount, so a word followed by "of" stays a word
+SPELLED_NUMBERS = {"one": 1, **NUMBER_WORDS, "eleven": 11, "twelve": 12, "fifteen": 15, "twenty": 20, "thirty": 30}
+SPELLED_NUMBER = re.compile(r"\b(" + "|".join(SPELLED_NUMBERS) + r")\b(?!\s+of\b)", re.I)
+
+def with_digits(text):
+    return SPELLED_NUMBER.sub(lambda m: str(SPELLED_NUMBERS[m.group(1).lower()]), str(text))
+
 MEASURE_WORDS = {"second", "seconds", "minute", "minutes", "hour", "hours", "day", "days", "week", "weeks", "month",
                  "months", "year", "years", "cup", "cups", "times", "percent"}
 

@@ -11,6 +11,10 @@ CONTEXT_LENGTH = int(os.environ.get("LMSTUDIO_CONTEXT_LENGTH", "8192"))
 
 SEARCH_URL = "https://html.duckduckgo.com/html/?q="
 
+# Sites a run must not read, comma-separated (a benchmark run excludes pages that republish its questions and answers):
+# "huggingface.co/datasets,github.com/openai/simple-evals". Empty, so off, unless set
+BLOCKED_SITES = [s.strip() for s in os.environ.get("LAB_BLOCKED_SITES", "").split(",") if s.strip()]
+
 REPORT_FILE = "research_report.md"
 
 JOURNAL_BATCH = 6        # The prompt shows 6-11 recent journal entries; old ones are dropped 6 at a time

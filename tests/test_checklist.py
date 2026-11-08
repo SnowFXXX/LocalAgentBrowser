@@ -119,7 +119,7 @@ class TestFinalResult:
 
     def test_the_result_is_read_from_its_field(self):
         client, model = fake_client([json.dumps({"result": "Kilimanjaro, 5,895 m [1]."})])
-        assert asyncio.run(ab.compose_final_result(client, "objective", discoveries("x"))) == "Kilimanjaro, 5,895 m [1]."
+        assert asyncio.run(ab.compose_final_result(client, "objective", discoveries("5,895 m"))) == "Kilimanjaro, 5,895 m [1]."
 
     def test_a_tool_call_or_the_prompt_repeated_is_asked_for_again(self):
         # What Llama 3.1 8B and Qwen 3B wrote instead of a final result in the 2026-10-25 model tests
@@ -127,7 +127,7 @@ class TestFinalResult:
         echoed = json.dumps({"result": "### OBJECTIVE\nHow tall is it?\n### DISCOVERIES\n[1] x"})
         for first in (tool_call, echoed):
             client, model = fake_client([first, json.dumps({"result": "It is 5,895 m tall [1]."})])
-            assert asyncio.run(ab.compose_final_result(client, "objective", discoveries("x"))) == "It is 5,895 m tall [1]."
+            assert asyncio.run(ab.compose_final_result(client, "objective", discoveries("5,895 m"))) == "It is 5,895 m tall [1]."
             assert model.calls[1][-1]["content"].startswith("That reply was not the final result")
 
     def test_two_unusable_replies_are_reported_as_no_result(self):
@@ -200,6 +200,16 @@ class TestCoverageRefusal:
         assert refusal[0] == "BLOCKED_COVERAGE"
         assert "- Item 1 (What comes out): nothing in DISCOVERIES SO FAR answers it" in refusal[1]
         assert asyncio.run(ab.coverage_refusal(client, "objective", tried, discoveries("x"))) is None
+
+    def test_sent_back_when_no_discovery_of_an_item_gives_the_amounts_it_asks_for(self):
+        client, _ = fake_client([verdict(missing="quantities")])
+        items = [{"text": "List what I need with the quantities", "discoveries": [1]}]
+        refusal = asyncio.run(ab.coverage_refusal(client, "objective", {"checklist": items},
+                                                  discoveries("You need coffee beans, water and a jar.")))
+        assert refusal[0] == "BLOCKED_COVERAGE" and "gives the amounts it asks for" in refusal[1]
+        client, _ = fake_client([verdict(missing="")])
+        assert asyncio.run(ab.coverage_refusal(client, "objective", {"checklist": items},
+                                               discoveries("1 cup (113 grams) whole coffee beans"))) is None
 
     def test_the_model_s_other_verdicts_do_not_send_back(self):
         reply = verdict(missing="official documentation", conditions=["free"],
@@ -479,7 +489,7 @@ def test_a_view_paragraph_repeating_the_whole_result_is_left_out():
     result = "SQLite suits a hobby project; PostgreSQL handles many writers with MVCC [1]. I recommend SQLite."
     client, model = fake_client([result, "My view: " + result])
     text = asyncio.run(ab.compose_final_result(client, "Compare them, then recommend one for my hobby project.",
-                                               discoveries("PostgreSQL handles many writers with MVCC.")))
+                                               discoveries("SQLite suits small projects; PostgreSQL handles many writers with MVCC.")))
     assert len(model.calls) == 2 and text.count("I recommend SQLite") == 1 and "My view:" not in text
 
 
@@ -498,3 +508,419 @@ def test_a_thing_no_discovery_names_is_not_counted():  # here Chinese culture is
     found = ("Owls play a role in Native American cultures.", "In Christianity owls carry darker connotations.")
     result, _ = gaps(["Find out how at least three different cultures have viewed owls"], [reply], found)
     assert any("only 2 of 3 found (Native American cultures, Christianity)" in g for g in result)
+
+
+class TestUnfinishedResults:
+    """Issue #11: a result that stops partway through leaves parts out without a word."""
+
+    CUT = ("1. **What goes in:** sunlight, carbon dioxide and water [1].\n\n2. **What comes out:** the Calvin cycle uses "
+           "stored chemical energy from the light-dependent reactions to")
+
+    def test_a_result_ending_on_a_word_like_to_or_a_comma_is_unfinished(self):
+        assert ab.ends_mid_sentence(self.CUT) and ab.ends_mid_sentence("It is tall,")
+        assert ab.ends_mid_sentence("The thylakoids hold the [1]")
+
+    def test_finished_sentences_lists_and_citation_lists_are_not(self):
+        for text in ["It stands at 5,895 m according to the information found at [1].", "- ONLYOFFICE Docs",
+                     "References: [1], [2], [4]", "[1], [2]", "Use these:", "Run `pip freeze`"]:
+            assert not ab.ends_mid_sentence(text), text
+
+    def test_the_unfinished_sentence_and_its_bare_list_number_are_cut(self):
+        assert ab.complete_sentences(self.CUT) == "1. **What goes in:** sunlight, carbon dioxide and water [1]."
+        assert ab.complete_sentences("A is B [1]. C is") == "A is B [1]."
+
+    def test_an_opening_line_repeating_the_objective_is_left_out(self):
+        assert ab.without_echoed_objective("Explain it.\n\nIt works [1].", "explain  it") == "It works [1]."
+        assert ab.without_echoed_objective("Explain it.", "Explain it.") == "Explain it."
+
+    def test_an_unfinished_result_is_written_again(self):
+        client, model = fake_client([self.CUT, "It takes in water and gives out glucose [1]."])
+        text = asyncio.run(ab.compose_final_result(client, "objective", discoveries("x")))
+        assert text == "It takes in water and gives out glucose [1]."
+        assert 'stops partway through a sentence ("' in model.calls[1][-1]["content"]
+
+    def test_written_unfinished_twice_it_is_cut_back_and_the_code_says_so(self):
+        client, model = fake_client([self.CUT, self.CUT])
+        text = asyncio.run(ab.compose_final_result(client, "objective", discoveries("x")))
+        assert text == "1. **What goes in:** sunlight, carbon dioxide and water [1].\n\n" + ab.UNFINISHED_NOTE
+
+    def test_a_reply_stopped_at_the_length_limit_is_written_again(self):
+        client, model = fake_client([("A long result [1].", "length"), "A shorter result [1]."])
+        assert asyncio.run(ab.compose_final_result(client, "objective", discoveries("x"))) == "A shorter result [1]."
+
+    def test_a_finished_result_needs_no_second_call(self):
+        client, model = fake_client(["It is 5,895 m tall [1]."])
+        asyncio.run(ab.compose_final_result(client, "objective", discoveries("x")))
+        assert len(model.calls) == 1
+
+
+class TestFewerFoundThanAsked:
+    """Issue #11: "Three free, open-source alternatives ... are LibreOffice [1] and Apache OpenOffice [2]"."""
+
+    def test_short_counts_are_read_from_the_coverage_gaps(self):
+        gaps = ["Item 1 (Name three free (and open) suites): only 2 of 3 found (LibreOffice, OpenOffice)",
+                "Item 2 (Say what each is best at): missing strengths"]
+        assert ab.short_counts(gaps) == {1: (2, 3)}
+
+    def test_the_final_result_is_told_and_the_code_reports_the_shortfall(self):
+        items = checklist("Name three free suites", "Say what each is best at")
+        client, model = fake_client(["LibreOffice [1] and OpenOffice [1]."])
+        text = asyncio.run(ab.compose_final_result(client, "objective", discoveries("x"), items, short={1: (2, 3)}))
+        assert "### FEWER FOUND THAN ASKED" in model.calls[0][-1]["content"]
+        assert "- Name three free suites: only 2 of 3 found" in model.calls[0][-1]["content"]
+        assert text.endswith("Not found in the pages read:\n- Name three free suites: one more (only two of the three "
+                             "were found)")
+        assert ab.unverified_numbers(text, discoveries("x")) == []
+
+    def test_short_items_are_counted_again_before_the_final_result(self):
+        items = checklist("Name three free suites", "Say what each is best at")
+        ab.link_discovery(items, [1, 2], 1)
+        found = discoveries("LibreOffice, OpenOffice and Calligra are free suites.")
+        client, model = fake_client([verdict(evidence="[1] LibreOffice, OpenOffice and Calligra are free suites.",
+                                             things=[("LibreOffice", "LibreOffice"), ("OpenOffice", "OpenOffice"),
+                                                     ("Calligra", "Calligra")])])
+        tried = {"checklist": items, "short_counts": {1: (2, 3)}}
+        asyncio.run(ab.not_found_items(client, "o", tried, found))
+        assert len(model.calls) == 1 and tried["short_counts"] == {}
+
+
+def cited(answer, quote):
+    return json.dumps({"answer": answer, "quote": quote})
+
+
+class TestFalseGaps:
+    """Issue #11: "its height above the plateau base is not specified", over a discovery that gives it."""
+
+    KILI = ("Mount Kilimanjaro is the highest mountain in Africa, at 5,895 m (19,341 ft) above sea level and 4,900 m "
+            "(16,100 ft) above its plateau base.")
+    RESULT = ("It stands at 5,895 meters (19,341 feet) above sea level [1], but its height above the plateau base is "
+              "not specified in the given discoveries [1].")
+
+    def test_a_clause_saying_a_discovery_lacks_what_it_gives_is_cut(self):
+        client, model = fake_client([cited("yes", "4,900 m (16,100 ft) above its plateau base")])
+        text = asyncio.run(ab.without_false_gaps(client, self.RESULT, discoveries(self.KILI)))
+        assert text == "It stands at 5,895 meters (19,341 feet) above sea level [1]."
+        assert model.calls[0][-1]["content"].startswith("### ITEM\nits height above the plateau base")
+
+    def test_a_quote_not_in_the_discoveries_does_not_count(self):
+        client, model = fake_client([cited("yes", "the plateau base is 4,000 m high")])
+        assert asyncio.run(ab.without_false_gaps(client, self.RESULT, discoveries(self.KILI))) == self.RESULT
+
+    def test_a_no_keeps_the_claim(self):
+        client, model = fake_client([cited("no", "")])
+        assert asyncio.run(ab.without_false_gaps(client, self.RESULT, discoveries(self.KILI))) == self.RESULT
+
+    def test_a_claim_sharing_one_word_with_the_quote_stays(self):
+        found = discoveries("LibreOffice is a free alternative to Microsoft Office.")
+        result = "LibreOffice [1]. The third alternative was not found."
+        client, model = fake_client([cited("yes", "LibreOffice is a free alternative")])
+        assert asyncio.run(ab.without_false_gaps(client, result, found)) == result
+
+    def test_a_whole_sentence_claim_goes_and_the_rest_stays(self):
+        found = discoveries("The light-dependent reactions take place in the thylakoids.")
+        result = "Water goes in [1].\nThe location of the light-dependent reactions is not given. It needs light."
+        client, model = fake_client([cited("yes", "The light-dependent reactions take place in the thylakoids")])
+        assert asyncio.run(ab.without_false_gaps(client, result, found)) == "Water goes in [1].\nIt needs light."
+
+    def test_one_word_claims_are_not_asked_about(self):
+        client, model = fake_client([])
+        result = "The exact duration was not found."
+        assert asyncio.run(ab.without_false_gaps(client, result, discoveries("x"))) == result and model.calls == []
+
+
+class TestLoopsAndBareNotFound:
+    def test_a_reply_looping_on_one_character_is_not_a_result(self):
+        loop = '{"result": "How \n\n#010;Do I Make 2023040116570' + "0" * 880
+        assert not ab.usable_result(ab.result_text(loop))
+        assert ab.usable_result("| Task | Done |\n|---|---|\n" + "-" * 60 + "\nA table [1].")
+
+    def test_looping_twice_is_no_result(self):
+        loop = '{"result": "How \n\n#010;Do I Make 2023040116570' + "0" * 880
+        client, model = fake_client([(loop, "length"), (loop, "length")])
+        assert asyncio.run(ab.compose_final_result(client, "objective", discoveries("x"))) == ab.NO_RESULT
+
+    def test_cut_back_to_nothing_finished_is_no_result(self):
+        client, model = fake_client(["How to make it with the", "How to make it with the"])
+        assert asyncio.run(ab.compose_final_result(client, "objective", discoveries("x"))) == ab.NO_RESULT
+
+    FOUND = discoveries("Chlorophyll captures energy from sunlight to break down water molecules.",
+                        "The Calvin cycle fixes carbon dioxide into glucose.")
+    ANSWERED = [("Explain what goes into photosynthesis.", "captures energy from sunlight to break down water molecules"),
+                ("Explain what comes out of photosynthesis.", "fixes carbon dioxide into glucose")]
+
+    def test_a_part_answered_only_not_found_gets_the_checked_words_of_its_item(self):
+        result = "1. **What goes into photosynthesis:**\n   - Not found.\n\n2. **What comes out:** glucose [2]."
+        client, model = fake_client([])
+        text = asyncio.run(ab.without_false_gaps(client, result, self.FOUND, self.ANSWERED))
+        assert text == ("1. **What goes into photosynthesis:**\n   - \"captures energy from sunlight to break down water "
+                        "molecules\" [1]\n\n2. **What comes out:** glucose [2].") and model.calls == []
+
+    def test_on_one_line_too(self):
+        client, model = fake_client([])
+        text = asyncio.run(ab.without_false_gaps(client, "**What comes out:** Not found.", self.FOUND, self.ANSWERED))
+        assert text == '**What comes out:** "fixes carbon dioxide into glucose" [2]'
+
+    def test_a_heading_matching_no_single_item_keeps_not_found(self):
+        client, model = fake_client([])
+        result = "**Photosynthesis:** Not found."
+        assert asyncio.run(ab.without_false_gaps(client, result, self.FOUND, self.ANSWERED)) == result
+        assert asyncio.run(ab.without_false_gaps(client, "**Care:** Not found.", self.FOUND, self.ANSWERED)) \
+            == "**Care:** Not found."
+
+
+class TestInventedNumbersAndCitations:
+    FOUND = discoveries("Steep the grounds for 16 hours in 1 cup of coffee to 4 cups of water.")
+
+    def test_a_sentence_giving_a_number_no_discovery_has_is_cut_and_the_number_named(self):
+        result = ("1. Add 1 cup of coffee to 4 cups of water [1].\n2. Fill the jar about 3/4 full.\n3. Steep for 16 "
+                  "hours [1]. It keeps for up to 2 weeks [1].")
+        assert ab.without_invented_numbers(result, self.FOUND) == (
+            "1. Add 1 cup of coffee to 4 cups of water [1].\n\n3. Steep for 16 hours [1].\n\n"
+            "Left out, because no discovery gives these numbers (the pages read may still have them): 3/4, 2.")
+
+    def test_list_numbers_and_backed_numbers_stay(self):
+        result = "1. Steep for 16 hours [1].\n2. Strain it."
+        assert ab.without_invented_numbers(result, self.FOUND) == result
+
+    def test_a_filled_gap_keeps_its_gap_in_the_final_result(self):
+        reply = "Steep for 16 hours [1]. How long it keeps is not specified, but it is usually 1-2 weeks [1]."
+        client, model = fake_client([reply])
+        text = asyncio.run(ab.compose_final_result(client, "objective", self.FOUND))
+        assert text == "Steep for 16 hours [1]. How long it keeps is not specified."
+
+    def test_citations_of_discoveries_that_do_not_exist_are_removed(self):
+        text = "It is 5,895 m [2]. In feet, 19,341 [1, 3].\n  - Kept [1]"
+        assert ab.without_missing_citations(text, 1) == "It is 5,895 m. In feet, 19,341 [1].\n  - Kept [1]"
+
+
+def test_digits_in_names_and_code_are_not_numbers_to_check():
+    found = discoveries("Photosynthesis takes in water and carbon dioxide.")
+    text = "It takes in water (H2O) and CO2 [1]. Use the `sqlite3` tool or `python3 -m venv`."
+    assert ab.unverified_numbers(text, found) == []
+    assert ab.without_invented_numbers(text, found) == text
+    assert ab.unverified_numbers("Steep 40g for 12 hours.", found) == ["40", "12"]
+
+
+class TestUncitedResults:
+    FOUND = discoveries("SQLite needs no server and no administration: the database is a single file.",
+                        "PostgreSQL supports JSON columns, window functions and full-text search.")
+
+    def test_a_result_citing_nothing_is_written_again(self):
+        client, model = fake_client(["SQLite needs no server.", "SQLite needs no server [1]."])
+        assert asyncio.run(ab.compose_final_result(client, "objective", self.FOUND)) == "SQLite needs no server [1]."
+        assert model.calls[1][-1]["content"].startswith("That result cites no discovery")
+
+    def test_cited_by_the_code_where_the_wording_matches_one_discovery(self):
+        result = ("### Setup\nSQLite needs no server and no administration at all.\nPostgreSQL supports JSON columns "
+                  "and window functions.\nBoth are popular choices for many developers.")
+        client, model = fake_client([result, result])
+        text = asyncio.run(ab.compose_final_result(client, "objective", self.FOUND))
+        assert text == ("### Setup\nSQLite needs no server and no administration at all. [1]\nPostgreSQL supports JSON "
+                        "columns and window functions. [2]\nBoth are popular choices for many developers.")
+
+    def test_a_line_introducing_a_list_or_naming_another_thing_is_not_cited(self):
+        found = discoveries("ONLYOFFICE Docs has editors for text documents, spreadsheets and presentations.")
+        text = "Here are editors for text documents, spreadsheets:\nLibreOffice has editors for text documents, spreadsheets."
+        assert ab.with_matched_citations(text, found) == text
+
+    def test_the_writing_rules_say_to_keep_each_fact_under_its_own_part(self):
+        client, model = fake_client(["Result [1]."])
+        asyncio.run(ab.compose_final_result(client, "objective", self.FOUND, checklist("Setup", "Users")))
+        assert "never under another part's heading" in model.calls[0][-1]["content"]
+
+
+class TestNamesNoDiscoveryGives:
+    FOUND = discoveries("It is also the highest free-standing mountain above sea level, at 5,895 m (19,341 ft).",
+                        "Customizable Interface, Digital Retouching, Layer management support")
+
+    def test_a_sentence_naming_what_no_discovery_names_is_cut_and_the_name_listed(self):
+        text = ("The tallest mountain in Africa is Mount Kilimanjaro [1]. It is 5,895 m (19,341 ft) tall [1].\n"
+                "- **GIMP**: Customizable Interface, Digital Retouching [2]")
+        assert ab.without_unnamed_names(text, self.FOUND, "What is the tallest mountain in Africa?") == (
+            "It is 5,895 m (19,341 ft) tall [1].\n\nLeft out, because no discovery names them (the pages read may "
+            "still have them): Kilimanjaro, GIMP.")
+
+    def test_sentence_starts_headings_labels_other_word_forms_and_acronyms_in_the_findings_are_fine(self):
+        found = discoveries("Egyptian and Christianity traditions; the Hopis; uses JSON.")
+        text = ("### Comparison\n**Recommendation:** Pour it. Both views: Egypt and Christian traditions, the Hopi, "
+                "and JSON [1].\nMy View: Although rare, it holds.")
+        assert ab.unnamed_names(text, found, "Compare views") == []
+
+    def test_an_acronym_no_discovery_gives_is_a_name(self):
+        assert ab.unnamed_names("Light reactions make ATP and NADPH [1].", self.FOUND) == ["ATP", "NADPH"]
+
+
+def test_bold_numbered_labels_are_not_numbers_to_check():
+    # Box 1, 2026-11-06: "**1. Explain what goes into photosynthesis:**" lost its "1" and the label was mangled
+    found = discoveries("Carbon dioxide and water go in.")
+    text = "**1. Explain what goes into photosynthesis:**\nCarbon dioxide and water go in [1].\n**3. Explain more:** fine."
+    assert ab.unverified_numbers(text, found) == []
+    assert ab.without_invented_numbers(text, found) == text
+
+
+def test_only_the_clause_holding_an_unbacked_name_is_cut():
+    # BB2 v5 explanation, 2026-11-06: the cited thylakoid location went with the whole sentence
+    found = discoveries("The light-dependent reactions take place in the thylakoids.")
+    text = ("The light-dependent reactions take place in the thylakoids [1] and convert light energy into chemical "
+            "energy, which is stored in molecules like ATP and NADPH.")
+    assert ab.without_unnamed_names(text, found, "Explain photosynthesis") == (
+        "The light-dependent reactions take place in the thylakoids [1] and convert light energy into chemical "
+        "energy.\n\nLeft out, because no discovery names them (the pages read may still have them): ATP, NADPH.")
+    # A name the whole sentence rests on still takes the sentence
+    assert ab.without_unnamed_names("Mount Kilimanjaro is the tallest [1].", discoveries("It is the tallest."),
+                                    "Which is tallest?").startswith("Left out")
+
+
+def test_do_not_specify_is_a_claim_that_something_is_missing():
+    assert ab.NOT_GIVEN.search("These reactions do not specify a particular location within the plant cell.")
+    assert ab.NOT_GIVEN.search("The page does not mention the steeping time.")
+
+
+def test_citations_written_inside_code_are_moved_out_before_the_command_check():
+    # Box 1 v5 docs, 2026-11-06: the retry put markers inside backticks, and the correct commands were cut
+    found = discoveries(r"On Windows run venv\Scripts\activate and on macOS or Linux run source venv/bin/activate.")
+    text = "Windows: `venv\\Scripts\\activate [1]`\nmacOS or Linux: `source venv/bin/activate [1]`"
+    moved = ab.with_citations_outside_code(text)
+    assert moved == "Windows: `venv\\Scripts\\activate` [1]\nmacOS or Linux: `source venv/bin/activate` [1]"
+    assert ab.unverified_code(moved, found) == []
+    assert ab.with_citations_outside_code("```\npython -m venv venv [1]\n```") == "```\npython -m venv venv\n```"
+
+
+def test_an_unclosed_code_block_is_closed_at_its_paragraph_end():
+    text = "Install:\n```\npip install requests\n\n### How to Activate it on Windows\nUse the script."
+    assert ab.with_code_closed(text) == ("Install:\n```\npip install requests\n```\n\n### How to Activate it on "
+                                         "Windows\nUse the script.")
+    assert ab.with_code_closed("```\nx\n```") == "```\nx\n```"
+
+
+def test_numbers_written_out_on_the_page_match_digits():
+    # Box 1 v6 cold brew, 2026-11-06: "one cup ... four cups" on the page, "1 cup ... 4 cups" in the DISCOVER
+    page = "Start with one cup of beans steeped in four cups of water, then wait about twelve hours."
+    state = {"url": "https://brew.example/a", "parts": [page], "index": 0, "seen_parts": {0}}
+    discover = "Start with 1 cup of beans steeped in 4 cups of water, then wait about 12 hours."
+    assert ab.check_decision("DISCOVER", discover, [], {"objective": "o"}, state, "https://brew.example/a") is None
+    assert ab.unverified_numbers("Use 1 cup of beans and 4 cups of water [1].", discoveries(page)) == []
+    # "one of the best" is not an amount
+    assert ab.unverified_numbers("Use 1 cup [1].", discoveries("It is one of the best brews.")) == ["1"]
+
+
+def test_names_copied_accepts_one_name_per_line_but_not_the_items_own_words():
+    from localagentbrowser.coverage import names_copied
+    page = "Popular free editors include GIMP, Krita and Darktable. Photosynthesis makes carbohydrates."
+    assert names_copied("GIMP\nKrita\nDarktable", page, "Find three free alternatives to Photoshop.")
+    assert names_copied("carbohydrates", page, "Describe what comes out of photosynthesis.")
+    assert not names_copied("Photosynthesis", page, "Describe what comes out of photosynthesis.")
+    assert not names_copied("Inkscape", page, "Find three free alternatives to Photoshop.")
+    assert not names_copied("free editors include GIMP", page, "Find three free alternatives to Photoshop.")
+
+
+def test_a_cited_heading_naming_a_program_no_discovery_names_goes_with_its_section():
+    found = discoveries("GIMP\nKey Features:\n- Layers", "PhotoSplice\nKey Features:\n- Blending modes")
+    text = ("### Alternatives\n\n#### GIMP [1]\n- Layers\n\n#### PhotoScape [2]\n- Blending modes\n\n"
+            "#### Setup and Administration Differences [1]\n- Simple")
+    assert ab.unnamed_names(text, found, "Find free alternatives to Photoshop") == ["PhotoScape"]
+    assert ab.without_unnamed_names(text, found, "Find free alternatives to Photoshop") == (
+        "### Alternatives\n\n#### GIMP [1]\n- Layers\n\n#### Setup and Administration Differences [1]\n- Simple\n\n"
+        "Left out, because no discovery names them (the pages read may still have them): PhotoScape.")
+
+
+def test_word_forms_count_as_named_but_a_shared_start_does_not():
+    from localagentbrowser.report import other_form
+    assert other_form("egypt", "egyptians") and other_form("comparison", "compare")
+    assert not other_form("photoscape", "photosplice")
+
+
+def test_a_citation_on_a_line_of_its_own_joins_the_line_it_cites():
+    from localagentbrowser.report import with_lone_citations_joined
+    text = "- **SQLite**: Compiles into your application.\n  - [1]\n- **PostgreSQL**: A server.\n[2], [3]\n\nNext [4]"
+    assert with_lone_citations_joined(text) == (
+        "- **SQLite**: Compiles into your application. [1]\n- **PostgreSQL**: A server. [2], [3]\n\nNext [4]")
+
+
+def test_an_amount_in_words_no_discovery_gives_is_cut():
+    found = discoveries("Steep for 12 hours. Use one cup of beans.")
+    text = "Steep for twelve hours [1]. Use one cup of beans [1]. It keeps for up to two weeks [not found]."
+    assert ab.unverified_numbers(text, found) == ["two weeks"]
+    assert ab.without_invented_numbers(text, found).startswith("Steep for twelve hours [1]. Use one cup of beans [1].\n")
+
+
+def test_a_recommendation_section_is_labelled_as_the_models_view():
+    from localagentbrowser.report import with_view_labelled
+    text = "#### Features\n- Small [1]\n\n### Recommendation for a Hobby Project\nPostgreSQL is recommended.\n"
+    assert with_view_labelled(text) == "#### Features\n- Small [1]\n\nMy view: PostgreSQL is recommended.\n"
+    assert with_view_labelled("### Recommendation\n- **PostgreSQL**: best") == "### Recommendation\n- **PostgreSQL**: best"
+    assert with_view_labelled("No heading here.") == "No heading here."
+
+
+def test_a_time_needs_the_same_number_given_as_a_time():
+    found = discoveries("Use a 2L mason jar. Refrigerate for 16 hours (minimum 12, maximum 24). Steep 12 to 24 hours.")
+    text = "Refrigerate for 16 hours [1]. Steep 12 hours [1]. It keeps for up to 2 weeks [1]."
+    assert ab.unverified_numbers(text, found) == ["2 weeks"]
+
+
+def test_one_sentence_given_for_several_items_counts_only_where_it_has_their_words():
+    from localagentbrowser.coverage import shared_evidence_items
+    checklist = [{"text": t} for t in ("Compare SQLite and PostgreSQL setup and administration",
+                                       "Compare SQLite and PostgreSQL handling of many simultaneous users",
+                                       "Compare SQLite and PostgreSQL features",
+                                       "Recommend one for a hobby project")]
+    sentence = ("I'd pick SQLite for any single-server app under roughly 10,000 daily active users, and PostgreSQL the "
+                "moment concurrent writes, team growth, or multi-region deployments enter the picture.")
+    assert shared_evidence_items({1: sentence, 2: sentence, 3: sentence}, checklist) == [1, 3]
+    # Different words for each item: nothing shared
+    assert shared_evidence_items({1: "SQLite needs no server to administer.", 3: "PostgreSQL has JSONB and full-text "
+                                  "search."}, checklist) == []
+
+
+def test_a_sentence_put_under_the_wrong_subject_is_cut():
+    found = discoveries("SQLite databases are self-contained single files. SQLite offers minimal, zero-configuration "
+                        "administration suitable for embedded databases.",
+                        "PostgreSQL has advanced administrative capabilities for enterprise servers.")
+    text = ("- **SQLite**: Databases are self-contained single files [1].\n"
+            "- **PostgreSQL**: Has advanced administrative capabilities for enterprise servers [2]. Offers minimal, "
+            "zero-configuration administration suitable for embedded databases [1].")
+    assert ab.without_swapped_subjects(text, found) == (
+        "- **SQLite**: Databases are self-contained single files [1].\n"
+        "- **PostgreSQL**: Has advanced administrative capabilities for enterprise servers [2].\n\n"
+        "Left out, because the discovery says it of another subject: PostgreSQL (the discovery says it of SQLite).")
+
+
+def test_a_shared_evidence_gap_sends_the_agent_back():
+    from localagentbrowser.coverage import UNANSWERED_GAP, shared_gap
+    # coverage_refusal sends back only gaps that end with UNANSWERED_GAP
+    assert shared_gap(2, "Compare SQLite and PostgreSQL features").endswith(UNANSWERED_GAP)
+
+
+def test_one_sentence_giving_both_units_answers_both_unit_items():
+    from localagentbrowser.coverage import shared_evidence_items
+    checklist = [{"text": t} for t in ("What is the tallest mountain in Africa?", "How tall is it in meters?",
+                                       "How tall is it in feet?")]
+    sentence = ("It is also the highest free-standing mountain above sea level in the world, at 5,895 m (19,341 ft) "
+                "above sea level.")
+    assert shared_evidence_items({2: sentence, 3: sentence}, checklist) == []
+
+
+def test_a_name_in_a_discovery_s_own_address_counts_as_given():
+    found = [{"extracted_data": "File formats support, command line options, extension system, filters and blend modes.",
+              "source": "https://inkscape.org/about/features/"}]
+    assert ab.unnamed_names("- **Inkscape**: file formats, extensions and filters [1].", found, "Find three alternatives") == []
+
+
+def test_a_concrete_missing_thing_no_discovery_names_sends_back():
+    from localagentbrowser.coverage import concrete_term
+    assert concrete_term("O2") and concrete_term("GA3P") and concrete_term("Step 3")
+    assert not concrete_term("the specific steps of the Calvin cycle") and not concrete_term("location in the plant cell")
+    client, _ = fake_client([verdict(missing="O2")])
+    items = [{"text": "Describe what comes out of photosynthesis.", "discoveries": [1]}]
+    paragraph = "The Calvin cycle, which takes place in the stroma, uses energy to make GA3P from CO2."
+    refusal = asyncio.run(ab.coverage_refusal(client, "objective", {"checklist": items}, discoveries(paragraph)))
+    assert refusal[0] == "BLOCKED_COVERAGE" and "O2: named by no discovery" in refusal[1]
+    # Named by a discovery after all ("6O2" in an equation): really_missing drops it, nothing is sent back
+    client, _ = fake_client([verdict(missing="O2")])
+    assert asyncio.run(ab.coverage_refusal(client, "objective", {"checklist": items},
+                                           discoveries("6CO2 + 6H2O -> C6H12O6 + 6O2"))) is None
+
+
+def test_the_prompt_s_own_section_names_are_not_unbacked_names():
+    found = discoveries("The light reactions make ATP.")
+    assert ab.unnamed_names("Following the OBJECTIVE CHECKLIST, the light reactions make ATP [1].", found, "Explain it") == []

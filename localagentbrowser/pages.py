@@ -3,7 +3,7 @@ checklist item needs, links, and what the model is shown of a page."""
 import asyncio
 import re
 import urllib.parse
-from .config import CONTENT_LINK_WORDS, MAX_LINKS, MAX_OUTLINE_LABEL, MAX_OUTLINE_LINES, MAX_QUERY_WORDS, MAX_SEARCH_RESULTS, MAX_SNIPPET_CHARS, OUTLINE_MIN_PARTS, PAGE_PART_CHARS, SEARCH_URL
+from .config import BLOCKED_SITES, CONTENT_LINK_WORDS, MAX_LINKS, MAX_OUTLINE_LABEL, MAX_OUTLINE_LINES, MAX_QUERY_WORDS, MAX_SEARCH_RESULTS, MAX_SNIPPET_CHARS, OUTLINE_MIN_PARTS, PAGE_PART_CHARS, SEARCH_URL
 from .text import MISSING_STOPWORDS, OPINION_REQUEST
 
 BLOCK_START = "[[[BLOCK_START {}]]]"
@@ -112,6 +112,17 @@ def search_query(parameter):
             clean_param = query_dict['q'][0]
     return " ".join(clean_param.replace('+', ' ').split()[:MAX_QUERY_WORDS])
 
+def blocked_site(url):
+    """Whether a URL is on a site the run excludes (BLOCKED_SITES: "huggingface.co/datasets", "github.com/openai/
+    simple-evals", ...; empty unless LAB_BLOCKED_SITES is set). A site matches with its subdomains, a path by prefix."""
+    parsed = urllib.parse.urlparse(str(url))
+    host, path = parsed.netloc.lower().removeprefix("www."), parsed.path.lower()
+    for site in BLOCKED_SITES:
+        site_host, _, site_path = site.lower().removeprefix("www.").partition("/")
+        if (host == site_host or host.endswith("." + site_host)) and path.lstrip("/").startswith(site_path):
+            return True
+    return False
+
 def decode_ddg_link(href):
     # DuckDuckGo wraps result links as //duckduckgo.com/l/?uddg=<encoded-target>&rut=...
     if not href:
@@ -138,6 +149,9 @@ async def extract_search_results(page, visited_urls):
     }).filter(Boolean)""")
 
     lines = []
+    # Sites a run excludes (LAB_BLOCKED_SITES) are left out of the results: a benchmark run must not read its answers
+    # from pages that republish the benchmark
+    results = [r for r in results if not blocked_site(decode_ddg_link(r['href']))]
     for i, r in enumerate(results[:MAX_SEARCH_RESULTS], start=1):
         url = decode_ddg_link(r['href'])
         visited = " (ALREADY VISITED)" if normalize_url(url) in visited_urls else ""
@@ -230,6 +244,83 @@ def build_outline(parts):
         outline.append(label if len(label) <= MAX_OUTLINE_LABEL else label[:MAX_OUTLINE_LABEL] + "...")
         all_headings += headings
     return clean, outline, all_headings
+
+BYLINE = re.compile(r"^(?:by|written by|posted by|words by|photos? by)\s", re.I)
+
+MAX_HEADING_WORDS = 14  # Longer "headings" are sentences: a numbered list item about the Calvin cycle was tagged as one
+
+def page_headings(page_state):
+    """The page's headings, whitespace-normalized, without bylines (an owl article's "BY ISABELLA HU" was tagged as the
+    section a discovery came from) and without sentences marked up as headings."""
+    headings = [" ".join(h.split()) for h in page_state.get("headings") or ()]
+    return [h for h in headings if not BYLINE.match(h) and len(h.split()) <= MAX_HEADING_WORDS]
+
+def section_heading(page_state, text):
+    """The heading of the page section a discovery was copied from, if the discovery does not already name it.
+
+    On a list of Photoshop alternatives the 7B copied the feature lines under "1. GIMP: The true Photoshop
+    alternative" without that heading, so its discovery named no tool; the final result then attached "GIMP" from
+    memory. A heading repeated on the page ("Key Features:" under every tool) names no section, so the one above it
+    is used. None when the text is not found in the current part or no heading comes before it."""
+    parts, index = page_state.get("parts") or [], page_state.get("index", 0)
+    headings = page_headings(page_state)
+    words = re.findall(r"[a-z0-9]+", str(text).lower())[:6]
+    if not parts or index >= len(parts) or len(words) < 3:
+        return None
+    found = re.search(r"\W+".join(map(re.escape, words)), parts[index], re.I)
+    if not found:
+        return None
+    # A discovery copied from a heading on starts its own section: "Krita\nKey Features: ..." from "2. Krita" was
+    # given "1. GIMP: The true Photoshop alternative", the heading above, as if Krita's features were GIMP's
+    text_part = parts[index]
+    own_line = text_part[text_part.rfind("\n", 0, found.start()) + 1:].split("\n", 1)[0]
+    if " ".join(own_line.split()) in headings:
+        return None
+    counts = {h: headings.count(h) for h in headings}
+    before = [parts[i] for i in range(index)] + [parts[index][:found.start()]]
+    for line in reversed([line for part in before for line in part.splitlines()]):
+        line = " ".join(line.split())
+        if counts.get(line) == 1:
+            own = {w for w in re.findall(r"[a-z0-9]+", line.lower()) if len(w) > 2} - MISSING_STOPWORDS
+            have = set(re.findall(r"[a-z0-9]+", str(text).lower()))
+            return None if own <= have else line
+    return None
+
+def with_inner_headings(page_state, text):
+    """The discovery with the heading of each further page section it runs into put before that section's lines.
+
+    A list run copied Krita's feature lines and, on the next line, Darktable's, from under "2. Krita" and
+    "3. Darktable": with only the first heading given, the final result listed Darktable's features as Krita's.
+    Only headings that appear once on the page count ("Key Features:" under every tool names no section)."""
+    parts, index = page_state.get("parts") or [], page_state.get("index", 0)
+    if not parts or index >= len(parts):
+        return text
+    part = parts[index]
+    headings = page_headings(page_state)
+    unique = {h for h in headings if headings.count(h) == 1}
+    lines, out, last_end = str(text).split("\n"), [], None
+    # The search starts where the discovery as a whole begins on the page: line by line from the top, a list run's
+    # "Layer management support" was found under GIMP (the page has it there too) before Krita's own copy, and
+    # Krita's heading was then put in the middle of Krita's list
+    opening = re.findall(r"[a-z0-9]+", str(text).lower())[:6]
+    anchor = re.search(r"\W+".join(map(re.escape, opening)), part, re.I) if len(opening) >= 3 else None
+    search_from = anchor.start() if anchor else 0
+    named = set()  # Words of the lines so far: a heading the discovery already gave ("Krita" first) is not added
+    for line in lines:
+        words = re.findall(r"[a-z0-9]+", line.lower())[:6]
+        found = re.search(r"\W+".join(map(re.escape, words)), part[search_from:], re.I) if len(words) >= 3 else None
+        if found:
+            start, end = search_from + found.start(), search_from + found.end()
+            if last_end is not None:
+                between = [" ".join(h.split()) for h in part[last_end:start].splitlines()]
+                crossed = [h for h in between if h in unique]
+                own = set(re.findall(r"[a-z0-9]+", line.lower())) | named
+                if crossed and not {w for w in re.findall(r"[a-z0-9]+", crossed[-1].lower()) if len(w) > 2} <= own:
+                    line = f'(Under the heading "{crossed[-1]}") {line}'
+            last_end = search_from = end
+        named |= set(re.findall(r"[a-z0-9]+", line.lower()))
+        out.append(line)
+    return "\n".join(out)
 
 async def extract_page_links(page, shown_links=None):
     # Links come from the whole page, menus included, since navigation menus are how sites are used

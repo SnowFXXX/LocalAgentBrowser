@@ -27,8 +27,10 @@ and tuned to work well with a **small 7B model on a CPU, no GPU required**.
 - ⚡ **Built for slow hardware.** It reuses LM Studio's prompt cache, so most turns process only what changed.
 - 📝 **A readable report every time.** `research_report.md` holds the final result and every finding with its
   source, written however the run ends; `research_log.txt` keeps every action and reason.
-- ✅ **Tested.** 251 tests on Linux and Windows, Python 3.10–3.13, run in a few seconds with no model or browser,
+- ✅ **Tested.** 324 tests on Linux and Windows, Python 3.10–3.13, run in a few seconds with no model or browser,
   plus a [regression suite](#regression-suite) of live runs on seven different kinds of task.
+
+**New with 1.64:** parts of the objective no longer drop out of the answer unannounced as often (the coverage check asks for the words first; missing amounts and terms send the agent back), measured on two PCs and then four models with identical code: Qwen2.5-7B 6 of 7, Llama 3.1 8B 7 of 7, Qwen2.5-14B 5 of 7 and Qwen2.5-3B 3 of 7 tasks, with no outside knowledge in any finished result ([regression history](docs/regression-history.md)). On Windows, a launcher with Start-menu and desktop shortcuts opens the report by itself when a run ends.
 
 **New with 1.63:** the [project site](https://snowfxxx.github.io/LocalAgentBrowser/), an article,
 [We Can Do Better: A Small AI That Can't Cover Up](https://snowfxxx.github.io/LocalAgentBrowser/article.html), and a
@@ -103,6 +105,11 @@ six lessons from 30 versions of keeping a small local model on track.
 
    When it finishes, read `research_report.md` in the folder you ran it from. Press Ctrl+C at any time to
    stop; the report is still written with everything found so far.
+
+**On Windows**, from a clone of the repository (below), `powershell -ExecutionPolicy Bypass -File
+tools\windows\make_shortcuts.ps1` adds LocalAgentBrowser to the Start menu and the desktop. The launcher checks that
+LM Studio is answering, runs each objective in its own folder under `Documents\LocalAgentBrowser runs`, and opens the
+report as a page in your browser when the run ends.
 
 To work on the code instead, clone the repository and install from it:
 
@@ -200,15 +207,15 @@ turns up, so the suite compares versions on all seven at once. 1.54 to 1.56 and 
 measured this way and released with 1.57 and 1.61; [docs/regression-history.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md)
 has every step's results and what each one showed.
 
-| Task | 1.52 | 1.53 (objective checklist) | 1.57 (coverage check) | 1.61 (verified send-backs, outline pointer) |
-|---|---|---|---|---|
-| Factual question | Finished, 12 min | Finished, 14 min | Finished, 13 min | Finished, 17 min |
-| List of three office suites | Time limit | Finished, 30 min; but WPS Office is not open source | Time limit: three correct open-source suites by turn 7, sent back because no words showed them to be "free" | Finished, 21 min: LibreOffice, WPS Office and OnlyOffice, each marked "not shown in the pages read to be free and open-source" |
-| Comparison and recommendation | Time limit | Finished, 39 min | Time limit, after a send-back for "official documentation", which the objective does not ask for | Finished, 26 min, setup and administration from the part of a long page the outline pointer chose |
-| How-to (cold brew from 1.55; repotting before) | Time limit | Time limit | Finished, 36 min; but "how long it keeps" answered with the steeping time | Finished, 33 min: every step, the 16-hour steep and the shelf life, cited |
-| Explanation (photosynthesis) | Time limit | Finished, 13 min, but thin: no oxygen or water | Finished, 59 min: inputs, outputs and both stages, cited | Finished, 39 min |
-| Opinion (owls) | Time limit | Finished, 38 min | Time limit: its first page covered two of the three cultures asked for | Finished, 42 min: four cultures, cited, with a view |
-| Documentation (venv, official docs) | Finished, 15 min, from a tutorial site | Time limit (30 min) | Finished, 37 min, all from python.org; but the Windows line repeats the create command instead of the activate one | Time limit: all four items found from python.org, then it read on |
+| Task | 1.52 | 1.53 (objective checklist) | 1.57 (coverage check) | 1.61 (verified send-backs, outline pointer) | 1.64 (quote-first coverage, send-backs for missing amounts and terms) |
+|---|---|---|---|---|---|
+| Factual question | Finished, 12 min | Finished, 14 min | Finished, 13 min | Finished, 17 min | Finished, 17 min |
+| List of three office suites | Time limit | Finished, 30 min; but WPS Office is not open source | Time limit: three correct open-source suites by turn 7, sent back because no words showed them to be "free" | Finished, 21 min: LibreOffice, WPS Office and OnlyOffice, each marked "not shown in the pages read to be free and open-source" | Finished, 34 min: GIMP, Krita and Darktable (the list task asks for Photoshop alternatives from 1.64) |
+| Comparison and recommendation | Time limit | Finished, 39 min | Time limit, after a send-back for "official documentation", which the objective does not ask for | Finished, 26 min, setup and administration from the part of a long page the outline pointer chose | Finished, 49 min |
+| How-to (cold brew from 1.55; repotting before) | Time limit | Time limit | Finished, 36 min; but "how long it keeps" answered with the steeping time | Finished, 33 min: every step, the 16-hour steep and the shelf life, cited | Finished, 50 min |
+| Explanation (photosynthesis) | Time limit | Finished, 13 min, but thin: no oxygen or water | Finished, 59 min: inputs, outputs and both stages, cited | Finished, 39 min | Finished, 73 min, oxygen included |
+| Opinion (owls) | Time limit | Finished, 38 min | Time limit: its first page covered two of the three cultures asked for | Finished, 42 min: four cultures, cited, with a view | Finished, 49 min |
+| Documentation (venv, official docs) | Finished, 15 min, from a tutorial site | Time limit (30 min) | Finished, 37 min, all from python.org; but the Windows line repeats the create command instead of the activate one | Time limit: all four items found from python.org, then it read on | Time limit: read the reference page part after part without recording (finished in 34 and 42 min in the two v11 runs) |
 
 ## How it works
 

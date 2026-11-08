@@ -111,10 +111,10 @@ def test_fresh_prompt_shortens_long_discoveries(scrapes):
 
 class TestComposeFinalResult:
     def test_sees_only_the_objective_and_discoveries(self):
-        client, model = fake_client(["Plain final text."])
+        client, model = fake_client(["Plain final text [1]."])
         journal = discoveries("fact one", "fact two")
         text = asyncio.run(ab.compose_final_result(client, "the objective", journal))
-        assert text == "Plain final text."
+        assert text == "Plain final text [1]."
         system, user = model.calls[0]
         assert system == {"role": "system", "content": ab.COMPOSE_SYSTEM} and len(model.calls[0]) == 2
         assert "### OBJECTIVE\nthe objective" in user["content"]

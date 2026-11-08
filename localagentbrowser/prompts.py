@@ -36,12 +36,16 @@ COVERAGE_QUOTE = ("Your evidence gives only discovery numbers. Reply again with 
 # "the light-dependent reactions, which take place in the thylakoids" against an item asking to describe them and
 # their location; asked this way it said yes 6 of 6, and still no 6 of 6 for a page's opening that never mentions
 # the simultaneous users an item asked about
-CITED_QUESTION = ("Does the DISCOVERY answer the ITEM, or part of it, in any words (for example 'POSIX' for macOS or "
-                  "Linux, 'refrigerator' for fridge)? Reply with JSON: \"answer\": \"yes\" or \"no\", and \"quote\": the "
-                  "words of the DISCOVERY that answer it, copied exactly ('' if the answer is no).")
+CITED_QUESTION = ("First copy the words of the DISCOVERY that give what the ITEM asks for, or part of it, in any words "
+                  "(a name, list, equation, step or amount counts; for example 'POSIX' for macOS or Linux, "
+                  "'-> C6H12O6 + 6O2' for what comes out); '' if none do. Then answer yes if you copied any, no "
+                  "otherwise. Words on the same topic that give a different kind of information do not count: for "
+                  "example how to create something when the ITEM asks how to activate it, or a list of features when "
+                  "the ITEM asks about many users at once. Reply with JSON: \"quote\" first, then \"answer\": \"yes\" "
+                  "or \"no\".")
 CITED_FORMAT = {"type": "json_schema", "json_schema": {"name": "cited", "strict": True, "schema": {
-    "type": "object", "properties": {"answer": {"type": "string", "enum": ["yes", "no"]}, "quote": {"type": "string"}},
-    "required": ["answer", "quote"]}}}
+    "type": "object", "properties": {"quote": {"type": "string"}, "answer": {"type": "string", "enum": ["yes", "no"]}},
+    "required": ["quote", "answer"]}}}
 
 COVERAGE_FORMAT = {"type": "json_schema", "json_schema": {"name": "coverage", "strict": True, "schema": {
     "type": "object", "properties": {
@@ -126,5 +130,13 @@ RESULT_RETRY = ("That reply was not the final result: it repeated the prompt or 
 CUT_OFF = ("Your reply was cut off at {limit} tokens because it was too long. Reply again with only the JSON object, "
            "with thought_process in two or three short sentences and a short parameter (a search query is 3 to 10 "
            "words).")
+# The 7B's photosynthesis result ended "...from the light-dependent reactions to", by itself, with two parts unwritten
+RESULT_UNFINISHED = ("That result stops partway through a sentence (\"{ending}\"). Write the complete final result "
+                     "again, following the rules above: finish every sentence and cover every part. " + RESULT_REPLY)
+# 15 of 135 finished results with discoveries cited none of them
+RESULT_UNCITED = ("That result cites no discovery. Write it again, following the rules above, with the number of the "
+                  "discovery that supports each point after it, like [2]. " + RESULT_REPLY)
+UNFINISHED_NOTE = ("(The written result stopped partway through here; the discoveries in the report give what it "
+                   "did not finish.)")
 NO_RESULT = ("The model did not write a final result (its replies repeated the prompt or were not text). The "
              "discoveries below are what the agent found.")
