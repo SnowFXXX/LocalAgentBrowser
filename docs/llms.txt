@@ -2,7 +2,7 @@
 
 > An autonomous web research agent driven by a local language model (LM Studio) and Playwright. Give it an
 > objective; it searches the web, reads pages, records findings with their sources and writes a cited report, all
-> on your own computer. Built for a small 7B model on a CPU; no GPU, cloud AI or API key needed.
+> on your own computer. Built for small models on a CPU (four tested); no GPU, cloud AI or API key needed.
 
 Key facts:
 
@@ -30,7 +30,7 @@ Key facts:
 - [README](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/README.md): what it does, the four models tested, install, first run, settings, FAQ
 - [How it works](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/how-it-works.md): the loop, code layout, the checks that keep a small model on track, performance, limitations
 - [Results by kind of task](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/task-results.md): single runs and the regression suite by version
-- [Example reports](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/examples/README.md): two unedited reports from a test run, with what each got right and wrong
+- [Example reports](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/examples/README.md): three unedited reports from the 1.64 test run, with what each got right and wrong
 - [Changelog](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/CHANGELOG.md): every version and why it changed
 - [Regression history](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md): each version measured on seven kinds of task
 - [Technical paper](https://snowfxxx.github.io/LocalAgentBrowser/paper.html): Verification over Trust; the design, a four-model evaluation and where the measures failed

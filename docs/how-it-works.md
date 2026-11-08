@@ -129,7 +129,7 @@ Measured on an Intel i5-9500 (6 cores, no GPU) with Qwen2.5-7B-Instruct Q4_K_M a
 
 Whole runs vary with the pages a search turns up. In the regression runs since 1.53, a factual question took 9 to
 19 minutes of model time; the list, comparison, how-to, opinion and documentation tasks 17 to 44 when they finished;
-and the explanation 13 to 59. A whole suite of seven tasks took 171 to 272 minutes. A GPU or a smaller model will be much faster.
+and the explanation 13 to 59. A whole suite of seven tasks took 171 to 272 minutes up to 1.63, and 262 to 361 minutes for the 7B on 1.64 (stricter checks, two PCs). A GPU or a smaller model will be much faster.
 
 ## Limitations
 
