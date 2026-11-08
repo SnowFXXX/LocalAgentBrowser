@@ -30,7 +30,7 @@ and tuned to work well with a **small 7B model on a CPU, no GPU required**.
 - ✅ **Tested.** 324 tests on Linux and Windows, Python 3.10–3.13, run in a few seconds with no model or browser,
   plus a [regression suite](#regression-suite) of live runs on seven different kinds of task.
 
-**New with 1.64:** parts of the objective no longer drop out of the answer unannounced as often (the coverage check asks for the words first; missing amounts and terms send the agent back), measured on two PCs and then four models with identical code: Qwen2.5-7B 6 of 7, Llama 3.1 8B 7 of 7, Qwen2.5-14B 5 of 7 and Qwen2.5-3B 3 of 7 tasks, with no outside knowledge in any finished result ([regression history](docs/regression-history.md)). On Windows, a launcher with Start-menu and desktop shortcuts opens the report by itself when a run ends.
+**New with 1.64:** parts of the objective no longer drop out of the answer unannounced as often (the coverage check asks for the words first; missing amounts and terms send the agent back), measured on two PCs and then four models with identical code: Qwen2.5-7B 6 of 7, Llama 3.1 8B 7 of 7, Qwen2.5-14B 5 of 7 and Qwen2.5-3B 3 of 7 tasks, with no outside knowledge in any finished result ([regression history](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md)). On Windows, a launcher with Start-menu and desktop shortcuts opens the report by itself when a run ends.
 
 **New with 1.63:** the [project site](https://snowfxxx.github.io/LocalAgentBrowser/), an article,
 [We Can Do Better: A Small AI That Can't Cover Up](https://snowfxxx.github.io/LocalAgentBrowser/article.html), and a
@@ -70,14 +70,19 @@ six lessons from 30 versions of keeping a small local model on track.
 ## Quick start
 
 1. Install [LM Studio](https://lmstudio.ai), download a model (developed with **Qwen2.5-7B-Instruct**),
-   load it and start the local server (Developer tab → Start Server).
-2. Install the agent from [PyPI](https://pypi.org/project/localagentbrowser/) (Python 3.10 or later, ideally
-   in a virtual environment) and the Chromium browser it drives:
+   load it with a **context length of 8192** (the agent's default, `LMSTUDIO_CONTEXT_LENGTH`; LM Studio's own
+   default may differ) and start the local server (Developer tab → Start Server).
+2. Install the agent from [PyPI](https://pypi.org/project/localagentbrowser/) (Python 3.10 or later) in a
+   virtual environment, with the Chromium browser it drives. On Windows:
 
    ```bash
+   python -m venv venv
+   venv\Scripts\activate
    pip install localagentbrowser
    python -m playwright install chromium
    ```
+
+   On macOS or Linux, activate with `source venv/bin/activate` instead.
 
 3. Run it and type your objective:
 
@@ -210,7 +215,7 @@ has every step's results and what each one showed.
 | Task | 1.52 | 1.53 (objective checklist) | 1.57 (coverage check) | 1.61 (verified send-backs, outline pointer) | 1.64 (quote-first coverage, send-backs for missing amounts and terms) |
 |---|---|---|---|---|---|
 | Factual question | Finished, 12 min | Finished, 14 min | Finished, 13 min | Finished, 17 min | Finished, 17 min |
-| List of three office suites | Time limit | Finished, 30 min; but WPS Office is not open source | Time limit: three correct open-source suites by turn 7, sent back because no words showed them to be "free" | Finished, 21 min: LibreOffice, WPS Office and OnlyOffice, each marked "not shown in the pages read to be free and open-source" | Finished, 34 min: GIMP, Krita and Darktable (the list task asks for Photoshop alternatives from 1.64) |
+| List (three office suites; three Photoshop alternatives from 1.64) | Time limit | Finished, 30 min; but WPS Office is not open source | Time limit: three correct open-source suites by turn 7, sent back because no words showed them to be "free" | Finished, 21 min: LibreOffice, WPS Office and OnlyOffice, each marked "not shown in the pages read to be free and open-source" | Finished, 34 min: GIMP, Krita and Darktable (the list task asks for Photoshop alternatives from 1.64) |
 | Comparison and recommendation | Time limit | Finished, 39 min | Time limit, after a send-back for "official documentation", which the objective does not ask for | Finished, 26 min, setup and administration from the part of a long page the outline pointer chose | Finished, 49 min |
 | How-to (cold brew from 1.55; repotting before) | Time limit | Time limit | Finished, 36 min; but "how long it keeps" answered with the steeping time | Finished, 33 min: every step, the 16-hour steep and the shelf life, cited | Finished, 50 min |
 | Explanation (photosynthesis) | Time limit | Finished, 13 min, but thin: no oxygen or water | Finished, 59 min: inputs, outputs and both stages, cited | Finished, 39 min | Finished, 73 min, oxygen included |
@@ -368,23 +373,24 @@ It was developed and tested with Qwen2.5-7B-Instruct (Q4_K_M). Any instruction-t
 serves should work, as long as the server supports `response_format` with a JSON schema (LM Studio 0.3 and
 later). Set `LMSTUDIO_MODEL` and `LMSTUDIO_CONTEXT_LENGTH` to match. Reports with other models are very welcome.
 
-The full suite, run on four models with the same code, 90 minutes per task, CPU only (October 2026):
+The full suite, run on four models with the same code, 90 minutes per task, CPU only (1.64, November 2026; 1.63 in
+brackets):
 
 | Model | Tasks finished | Model time | Gaps filled from the model's own knowledge |
 |---|---|---|---|
-| Qwen2.5-7B-Instruct | 6 of 7 | 197 min | 0 |
-| Qwen2.5-14B-Instruct | 2 of 7 | 535 min | 0 |
-| Llama-3.1-8B-Instruct | 2 of 7 | 278 min | 0 |
-| Qwen2.5-3B-Instruct | 0 of 7 | 302 min | — |
+| Qwen2.5-7B-Instruct | 6 of 7 (6) | 361 min | 0 |
+| Llama-3.1-8B-Instruct | 7 of 7 (2) | 303 min | 0 |
+| Qwen2.5-14B-Instruct | 5 of 7 (2) | 565 min | 0 |
+| Qwen2.5-3B-Instruct | 3 of 7 (0) | 490 min | 0 |
 
-Where they finished, every model's results were honest by the suite's measures. What separates them is speed and
-follow-through:
-- The 14B was about 2.5 times slower than the 7B on a CPU. It reached FINISH on five tasks, but on three of them
-  the time limit hit while the final result was being written, so only two count.
-- Llama found most items but rarely finished in time.
-- The 3B recorded findings on every task but never finished one.
+Where they finished, no model filled a gap from its own knowledge. What separates them is speed and follow-through:
+- Llama finished every task; read by hand, its results contain no invented facts, and its mistakes lean cautious
+  (caveats and "not found" lines for things its findings do give).
+- The 14B is about 2.5 times slower than the 7B on a CPU; its two time-outs came while a correct result was being
+  checked and written.
+- The 3B finished 3 tasks; one of them has a claim the suite's checks did not catch (a misread link card).
 
-With no time limit, the 7B finished 7 of 7 (277 minutes). These measures are word checks: the suite counted a
+On 1.63, with no time limit, the 7B finished 7 of 7 (277 minutes). These measures are word checks: the suite counted a
 documentation result with an invented command as clean, which led to the command check above.
 
 **Can I use another OpenAI-compatible server instead of LM Studio?**
