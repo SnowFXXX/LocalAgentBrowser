@@ -21,19 +21,25 @@ SetupIconFile={#Stage}\tools\windows\localagentbrowser.ico
 UninstallDisplayIcon={app}\tools\windows\localagentbrowser.ico
 Compression=lzma2/max
 SolidCompression=yes
-WizardStyle=modern dynamic
+; Always dark, in the project website's colors (navy #0b111b), in Setup and Uninstall alike
+WizardStyle=modern dark windows11 includetitlebar hidebevels
+WizardBackColor=#0b111b
+WizardImageBackColor=#0b111b
+WizardImageFile=images\wizard-100.bmp,images\wizard-150.bmp,images\wizard-200.bmp
+WizardSmallImageFile=images\small-100.bmp,images\small-150.bmp,images\small-200.bmp
+; The uninstaller in its own clearly named folder, not "unins000.exe" beside the app's files
+UninstallFilesDir={app}\uninstall
 LicenseFile={#Stage}\LICENSE
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 
+; One plain list of checkboxes, no "setup type" to pick
 [Types]
-Name: "app"; Description: "LocalAgentBrowser"
-Name: "full"; Description: "LocalAgentBrowser and the test suite"
-Name: "custom"; Description: "Choose"; Flags: iscustom
+Name: "selection"; Description: "Your selection"; Flags: iscustom
 
 [Components]
-Name: "app"; Description: "LocalAgentBrowser (the agent, its launcher and shortcuts)"; Types: app full custom; Flags: fixed
-Name: "suite"; Description: "Test suite (the 7-task regression suite the project is measured with; runs take hours)"; Types: full
+Name: "app"; Description: "LocalAgentBrowser (the agent, its launcher and shortcuts)"; Types: selection; Flags: fixed
+Name: "suite"; Description: "Test suite (the 7-task regression suite the project is measured with; runs take hours)"
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"
@@ -126,6 +132,27 @@ begin
     False, False);
   OptionalPage.Add('Use cloud models (OpenRouter, your own key)');
   OptionalPage.Values[0] := False;
+end;
+
+{ The "Ready to Install" summary: what was actually chosen, without a "setup type" line }
+function UpdateReadyMemo(Space, NewLine, MemoUserInfoInfo, MemoDirInfo, MemoTypeInfo, MemoComponentsInfo,
+  MemoGroupInfo, MemoTasksInfo: String): String;
+var
+  Model, Cloud: String;
+begin
+  if ChosenModel < ModelCount then
+    Model := ModelPage.CheckListBox.ItemCaption[ChosenModel]
+  else
+    Model := 'None now: chosen later in LM Studio';
+  if OptionalPage.Values[0] then
+    Cloud := 'On: OpenRouter, with your own key'
+  else
+    Cloud := 'Off';
+  Result := MemoDirInfo + NewLine + NewLine + MemoComponentsInfo + NewLine + NewLine +
+    'Model:' + NewLine + Space + Model + NewLine + NewLine +
+    'Cloud models:' + NewLine + Space + Cloud;
+  if MemoTasksInfo <> '' then
+    Result := Result + NewLine + NewLine + MemoTasksInfo;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
