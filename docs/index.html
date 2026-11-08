@@ -165,14 +165,13 @@
       <span>SEARCH</span><i>→</i><span>NAVIGATE</span><i>→</i><span>READ_MORE</span><i>→</i><span>DISCOVER</span><i>→</i><span class="end">FINISH</span>
     </div>
     <div class="ctas">
-      <a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest">Download for Windows</a>
-      <a class="btn" href="#install">Other ways to install</a>
+      <a class="btn primary" href="#install">Get started</a>
       <a class="btn" href="https://github.com/SnowFXXX/LocalAgentBrowser">View on GitHub</a>
       <a class="btn" href="#article">Read the article</a>
     </div>
     <div class="pills">
-      <span class="pill">Local by default</span><span class="pill">Four models tested on a CPU</span>
-      <span class="pill">Windows installer</span>
+      <span class="pill">No cloud AI</span><span class="pill">Four models tested on a CPU</span>
+      <span class="pill">Windows shortcuts</span>
       <span class="pill">Free and open source (MIT)</span><span class="pill">LM Studio + Playwright</span>
     </div>
   </div>
@@ -287,17 +286,18 @@
       let it work. You'll need <a href="https://lmstudio.ai">LM Studio</a> (free), which runs the model.</p>
     <div class="two">
       <div>
-        <h3>Windows: the installer</h3>
+        <h3>Windows: shortcuts</h3>
         <ol class="start">
-          <li>Install <a href="https://lmstudio.ai">LM Studio</a>.</li>
-          <li>Download <strong>LocalAgentBrowser-setup.exe</strong> from the latest release and run it. If Windows says
-            it protected your PC, click <strong>More info → Run anyway</strong>: the installer isn't code-signed yet.</li>
-          <li>Pick what to install and one of the four tested models; setup downloads it through LM Studio, and the
-            browser the agent uses. No administrator rights, no Python needed.</li>
-          <li>Open <strong>LocalAgentBrowser</strong> from the Start menu and type your question. The report opens in
-            your browser when it's done.</li>
+          <li>Install <a href="https://lmstudio.ai">LM Studio</a>, load a model with a context length of 8192, and
+            start its local server.</li>
+          <li>Clone the repository and install its packages in a <code>venv</code> folder inside it.</li>
+          <li>Run <code>tools\windows\make_shortcuts.ps1</code>: LocalAgentBrowser appears in the Start menu and on the
+            desktop.</li>
+          <li>Open it and type your question. Each run gets its own folder in Documents, and the report opens in your
+            browser when it's done.</li>
         </ol>
-        <div class="ctas"><a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest">Download for Windows</a></div>
+        <p class="note">Coming in the next release: a Windows installer that brings its own Python and lets you pick
+          one of the four tested models during setup.</p>
       </div>
       <div>
         <h3>Any system: pip</h3>
@@ -329,8 +329,7 @@ localagentbrowser</code></pre>
           <li>Fast answers. A small model on a CPU takes its time.</li>
         </ul>
         <p class="lead" style="font-size:16px">Local by default: searches go to DuckDuckGo and pages load like in any
-          browser, while the model and the report stay on your computer. Cloud models are an option you turn on
-          yourself, with your own key.</p>
+          browser, while the model and the report stay on your computer.</p>
       </div>
     </div>
     <p class="lead" style="margin-top:30px">See <a href="https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/examples/README.md">two

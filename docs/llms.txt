@@ -12,7 +12,12 @@ Key facts:
   recommendation, how-tos, explanations, views from several sources, lookups in official documentation.
 - Not yet: anything behind a form, a login or a button. It reads pages only; it does not click, fill in forms or
   sign in, so flight or hotel prices, shopping and booking sites won't work.
-- Speed: on a CPU a run takes about 10 to 45 minutes, and a 7B model sometimes returns thin findings.
+- Speed: on a CPU a run takes about 10 to 60 minutes, and a small model sometimes returns thin findings.
+- Tested on four models with identical code (1.64, seven tasks, 90 minutes each, CPU only): Qwen2.5-7B finished
+  6 of 7, Llama-3.1-8B 7 of 7, Qwen2.5-14B 5 of 7, Qwen2.5-3B 3 of 7; no finished answer filled a gap from the
+  model's own knowledge.
+- Windows: a launcher with Start-menu and desktop shortcuts (tools/windows/make_shortcuts.ps1) opens the report by
+  itself when a run ends. A Windows installer is planned for the next release.
 - Honesty by design: rules in code check the model's claims. Findings must be on the page shown. Before finishing,
   each part of the objective is checked against the findings. What was not found is reported as not found, and
   things the pages didn't prove are marked ("not shown in the pages read to be open-source").
@@ -22,7 +27,9 @@ Key facts:
 
 ## Docs
 
-- [README](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/README.md): what it does, quick start, how it works, settings, limitations
+- [README](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/README.md): what it does, the four models tested, install, first run, settings, FAQ
+- [How it works](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/how-it-works.md): the loop, code layout, the checks that keep a small model on track, performance, limitations
+- [Results by kind of task](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/task-results.md): single runs and the regression suite by version
 - [Example reports](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/examples/README.md): two unedited reports from a test run, with what each got right and wrong
 - [Changelog](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/CHANGELOG.md): every version and why it changed
 - [Regression history](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md): each version measured on seven kinds of task
@@ -30,7 +37,7 @@ Key facts:
 
 ## Optional
 
-- [Project site](https://snowfxxx.github.io/LocalAgentBrowser/): findings, quick start and the challenge
+- [Project site](https://snowfxxx.github.io/LocalAgentBrowser/): findings, the four models, install and the challenge
 - [PyPI](https://pypi.org/project/localagentbrowser/): the package
 - [Article](https://snowfxxx.github.io/LocalAgentBrowser/article.html): We Can Do Better: A Small AI That Can't Cover Up
 - [Article](https://dev.to/snowfxxx/teaching-a-7b-model-on-a-cpu-to-finish-what-it-starts-1amc): Teaching a 7B model on a CPU to finish what it starts

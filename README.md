@@ -11,24 +11,23 @@ find.**
 ![Runs locally](https://img.shields.io/badge/LLM-local%20(LM%20Studio)-green.svg)
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/social-preview.png" alt="LocalAgentBrowser: SEARCH, NAVIGATE, READ_MORE, DISCOVER, FINISH. No cloud AI, 7B model on a CPU, LM Studio and Playwright." width="820">
+  <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/social-preview.png" alt="LocalAgentBrowser: a small AI that can't cover up. SEARCH, NAVIGATE, READ_MORE, DISCOVER, FINISH. No cloud AI, four models tested on a CPU, Windows shortcuts, free and open source, LM Studio and Playwright." width="820">
 </p>
 
 A local language model served by [LM Studio](https://lmstudio.ai) decides what to do next, and
 [Playwright](https://playwright.dev/python/) carries it out in a Chromium window you can watch. It is built for a
 **small model on an ordinary CPU, no GPU required**, and every claim in its answer points to the page it came from.
 
-- 🔒 **Local by default.** The model runs in your own LM Studio; your objective, the model and the report stay on
-  your computer. (Searches go to DuckDuckGo and pages load like in any browser.) Cloud models are an option you turn
-  on yourself, with your own key.
+- 🔒 **No cloud AI and no API keys.** The model runs in your own LM Studio; your objective, the model and the
+  report stay on your computer. (Searches go to DuckDuckGo and pages load like in any browser.)
 - ✅ **Checks instead of trust.** Findings must be copied from the page shown, commands must appear on the page
   exactly, and numbers no finding gives are cut. What it can't find is listed as not found, not filled in.
 - 🧭 **Unattended.** It searches, opens pages, reads long pages part by part, records what's relevant and finishes
   when every part of the objective is covered.
 - 📝 **A report every time.** The final result with numbered citations and every finding with its source, written
   however the run ends.
-- 🪟 **Easy on Windows.** An installer with its own Python, Start-menu shortcuts, and the report opening by itself
-  when a run ends.
+- 🪟 **Windows shortcuts.** A launcher with Start-menu and desktop shortcuts opens the report by itself when a run
+  ends. A Windows installer is coming in the next release.
 
 📖 [Project site](https://snowfxxx.github.io/LocalAgentBrowser/) ·
 [Article: We Can Do Better: A Small AI That Can't Cover Up](https://snowfxxx.github.io/LocalAgentBrowser/article.html) ·
@@ -68,27 +67,9 @@ a PC with little memory. Any instruction-tuned model LM Studio serves should wor
 
 ## Install
 
-### Windows: the installer (recommended)
-
-1. Install [LM Studio](https://lmstudio.ai) (free). You don't need to download a model in it yet.
-2. Download **`LocalAgentBrowser-<version>-setup.exe`** from the
-   [latest release](https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest) and run it.
-   - Windows may say **"Windows protected your PC"**, because the installer isn't code-signed yet. Click
-     **More info → Run anyway**.
-   - It installs for your Windows account only, with no administrator rights, and brings its own Python.
-3. Setup asks:
-   - **What to install:** LocalAgentBrowser, and optionally the test suite the project is measured with.
-   - **A model:** one of the four tested above, downloaded through LM Studio, or "none now" to pick one yourself.
-   - **Optional: cloud models,** off unless you tick it (see [the FAQ](#faq)).
-   - It then downloads the Chromium browser the agent uses (about 150 MB, once).
-4. Open **LocalAgentBrowser** from the Start menu or the desktop.
-
-To remove it: **Start menu → LocalAgentBrowser → Uninstall LocalAgentBrowser**, or Windows Settings → Apps. Your
-reports in Documents are kept.
+You need [LM Studio](https://lmstudio.ai) (free), which runs the model, and Python 3.10 or later.
 
 ### Any system: pip
-
-You need Python 3.10 or later and [LM Studio](https://lmstudio.ai).
 
 ```bash
 python -m venv venv
@@ -104,12 +85,28 @@ On macOS or Linux, activate with `source venv/bin/activate` instead.
 ```bash
 git clone https://github.com/SnowFXXX/LocalAgentBrowser.git
 cd LocalAgentBrowser
+python -m venv venv
+venv\Scriptsctivate
 pip install -r requirements.txt
 python -m playwright install chromium
 ```
 
-Run it with `python agent_browser.py`. On Windows, `powershell -ExecutionPolicy Bypass -File
-tools\windows\make_shortcuts.ps1` adds the same Start-menu and desktop shortcuts as the installer.
+Run it with `python agent_browser.py`.
+
+### Windows: Start-menu and desktop shortcuts
+
+From a clone (above), with its packages installed in a `venv` folder inside it:
+
+```bash
+powershell -ExecutionPolicy Bypass -File tools\windows\make_shortcuts.ps1
+```
+
+This adds **LocalAgentBrowser** to the Start menu and the desktop. The launcher checks that LM Studio is answering,
+runs each objective in its own folder under **Documents\LocalAgentBrowser runs**, and opens the report as a page in
+your browser when the run ends.
+
+**Coming in the next release:** a Windows installer that brings its own Python, lets you pick one of the four tested
+models during setup, and adds the shortcuts for you.
 
 ## First run
 
@@ -214,8 +211,7 @@ The full details, code layout, timings and known limits:
 | `LMSTUDIO_CONTEXT_LENGTH` | `8192` | Context length the model is loaded with; the conversation budget follows it |
 | `LMSTUDIO_EXTRA_BODY` | none | Extra JSON fields sent with every request, for other servers |
 
-The Windows installer writes the model you chose, and the cloud setting if you turned it on, to small files in its
-`settings` folder. Behaviour limits are named constants in `localagentbrowser/config.py`, each with a comment.
+Behaviour limits are named constants in `localagentbrowser/config.py`, each with a comment.
 
 ## FAQ
 
@@ -224,16 +220,8 @@ The Windows installer writes the model you chose, and the cloud setting if you t
 **Why does a turn take minutes?** On a CPU the model reads the prompt slowly (about 8 tokens a second on the
 development PC), so a turn that brings in a new page takes a few minutes. Most other turns reuse LM Studio's cache.
 
-**Is anything sent to the internet?** By default no AI service is involved and nothing about your run is uploaded.
-The agent does browse the real web: searches, written from your objective, go to DuckDuckGo, and pages load
-normally. If you turn on cloud models, the objective, the prompts and the pages read go to OpenRouter and the
-model's provider.
-
-**What are cloud models?** An option, off unless you turn it on, for people with an
-[OpenRouter](https://openrouter.ai) account: the agent then uses a model in the cloud instead of LM Studio. It's
-much faster, but it costs money on your account, and your prompts and the pages read leave your computer (the
-agent asks providers not to store or train on them). You set your own key in the `OPENROUTER_API_KEY` environment
-variable; the installer never asks for it. Runs are attributed to LocalAgentBrowser in OpenRouter's app listings.
+**Is anything sent to the internet?** No AI service is involved, and nothing about your run is uploaded. The agent
+does browse the real web: searches, written from your objective, go to DuckDuckGo, and pages load normally.
 
 **Can I use another OpenAI-compatible server?** Probably: point `LMSTUDIO_BASE_URL` at it. The speed tricks rely
 on the server reusing cached prompt prefixes (llama.cpp-based servers do).
@@ -258,7 +246,7 @@ More in [docs/how-it-works.md](https://github.com/SnowFXXX/LocalAgentBrowser/blo
 - [x] A fixed checklist, a coverage check verified in code, and every change measured on a regression suite (1.53–1.61)
 - [x] Exact-text command checks, and four models measured on identical code (1.63)
 - [x] Parts of the objective no longer dropped silently as often; the Windows launcher (1.64)
-- [x] A Windows installer, and optional cloud models (1.65)
+- [ ] A Windows installer with its own Python and a choice of tested models (next release)
 - [ ] Count silent omissions in the regression suite, so [issue #11](https://github.com/SnowFXXX/LocalAgentBrowser/issues/11) can close on a number
 - [ ] Decide in code, not by asking the model, whether a finding answers the part it's credited to
 - [ ] A tray app on Windows: new research, progress, a notification when done
@@ -311,8 +299,7 @@ the measurements behind each decision.
 
 Versions 1.13 onwards were developed together with [Claude](https://www.anthropic.com/claude) (Anthropic), working
 in Claude Code; those commits list Claude as co-author. Built on [LM Studio](https://lmstudio.ai),
-[Playwright](https://playwright.dev/python/), the [OpenAI Python library](https://github.com/openai/openai-python)
-and, for the Windows installer, [Inno Setup](https://jrsoftware.org/isinfo.php).
+[Playwright](https://playwright.dev/python/) and the [OpenAI Python library](https://github.com/openai/openai-python).
 
 ## License
 
