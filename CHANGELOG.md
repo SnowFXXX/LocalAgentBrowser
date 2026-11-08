@@ -6,6 +6,15 @@ measured on the regression suite and released as part of 1.57 and 1.61 (see
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [1.64.1] - 2026-11-08
+Documentation only; the code is unchanged from 1.64, as measured.
+- **README revamped,** so PyPI's page shows it too: the four models tested near the top, with download size, RAM and
+  results; install steps with the virtual-environment commands; a first-run guide (load the model at 8192 context);
+  Windows shortcuts. The long technical sections moved to docs/how-it-works.md and docs/task-results.md.
+- **Fixed in the README:** the FAQ's model table showed the October results, and a link was broken on PyPI.
+- **Project site:** a "pick the model that fits your PC" section, an Install section, and its charts redrawn with
+  1.64's results.
+
 ## [1.64] - 2026-11-08
 The theme is **silent omission** ([issue #11](https://github.com/SnowFXXX/LocalAgentBrowser/issues/11)): a part of
 the objective dropping out of the final answer without being marked "not found". It was measured on two PCs (PC A
