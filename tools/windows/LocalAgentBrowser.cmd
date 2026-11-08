@@ -29,7 +29,10 @@ if defined LAB_CLOUD (
   )
 )
 for /f %%t in ('powershell -NoProfile -Command "Get-Date -Format yyyy-MM-dd_HHmmss"') do set "STAMP=%%t"
-set "RUN=%USERPROFILE%\Documents\LocalAgentBrowser runs\%STAMP%"
+rem Windows' own Documents folder (it may be in OneDrive), the same one the installer's "Past reports" shortcut opens
+for /f "delims=" %%d in ('powershell -NoProfile -Command "[Environment]::GetFolderPath('MyDocuments')"') do set "DOCS=%%d"
+if not defined DOCS set "DOCS=%USERPROFILE%\Documents"
+set "RUN=%DOCS%\LocalAgentBrowser runs\%STAMP%"
 mkdir "%RUN%"
 cd /d "%RUN%"
 echo Reports for this run go to: %RUN%
