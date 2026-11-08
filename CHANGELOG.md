@@ -6,7 +6,25 @@ measured on the regression suite and released as part of 1.57 and 1.61 (see
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
-## [1.64.2] - 2026-11-08
+## [1.65] - 2026-11-08
+### Added
+- **A Windows installer** (`LocalAgentBrowser-1.65-setup.exe` on the release): per-user, no administrator rights,
+  its own Python 3.13, a choice of the four tested models (downloaded through LM Studio), an optional test suite,
+  Start-menu and desktop shortcuts, and an uninstaller that keeps your reports. Dark, in the project's colors.
+- **Optional cloud models through OpenRouter,** off unless you turn them on, with your own key in
+  `OPENROUTER_API_KEY`. Requests ask providers not to store or train on prompts and to honour the JSON format;
+  cloud runs are attributed to LocalAgentBrowser in OpenRouter's app rankings (removable). The regression suite
+  takes `--cloud`. Cloud results are not yet measured on the suite.
+- New settings: `LMSTUDIO_EXTRA_BODY` and `LMSTUDIO_EXTRA_HEADERS`, extra JSON fields and HTTP headers for other servers.
+### Changed
+- The first step says it takes a minute or two on a CPU, so the console doesn't look frozen.
+- The Windows launcher uses the installed Python, reads the model chosen in setup, and writes reports to Windows'
+  real Documents folder (also when it is in OneDrive).
+- Wording everywhere: local by default, cloud optional; the README, site, banner, PyPI description and SECURITY.md.
+- Includes the documentation fixes prepared as 1.64.2 (never released separately): article and paper update notes,
+  new example reports from the 1.64 test run, llms.txt, CONTRIBUTING and docs pages.
+
+## [1.64.2] - not released separately (folded into 1.65)
 Documentation only; the code is unchanged from 1.64, as measured. A full check of everything public:
 - The README's top image (also the link preview) redrawn from the website's hero: "four models tested on a CPU"
   instead of "7B model on a CPU".

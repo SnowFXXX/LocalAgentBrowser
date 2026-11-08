@@ -15,7 +15,8 @@ Only the latest version is supported with fixes.
   clicks, fills in forms, signs in or runs downloaded files. Even so, treat its findings as
   unverified, especially from unfamiliar sites.
 - **It browses the real web.** Search queries go to DuckDuckGo, and the pages the agent chooses are loaded in a
-  normal Chromium window, just as if you visited them yourself. Nothing is sent to any cloud AI service; the
+  normal Chromium window, just as if you visited them yourself. By default nothing is sent to any cloud AI service (if you turn on cloud models, your prompts and the pages read go
+  to OpenRouter and the model's provider); the
   model runs on your own LM Studio server.
 - **Keep LM Studio's server local.** The agent talks to the address in `LMSTUDIO_BASE_URL` (by default
   `localhost`). If you expose LM Studio on a network, protect it as you would any other service.

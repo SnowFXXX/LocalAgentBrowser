@@ -18,7 +18,7 @@ current page, and answers with exactly one JSON action:
 ```mermaid
 flowchart LR
     O[Objective] --> P[Build prompt]
-    P --> M[Local model<br/>LM Studio]
+    P --> M[Model<br/>LM Studio or cloud]
     M -->|JSON action| C{Rule checks}
     C -->|refused: cheap retry| M
     C -->|accepted| B[Playwright<br/>Chromium]

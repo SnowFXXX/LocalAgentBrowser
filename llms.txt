@@ -2,7 +2,8 @@
 
 > An autonomous web research agent driven by a local language model (LM Studio) and Playwright. Give it an
 > objective; it searches the web, reads pages, records findings with their sources and writes a cited report, all
-> on your own computer. Built for small models on a CPU (four tested); no GPU, cloud AI or API key needed.
+> on your own computer. Local by default and built for small models on a CPU (four tested), with no GPU or API key
+> needed; optional cloud models through OpenRouter with your own key.
 
 Key facts:
 
@@ -16,8 +17,10 @@ Key facts:
 - Tested on four models with identical code (1.64, seven tasks, 90 minutes each, CPU only): Qwen2.5-7B finished
   6 of 7, Llama-3.1-8B 7 of 7, Qwen2.5-14B 5 of 7, Qwen2.5-3B 3 of 7; no finished answer filled a gap from the
   model's own knowledge.
-- Windows: a launcher with Start-menu and desktop shortcuts (tools/windows/make_shortcuts.ps1) opens the report by
-  itself when a run ends. A Windows installer is planned for the next release.
+- Windows: an installer (LocalAgentBrowser-<version>-setup.exe on the GitHub releases) with its own Python, a choice of
+  the four tested models during setup, and Start-menu shortcuts; the report opens by itself when a run ends.
+- Cloud models (optional, 1.65): through OpenRouter with the user's own key; much faster, but prompts and pages read
+  leave the computer.
 - Honesty by design: rules in code check the model's claims. Findings must be on the page shown. Before finishing,
   each part of the objective is checked against the findings. What was not found is reported as not found, and
   things the pages didn't prove are marked ("not shown in the pages read to be open-source").
