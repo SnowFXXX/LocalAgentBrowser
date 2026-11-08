@@ -11,6 +11,7 @@ Settings (environment variables):
     LMSTUDIO_MODEL           model identifier                   (default qwen2.5-7b-instruct)
     LMSTUDIO_API_KEY         API key, if the server needs one   (default lm-studio)
     LMSTUDIO_CONTEXT_LENGTH  context length the model is loaded with (default 8192)
+    LMSTUDIO_EXTRA_BODY      extra JSON fields sent with every request, for other servers (default none)
 
 The package, one file per job; each imports only from the ones listed before it:
     config      settings and every limit and threshold

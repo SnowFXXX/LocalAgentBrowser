@@ -1,4 +1,5 @@
 """Settings: the LM Studio connection, read from environment variables, and every limit and threshold."""
+import json
 import os
 
 BASE_URL = os.environ.get("LMSTUDIO_BASE_URL", "http://localhost:1234/v1")
@@ -6,6 +7,10 @@ BASE_URL = os.environ.get("LMSTUDIO_BASE_URL", "http://localhost:1234/v1")
 MODEL = os.environ.get("LMSTUDIO_MODEL", "qwen2.5-7b-instruct")
 
 API_KEY = os.environ.get("LMSTUDIO_API_KEY", "lm-studio")
+
+# Extra JSON fields sent with every model request, for servers other than LM Studio (empty by default). The cloud
+# mode sends OpenRouter's provider rules: only providers that honour the JSON format, and none that keep prompts.
+EXTRA_BODY = json.loads(os.environ.get("LMSTUDIO_EXTRA_BODY") or "{}")
 
 CONTEXT_LENGTH = int(os.environ.get("LMSTUDIO_CONTEXT_LENGTH", "8192"))
 

@@ -4,7 +4,7 @@ import json
 import re
 from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, BadRequestError, InternalServerError
 from playwright.async_api import async_playwright
-from .config import API_KEY, BASE_URL, MAX_CHEAP_RETRIES, MAX_CONVERSATION_TOKENS, MAX_DISCOVERY_PROMPT_CHARS, MAX_FOLLOWUPS, MAX_JSON_RETRIES, MAX_QUERY_WORDS, MAX_VISITS_PER_URL, MODEL, MODEL_RETRY_WAITS, MODEL_TIMEOUT_SECONDS, TURN_MAX_TOKENS, OBJECTIVE_CHECK_EVERY, REPORT_FILE, STALL_TURNS, TURN_PAUSE_SECONDS
+from .config import API_KEY, BASE_URL, EXTRA_BODY, MAX_CHEAP_RETRIES, MAX_CONVERSATION_TOKENS, MAX_DISCOVERY_PROMPT_CHARS, MAX_FOLLOWUPS, MAX_JSON_RETRIES, MAX_QUERY_WORDS, MAX_VISITS_PER_URL, MODEL, MODEL_RETRY_WAITS, MODEL_TIMEOUT_SECONDS, TURN_MAX_TOKENS, OBJECTIVE_CHECK_EVERY, REPORT_FILE, STALL_TURNS, TURN_PAUSE_SECONDS
 from .prompts import CUT_OFF, FINAL_RESULT, FIRST_TURN_INSTRUCTION, GIVE_UP_RULE, READ_FIRST, RESPONSE_FORMAT, SYSTEM_PROMPT, TURN_INSTRUCTIONS
 from .text import extract_message_content, was_cut_off
 from .pages import build_environment, count_search_results, determine_url, is_search_page, load_page, normalize_url, read_more_target, render_part, search_query, section_heading, where_you_are, with_inner_headings
@@ -208,6 +208,8 @@ def with_retries(client):
     create = client.chat.completions.create
 
     async def create_with_retries(*args, **kwargs):
+        if EXTRA_BODY:
+            kwargs["extra_body"] = {**EXTRA_BODY, **(kwargs.get("extra_body") or {})}
         for attempt, wait in enumerate((*MODEL_RETRY_WAITS, None), start=1):
             try:
                 return await create(*args, **kwargs)

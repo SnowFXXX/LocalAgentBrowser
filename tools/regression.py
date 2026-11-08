@@ -412,11 +412,26 @@ def write_run_info(folder, meta):
     """run_info.json at the start of a run: which code, model and machine. The PC is a neutral label set on each PC
     (LAB_PC_LABEL, "PC A" / "PC B"), never its name."""
     os.makedirs(folder, exist_ok=True)
-    info = {**meta, "pc": os.environ.get("LAB_PC_LABEL", "unlabelled"), **code_fingerprint(),
+    info = {**meta, "pc": os.environ.get("LAB_PC_LABEL", "unlabelled"), "server": ab.BASE_URL, **code_fingerprint(),
             "python": sys.version.split()[0]}
     with open(os.path.join(folder, "run_info.json"), "w", encoding="utf-8") as f:
         json.dump(info, f, indent=1)
     return info
+
+
+CLOUD_URL = "https://openrouter.ai/api/v1"
+# Only providers that honour the JSON format the agent asks for, and none that store or train on prompts
+CLOUD_RULES = {"provider": {"require_parameters": True, "data_collection": "deny"}}
+
+
+def use_cloud():
+    """Points this run and its task processes at OpenRouter. The key is read from the user's own environment
+    variable and passed on in the environment only: it is never printed or written to a file."""
+    key = os.environ.get("OPENROUTER_API_KEY")
+    if not key:
+        sys.exit("Cloud mode needs the OPENROUTER_API_KEY environment variable (set it yourself, never in a file).")
+    os.environ.update(LMSTUDIO_BASE_URL=CLOUD_URL, LMSTUDIO_API_KEY=key, LMSTUDIO_EXTRA_BODY=json.dumps(CLOUD_RULES))
+    ab.BASE_URL, ab.API_KEY = CLOUD_URL, key
 
 
 def model_server_ready():
@@ -428,8 +443,10 @@ def model_server_ready():
 
 
 def get_json(url, data=None, timeout=10):
-    request = urllib.request.Request(url, data=json.dumps(data).encode() if data else None,
-                                     headers={"Content-Type": "application/json"})
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {ab.API_KEY}"}
+    if data:
+        data = {**data, **json.loads(os.environ.get("LMSTUDIO_EXTRA_BODY") or "{}")}
+    request = urllib.request.Request(url, data=json.dumps(data).encode() if data else None, headers=headers)
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return json.load(response)
 
@@ -494,6 +511,9 @@ def main():
     parser.add_argument("--minutes", type=float, help="time limit for every task instead of each task's own")
     parser.add_argument("--model", help=f"the model to run, as LM Studio lists it (default: {ab.MODEL})")
     parser.add_argument("--list", action="store_true", help="list the tasks and exit")
+    parser.add_argument("--cloud", action="store_true",
+                        help="run on OpenRouter instead of LM Studio, with the key in OPENROUTER_API_KEY "
+                             "(model names as OpenRouter lists them, e.g. qwen/qwen-2.5-7b-instruct)")
     args = parser.parse_args()
 
     tasks = [t for t in TASKS if args.suite == "all" or t["core"]]
@@ -522,6 +542,8 @@ def main():
         print(summary_markdown(meta, scores, baseline))
         return
 
+    if args.cloud:
+        use_cloud()
     if not model_server_ready():
         sys.exit(f"The model server at {ab.BASE_URL} is not answering; start LM Studio's server first.")
     model = args.model or ab.MODEL
