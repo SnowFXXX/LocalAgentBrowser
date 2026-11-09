@@ -1,6 +1,6 @@
 # Regression history
 
-Every change since 1.53 has been measured on the regression suite (`tools/regression.py`): the same seven
+Every change to how the agent works since 1.53 has been measured on the regression suite (`tools/regression.py`): the same seven
 objectives, one of each kind of task, run one after the other on the development machine (Intel i5-9500, no GPU,
 Qwen2.5-7B-Instruct Q4_K_M in LM Studio, 8,192-token context). Single runs vary with the pages a search turns up, so
 each step was judged on all seven at once, and the run folders were read, not just their scores.

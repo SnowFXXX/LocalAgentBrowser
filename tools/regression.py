@@ -506,6 +506,12 @@ def run_task(task, folder, minutes, model):
         process.wait()
 
 
+def runs_folder():
+    """Where run folders go: regression_runs/ in the project, or LAB_RUNS_DIR (the installed test suite sets it to a
+    folder in Documents, so results are kept apart from the program and survive an uninstall)."""
+    return os.environ.get("LAB_RUNS_DIR") or os.path.join(ROOT, "regression_runs")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--suite", choices=["core", "all"], default="core", help="core: one task of each kind (default)")
@@ -555,7 +561,7 @@ def main():
     version = project_version()
     started = datetime.datetime.now()
     name = run_name(version, model, started)
-    folder = os.path.join(ROOT, "regression_runs", name)
+    folder = os.path.join(runs_folder(), name)
     meta = {"name": name, "version": version, "commit": git_commit(), "started": f"{started:%Y-%m-%d %H:%M}",
             "model": model, **loaded, "tasks": [t["id"] for t in tasks]}
     info = write_run_info(folder, meta)

@@ -207,3 +207,15 @@ def test_a_left_out_note_is_neither_an_uncited_line_nor_an_unverified_command():
     assert rg.uncited_lines(text) == []
     assert rg.ab.unverified_code(text, found) == []
     assert rg.ab.unverified_code(text + "\n\nRun `source venv/bin/activate` [4].", found) == ["source venv/bin/activate"]
+
+
+class TestRunsFolder:
+    """The installed test suite keeps its results in Documents (LAB_RUNS_DIR); a clone keeps regression_runs/."""
+
+    def test_default_is_the_projects_regression_runs(self, monkeypatch):
+        monkeypatch.delenv("LAB_RUNS_DIR", raising=False)
+        assert rg.runs_folder() == os.path.join(rg.ROOT, "regression_runs")
+
+    def test_lab_runs_dir_moves_it(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("LAB_RUNS_DIR", str(tmp_path))
+        assert rg.runs_folder() == str(tmp_path)

@@ -6,7 +6,7 @@
     <title>Verification over Trust</title>
     <meta name="description" content="Code-enforced grounding for honest reporting by small local language models in autonomous web research: design, a four-model evaluation, and where our own measures failed.">
     <meta property="og:title" content="Verification over Trust: Code-Enforced Grounding for Honest Reporting by Small Local Language Models in Autonomous Web Research">
-    <meta property="og:image" content="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/chart1.png">
+    <meta property="og:image" content="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/2026-10-chart1.png">
     <meta name="twitter:card" content="summary_large_image">
     <style>
       :root { --bg:#0b111b; --ink:#e8eef5; --sub:#b9c7d6; --muted:#8191a5; --mint:#5fd3a6; --mint-hi:#8ff0c8;
@@ -56,7 +56,7 @@
     <nav><div><a class="mark" href="index.html">LocalAgent<b>Browser</b></a>
       <a href="https://github.com/SnowFXXX/LocalAgentBrowser">GitHub →</a></div></nav>
     <header><div><div class="kicker">LocalAgentBrowser · Technical paper</div>
-      <h1>Verification over Trust:<span class=long>Code-Enforced Grounding for Honest Reporting by Small Local Language Models in Autonomous Web Research</span></h1><p style="margin-top:18px;color:var(--muted);font-size:16px">SnowFX · LocalAgentBrowser 1.63 · November 2026</p><div style="margin:22px 0 0;padding:14px 18px;border-left:4px solid var(--mint);background:rgba(18,49,43,.45);border-radius:0 10px 10px 0;font-size:16px;color:var(--sub)"><strong style="color:var(--ink)">Update, November 8, 2026:</strong> this paper reports version 1.63. Version 1.64 reran the four-model round on identical code with a 90-minute limit: Qwen2.5-7B finished 6 of 7 tasks, Llama-3.1-8B 7 of 7, Qwen2.5-14B 5 of 7 and Qwen2.5-3B 3 of 7, with no finished result filling a gap from the model's own knowledge. One finished 3B result contains a claim the measures missed (a misread link card). Details: <a href="https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md">regression history</a>.</div></div></header>
+      <h1>Verification over Trust:<span class=long>Code-Enforced Grounding for Honest Reporting by Small Local Language Models in Autonomous Web Research</span></h1><p style="margin-top:18px;color:var(--muted);font-size:16px">SnowFX · LocalAgentBrowser 1.63 · November 2026</p><div style="margin:22px 0 0;padding:14px 18px;border-left:4px solid var(--mint);background:rgba(18,49,43,.45);border-radius:0 10px 10px 0;font-size:16px;color:var(--sub)"><strong style="color:var(--ink)">Update, November 8, 2026:</strong> this paper reports version 1.63. Version 1.64 reran the four-model round on identical code with a 90-minute limit: Qwen2.5-7B finished 6 of 7 tasks, Llama-3.1-8B 7 of 7, Qwen2.5-14B 5 of 7 and Qwen2.5-3B 3 of 7, with no finished result filling a gap from the model's own knowledge. One finished 3B result contains a claim the measures missed (a misread link card). Details: <a href="https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md">regression history</a>. Version 1.65 adds a Windows installer and optional cloud models through OpenRouter; the tests in this paper used local models only.</div></div></header>
     <article>
     <h2>Abstract</h2>
 <p>Language models used as research assistants produce fluent answers whose claims are often not supported by any source.
@@ -403,14 +403,14 @@ the report.</p>
 </tr>
 </tbody>
 </table></div>
-<p><em>Figure 3 (chart3.png). Version 1.62 changed no behaviour (a code reorganisation verified by golden-prompt tests), so
+<p><em>Figure 3 (2026-10-chart3.png). Version 1.62 changed no behaviour (a code reorganisation verified by golden-prompt tests), so
 its 7 of 7 against 1.61's 6 of 7 is run-to-run variance. One run per version cannot separate small effects from
 variance, and we do not claim it does.</em></p>
 <p>The large steps were the fixed checklist (1.53: 2 → 5) and sending the agent back only for gaps the code verifies
 (1.58). Several versions finished fewer tasks because they were stricter: a check that refuses more costs turns, and
 each turn costs minutes.</p>
 <h3>5.2 Four models, identical code</h3>
-<p><em>Figure 1 (chart1.png).</em> Round 3, 90 minutes per task:</p>
+<p><em>Figure 1 (2026-10-chart1.png).</em> Round 3, 90 minutes per task:</p>
 <div class="tbl"><table>
 <thead>
 <tr>

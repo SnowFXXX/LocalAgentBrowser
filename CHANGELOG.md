@@ -1,12 +1,12 @@
 # Changelog
 
-Every version of LocalAgentBrowser, newest first. Each released version is also a tagged commit (`v1.11` … `v1.63`); 1.54 to 1.56 and 1.58 to 1.60 were internal steps
+Every version of LocalAgentBrowser, newest first. Each released version is also a tagged commit (`v1.11` … `v1.65`); 1.54 to 1.56 and 1.58 to 1.60 were internal steps
 measured on the regression suite and released as part of 1.57 and 1.61 (see
 [docs/regression-history.md](docs/regression-history.md)).
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
-## [1.65] - 2026-11-08
+## [1.65] - 2026-11-09
 ### Added
 - **A Windows installer** (`LocalAgentBrowser-1.65-setup.exe` on the release): per-user, no administrator rights,
   its own Python 3.13, a choice of the four tested models (downloaded through LM Studio), an optional test suite,
@@ -16,13 +16,20 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
   cloud runs are attributed to LocalAgentBrowser in OpenRouter's app rankings (removable). The regression suite
   takes `--cloud`. Cloud results are not yet measured on the suite.
 - New settings: `LMSTUDIO_EXTRA_BODY` and `LMSTUDIO_EXTRA_HEADERS`, extra JSON fields and HTTP headers for other servers.
+- Regression suite: `LAB_RUNS_DIR` sets where run folders go; the installed test suite keeps them in
+  Documents\LocalAgentBrowser test-suite runs.
 ### Changed
 - The first step says it takes a minute or two on a CPU, so the console doesn't look frozen.
 - The Windows launcher uses the installed Python, reads the model chosen in setup, and writes reports to Windows'
   real Documents folder (also when it is in OneDrive).
-- Wording everywhere: local by default, cloud optional; the README, site, banner, PyPI description and SECURITY.md.
+- Wording everywhere: local by default, cloud optional, and the 1.65 features at the top; the README, site,
+  banner, PyPI description and links, llms.txt, SECURITY.md (your OpenRouter key), CONTRIBUTING.md (building the
+  installer), the docs pages, the article and paper update notes, and the issue form.
 - Includes the documentation fixes prepared as 1.64.2 (never released separately): article and paper update notes,
   new example reports from the 1.64 test run, llms.txt, CONTRIBUTING and docs pages.
+### Fixed
+- The README's "From source" steps showed `venv\Scripts` followed by an invisible control character instead of
+  `venv\Scripts\activate` (on GitHub and PyPI since 1.64.1).
 
 ## [1.64.2] - not released separately (folded into 1.65)
 Documentation only; the code is unchanged from 1.64, as measured. A full check of everything public:

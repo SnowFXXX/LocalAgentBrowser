@@ -37,6 +37,19 @@ pull request:
 python tools/live_test.py "Your objective here" --minutes 25
 ```
 
+## Building the Windows installer
+
+You need [Inno Setup 6](https://jrsoftware.org/isinfo.php) (`winget install JRSoftware.InnoSetup --scope user`) and
+Python 3.13 (the `py` launcher). From the repository:
+
+```bash
+powershell -ExecutionPolicy Bypass -File installer\build.ps1
+```
+
+It builds `installer\build\LocalAgentBrowser-<version>-setup.exe` with its own Python and the exact package versions
+in `requirements.txt`; `BUILD.txt` in the installed folder records what went in. The setup script is
+`installer/LocalAgentBrowser.iss`.
+
 ## Guidelines
 
 - **Keep the agent general-purpose.** It is meant to handle any objective. Rules, filters and prompts should

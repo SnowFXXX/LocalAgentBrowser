@@ -51,19 +51,25 @@ Source: "{#Stage}\tools\live_test.py"; DestDir: "{app}\tools"; Flags: ignorevers
 Source: "{#Stage}\tools\windows\run_suite.cmd"; DestDir: "{app}\tools\windows"; Flags: ignoreversion; Components: suite
 
 [Icons]
-Name: "{group}\LocalAgentBrowser"; Filename: "{app}\tools\windows\LocalAgentBrowser.cmd"; WorkingDir: "{app}"; IconFilename: "{app}\tools\windows\localagentbrowser.ico"; Comment: "Research an objective with a local model"
-Name: "{autodesktop}\LocalAgentBrowser"; Filename: "{app}\tools\windows\LocalAgentBrowser.cmd"; WorkingDir: "{app}"; IconFilename: "{app}\tools\windows\localagentbrowser.ico"; Comment: "Research an objective with a local model"; Tasks: desktopicon
+; The launcher starts in Documents, not in the program folder: a launcher window left open then doesn't keep the
+; program folder from being removed by the uninstaller
+Name: "{group}\LocalAgentBrowser"; Filename: "{app}\tools\windows\LocalAgentBrowser.cmd"; WorkingDir: "{userdocs}"; IconFilename: "{app}\tools\windows\localagentbrowser.ico"; Comment: "Research an objective with a local model"
+Name: "{autodesktop}\LocalAgentBrowser"; Filename: "{app}\tools\windows\LocalAgentBrowser.cmd"; WorkingDir: "{userdocs}"; IconFilename: "{app}\tools\windows\localagentbrowser.ico"; Comment: "Research an objective with a local model"; Tasks: desktopicon
 Name: "{group}\Past reports"; Filename: "{userdocs}\LocalAgentBrowser runs"
-Name: "{group}\Run the test suite"; Filename: "{app}\tools\windows\run_suite.cmd"; WorkingDir: "{app}"; IconFilename: "{app}\tools\windows\localagentbrowser.ico"; Components: suite
-Name: "{group}\Uninstall LocalAgentBrowser"; Filename: "{uninstallexe}"
+Name: "{group}\Run the test suite"; Filename: "{app}\tools\windows\run_suite.cmd"; WorkingDir: "{userdocs}"; IconFilename: "{app}\tools\windows\localagentbrowser.ico"; Components: suite
+; The uninstaller restarts itself from a temporary copy, and that copy may not be allowed to come to the front: its
+; "Are you sure" box then opened behind other windows, minimized. From this shortcut it runs without its own boxes
+; (/SILENT) and asks with boxes that always open on top (see InitializeUninstall)
+Name: "{group}\Uninstall LocalAgentBrowser"; Filename: "{uninstallexe}"; Parameters: "/SILENT /FROMSHORTCUT"
 
 [Dirs]
 Name: "{userdocs}\LocalAgentBrowser runs"; Flags: uninsneveruninstall
 
 [Run]
-Filename: "{app}\python\python.exe"; Parameters: "-m playwright install chromium"; StatusMsg: "Downloading the Chromium browser the agent uses (about 150 MB, once)..."; Flags: waituntilterminated
-Filename: "{code:LmsPath}"; Parameters: "get {code:ModelDownload} -y"; StatusMsg: "Downloading the chosen model through LM Studio (several GB; this can take a while)..."; Check: WantsModelDownload; Flags: waituntilterminated
-Filename: "{app}\tools\windows\LocalAgentBrowser.cmd"; Description: "Start LocalAgentBrowser now"; Flags: postinstall nowait skipifsilent shellexec unchecked
+; The downloads run without a console window of their own; setup's progress page shows what is happening
+Filename: "{app}\python\python.exe"; Parameters: "-m playwright install chromium"; StatusMsg: "Downloading the Chromium browser the agent uses (about 150 MB, once)..."; Flags: waituntilterminated runhidden
+Filename: "{code:LmsPath}"; Parameters: "get {code:ModelDownload} -y"; StatusMsg: "Downloading the chosen model through LM Studio (several GB; this can take a while)..."; Check: WantsModelDownload; Flags: waituntilterminated runhidden
+Filename: "{app}\tools\windows\LocalAgentBrowser.cmd"; WorkingDir: "{userdocs}"; Description: "Start LocalAgentBrowser now"; Flags: postinstall nowait skipifsilent shellexec unchecked
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\settings"
@@ -72,10 +78,41 @@ Type: filesandordirs; Name: "{app}\python\Lib\site-packages\__pycache__"
 [Code]
 const
   ModelCount = 4;
+  CloudModel = 'qwen/qwen-2.5-7b-instruct';
 var
   ModelPage: TInputOptionWizardPage;
   OptionalPage: TInputOptionWizardPage;
   ModelIds, ModelDownloads: array[0..ModelCount] of String;
+
+{ Uninstall from the Start-menu shortcut: the same questions as the uninstaller's own, in boxes that open on top }
+function MessageBoxW(hWnd: Integer; lpText, lpCaption: String; uType: Cardinal): Integer;
+  external 'MessageBoxW@user32.dll stdcall';
+
+const
+  { Windows MessageBox flags, named apart from Inno Setup's own MsgBox constants }
+  WinOk = $0; WinYesNo = $4; WinQuestion = $20; WinInformation = $40; WinSecondDefault = $100;
+  WinForeground = $10000; WinTopmost = $40000; WinYes = 6;
+  UninstallTitle = 'LocalAgentBrowser Uninstall';
+
+function FromShortcut: Boolean;
+begin
+  Result := Pos('/FROMSHORTCUT', Uppercase(GetCmdTail)) > 0;
+end;
+
+function InitializeUninstall: Boolean;
+begin
+  Result := True;
+  if FromShortcut then
+    Result := MessageBoxW(0, 'Are you sure you want to completely remove LocalAgentBrowser and all of its components?',
+      UninstallTitle, WinYesNo or WinQuestion or WinSecondDefault or WinForeground or WinTopmost) = WinYes;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if (CurUninstallStep = usDone) and FromShortcut then
+    MessageBoxW(0, 'LocalAgentBrowser was successfully removed from your computer.', UninstallTitle,
+      WinOk or WinInformation or WinForeground or WinTopmost);
+end;
 
 function LmsPath(Param: String): String;
 begin
@@ -134,25 +171,43 @@ begin
   OptionalPage.Values[0] := False;
 end;
 
-{ The "Ready to Install" summary: what was actually chosen, without a "setup type" line }
+{ Adds one section to the summary, with a blank line between sections and none before the first }
+procedure AddSection(var Memo: String; Section, NewLine: String);
+begin
+  if Section = '' then
+    Exit;
+  if Memo <> '' then
+    Memo := Memo + NewLine + NewLine;
+  Memo := Memo + Section;
+end;
+
+{ The "Ready to Install" summary: what was actually chosen, without a "setup type" line. With cloud models on, it
+  names the cloud model the runs will use, and says the LM Studio model is for when cloud models are turned off }
 function UpdateReadyMemo(Space, NewLine, MemoUserInfoInfo, MemoDirInfo, MemoTypeInfo, MemoComponentsInfo,
   MemoGroupInfo, MemoTasksInfo: String): String;
 var
-  Model, Cloud: String;
+  Model, ModelTitle, Cloud: String;
 begin
   if ChosenModel < ModelCount then
     Model := ModelPage.CheckListBox.ItemCaption[ChosenModel]
   else
     Model := 'None now: chosen later in LM Studio';
   if OptionalPage.Values[0] then
-    Cloud := 'On: OpenRouter, with your own key'
+  begin
+    ModelTitle := 'Model in LM Studio (used when cloud models are turned off):';
+    Cloud := 'On: OpenRouter''s ' + CloudModel + ', with your own key'
+  end
   else
+  begin
+    ModelTitle := 'Model:';
     Cloud := 'Off';
-  Result := MemoDirInfo + NewLine + NewLine + MemoComponentsInfo + NewLine + NewLine +
-    'Model:' + NewLine + Space + Model + NewLine + NewLine +
-    'Cloud models:' + NewLine + Space + Cloud;
-  if MemoTasksInfo <> '' then
-    Result := Result + NewLine + NewLine + MemoTasksInfo;
+  end;
+  Result := '';
+  AddSection(Result, MemoDirInfo, NewLine);
+  AddSection(Result, MemoComponentsInfo, NewLine);
+  AddSection(Result, ModelTitle + NewLine + Space + Model, NewLine);
+  AddSection(Result, 'Cloud models:' + NewLine + Space + Cloud, NewLine);
+  AddSection(Result, MemoTasksInfo, NewLine);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -180,7 +235,7 @@ begin
     Lines[1] := 'rem OPENROUTER_API_KEY environment variable and is never stored here. Delete this file to use LM Studio again.';
     Lines[2] := 'set "LAB_CLOUD=1"';
     Lines[3] := 'set "LMSTUDIO_BASE_URL=https://openrouter.ai/api/v1"';
-    Lines[4] := 'set "LMSTUDIO_MODEL=qwen/qwen-2.5-7b-instruct"';
+    Lines[4] := 'set "LMSTUDIO_MODEL=' + CloudModel + '"';
     Lines[5] := 'set "LMSTUDIO_EXTRA_BODY={"provider": {"require_parameters": true, "data_collection": "deny"}}"';
     Lines[6] := 'rem OpenRouter app attribution (lists runs under LocalAgentBrowser, no content shared); delete the next line to turn it off';
     Lines[7] := 'set "LMSTUDIO_EXTRA_HEADERS={"HTTP-Referer": "https://snowfxxx.github.io/LocalAgentBrowser/", "X-OpenRouter-Title": "LocalAgentBrowser"}"';

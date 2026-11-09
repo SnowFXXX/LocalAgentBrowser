@@ -4,11 +4,14 @@
 decides when it's done, on your own computer, with a local model or, if you choose, a cloud one. It gives an answer
 you can check, or says honestly what it couldn't find.**
 
+**New in 1.65:** a [Windows installer](#windows-the-installer-recommended) with a choice of tested models, and optional
+cloud models through [OpenRouter](https://openrouter.ai) for fast answers.
+
 [![Tests](https://github.com/SnowFXXX/LocalAgentBrowser/actions/workflows/tests.yml/badge.svg)](https://github.com/SnowFXXX/LocalAgentBrowser/actions/workflows/tests.yml)
 [![PyPI](https://img.shields.io/pypi/v/localagentbrowser.svg)](https://pypi.org/project/localagentbrowser/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/LICENSE)
 ![Python 3.10–3.13](https://img.shields.io/badge/python-3.10%E2%80%933.13-blue.svg)
-![Runs locally](https://img.shields.io/badge/LLM-local%20(LM%20Studio)-green.svg)
+![Local by default, cloud optional](https://img.shields.io/badge/LLM-local%20by%20default%20%C2%B7%20cloud%20optional-green.svg)
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/social-preview.png" alt="LocalAgentBrowser: an AI that can't cover up. SEARCH, NAVIGATE, READ_MORE, DISCOVER, FINISH. Local by default, cloud optional, four models tested on a CPU, Windows installer, free and open source." width="820">
@@ -37,9 +40,6 @@ can use a cloud model instead. Every claim in its answer points to the page it c
 [Paper: Verification over Trust](https://snowfxxx.github.io/LocalAgentBrowser/paper.html) ·
 [Example reports](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/examples/README.md)
 
-**New in 1.65:** a Windows installer, and optional cloud models through [OpenRouter](https://openrouter.ai) for
-fast answers.
-
 ## Contents
 
 [Tested on four models](#tested-on-four-models) · [Install](#install) · [First run](#first-run) ·
@@ -48,10 +48,11 @@ fast answers.
 
 ## Tested on four models
 
-Every release is measured on the same seven tasks, one of each kind it's built for: a fact, a list with conditions,
-a comparison with a recommendation, a how-to, an explanation, views from several sources, and a lookup in official
-documentation. In 1.64, four models ran them with identical code, 90 minutes per task, on an ordinary 6-core PC with
-no GPU (Intel i5-9500):
+Releases that change how the agent works are measured on the same seven tasks, one of each kind it's built for: a
+fact, a list with conditions, a comparison with a recommendation, a how-to, an explanation, views from several
+sources, and a lookup in official documentation. In 1.64, four models ran them with identical code, 90 minutes per
+task, on an ordinary 6-core PC with no GPU (Intel i5-9500). 1.65 adds the installer and optional cloud models
+without changing how the agent works with a local model, so these results still apply:
 
 | Model (Q4_K_M) | Download | RAM | Tasks finished | Model time | Gaps filled from its own knowledge |
 |---|---|---|---|---|---|
@@ -78,7 +79,8 @@ a PC with little memory. Any instruction-tuned model LM Studio serves should wor
 
 ### Windows: the installer (recommended)
 
-1. Install [LM Studio](https://lmstudio.ai) (free). You don't need to download a model in it yet.
+1. Install [LM Studio](https://lmstudio.ai) (free). You don't need to download a model in it yet. (Not needed if
+   you'll only use cloud models.)
 2. Download **`LocalAgentBrowser-1.65-setup.exe`** from the
    [latest release](https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest) and run it.
    - Windows may say **"Windows protected your PC"**, because the installer isn't code-signed yet. Click
@@ -99,7 +101,8 @@ reports in Documents are kept.
 
 ### Any system: pip
 
-You need [LM Studio](https://lmstudio.ai) (free), which runs the model, and Python 3.10 or later.
+You need Python 3.10 or later, and [LM Studio](https://lmstudio.ai) (free) to run the model, unless you use cloud
+models.
 
 ```bash
 python -m venv venv
@@ -116,7 +119,7 @@ On macOS or Linux, activate with `source venv/bin/activate` instead.
 git clone https://github.com/SnowFXXX/LocalAgentBrowser.git
 cd LocalAgentBrowser
 python -m venv venv
-venv\Scriptsctivate
+venv\Scripts\activate
 pip install -r requirements.txt
 python -m playwright install chromium
 ```
@@ -131,7 +134,8 @@ The installer adds these for you. From a clone (above), with its packages instal
 powershell -ExecutionPolicy Bypass -File tools\windows\make_shortcuts.ps1
 ```
 
-This adds **LocalAgentBrowser** to the Start menu and the desktop. The launcher checks that LM Studio is answering,
+This adds **LocalAgentBrowser** to the Start menu and the desktop. The launcher checks that LM Studio is answering
+(or, with cloud models on, that your key is set),
 runs each objective in its own folder under **Documents\LocalAgentBrowser runs**, and opens the report as a page in
 your browser when the run ends.
 
@@ -139,7 +143,8 @@ your browser when the run ends.
 
 1. In LM Studio, load your model with a **context length of 8192** (the agent's default; LM Studio's own default may
    differ) and start the local server (Developer tab → Start Server). With cloud models turned on, skip this step and
-   set your OpenRouter key in the `OPENROUTER_API_KEY` environment variable instead.
+   set your OpenRouter key in the `OPENROUTER_API_KEY` environment variable instead (without the installer, see
+   the [FAQ](#faq) for the other settings).
 2. Start LocalAgentBrowser: the Start-menu shortcut on Windows, or `localagentbrowser` in a terminal.
 3. Type your objective, for example *What is the tallest mountain in Africa, and how tall is it in meters and in
    feet?* A Chromium window opens and the agent starts working. The first step takes a minute or two on a CPU.
@@ -219,15 +224,14 @@ answers with one JSON action:
 | `DISCOVER` | Records something from the current page as a finding |
 | `FINISH` | Ends the run, after each part of the objective is checked; the answer is then written in a separate step |
 
-```mermaid
-flowchart LR
-    O[Objective] --> P[Build prompt]
-    P --> M[Model<br/>LM Studio or cloud]
-    M -->|JSON action| C{Checks in code}
-    C -->|refused: cheap retry| M
-    C -->|accepted| B[Playwright<br/>Chromium]
-    B -->|page text, links| P
-    C -->|FINISH| R[Report]
+```text
+Objective --> prompt --> model (LM Studio or cloud) --> one JSON action --> checks in code
+                ^          ^                                                      |
+                |          +--- refused: a cheap retry ---------------------------+
+                |                                                                 |
+                +--- page text, links <--- Playwright (Chromium) <--- accepted ---+
+                                                                                  |
+                                                        the report <--- FINISH ---+
 ```
 
 The model proposes; code checks before anything is accepted:
@@ -253,6 +257,8 @@ The full details, code layout, timings and known limits:
 | `LMSTUDIO_CONTEXT_LENGTH` | `8192` | Context length the model is loaded with; the conversation budget follows it |
 | `LMSTUDIO_EXTRA_BODY` | none | Extra JSON fields sent with every request, for other servers |
 | `LMSTUDIO_EXTRA_HEADERS` | none | Extra HTTP headers sent with every request, as JSON |
+| `OPENROUTER_API_KEY` | none | Your OpenRouter key for cloud models, read by the Windows launcher and the test suite's `--cloud` |
+| `LAB_RUNS_DIR` | `regression_runs/` | Where the test suite puts its run folders |
 
 The Windows installer writes the model you chose, and the cloud setting if you turned it on, to small files in its
 `settings` folder. Behaviour limits are named constants in `localagentbrowser/config.py`, each with a comment.
@@ -277,6 +283,28 @@ providers not to store or train on them). You set your own key in the `OPENROUTE
 installer never asks for it. Cloud runs are listed under LocalAgentBrowser in OpenRouter's app rankings (no request
 content is shared); to turn that off, delete the `LMSTUDIO_EXTRA_HEADERS` line in the installer's
 `settings\cloud.cmd`.
+
+**How do I turn on cloud models without the installer?** Set your key in `OPENROUTER_API_KEY`, then these, in
+the same window before you start the agent. In Windows' command prompt:
+
+```bat
+set "LMSTUDIO_BASE_URL=https://openrouter.ai/api/v1"
+set "LMSTUDIO_MODEL=qwen/qwen-2.5-7b-instruct"
+set "LMSTUDIO_API_KEY=%OPENROUTER_API_KEY%"
+set "LMSTUDIO_EXTRA_BODY={"provider": {"require_parameters": true, "data_collection": "deny"}}"
+```
+
+On macOS or Linux:
+
+```bash
+export LMSTUDIO_BASE_URL=https://openrouter.ai/api/v1
+export LMSTUDIO_MODEL=qwen/qwen-2.5-7b-instruct
+export LMSTUDIO_API_KEY="$OPENROUTER_API_KEY"
+export LMSTUDIO_EXTRA_BODY='{"provider": {"require_parameters": true, "data_collection": "deny"}}'
+```
+
+The last line asks providers not to store or train on your prompts and to honour the JSON format. Any model
+OpenRouter lists can go in `LMSTUDIO_MODEL`; this one is the cloud version of the default.
 
 **Can I use another OpenAI-compatible server?** Probably: point `LMSTUDIO_BASE_URL` at it. The speed tricks rely
 on the server reusing cached prompt prefixes (llama.cpp-based servers do).
@@ -333,7 +361,12 @@ To measure a change on all seven kinds of task (several hours on a CPU), on any 
 python tools/regression.py --model qwen2.5-7b-instruct --baseline regression_runs/<earlier run>/summary.json
 ```
 
-Each run gets a folder in `regression_runs/` with every task's report, journal and prompt trace, a `summary.md`
+With `--cloud --model qwen/qwen-2.5-7b-instruct` the same suite runs on OpenRouter, with your key in
+`OPENROUTER_API_KEY` (those runs are listed under LocalAgentBrowser in OpenRouter's app rankings).
+
+Each run gets a folder in `regression_runs/` (or in the folder `LAB_RUNS_DIR` names; the installer's "Run the test
+suite" shortcut uses Documents\LocalAgentBrowser test-suite runs) with every task's report, journal and prompt
+trace, a `summary.md`
 with honesty measures for each result, and `run_info.json` naming the PC and the exact code it ran. Results by kind
 of task are in [docs/task-results.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/task-results.md),
 and every step since 1.53 in
@@ -355,8 +388,9 @@ the measurements behind each decision.
 
 Versions 1.13 onwards were developed together with [Claude](https://www.anthropic.com/claude) (Anthropic), working
 in Claude Code; those commits list Claude as co-author. Built on [LM Studio](https://lmstudio.ai),
-[Playwright](https://playwright.dev/python/), the [OpenAI Python library](https://github.com/openai/openai-python)
-and, for the Windows installer, [Inno Setup](https://jrsoftware.org/isinfo.php).
+[Playwright](https://playwright.dev/python/), the [OpenAI Python library](https://github.com/openai/openai-python),
+[OpenRouter](https://openrouter.ai) for the optional cloud models and, for the Windows installer,
+[Inno Setup](https://jrsoftware.org/isinfo.php).
 
 ## License
 

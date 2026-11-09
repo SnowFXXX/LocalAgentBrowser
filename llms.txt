@@ -1,8 +1,8 @@
 # LocalAgentBrowser
 
 > An autonomous web research agent driven by a local language model (LM Studio) and Playwright. Give it an
-> objective; it searches the web, reads pages, records findings with their sources and writes a cited report, all
-> on your own computer. Local by default and built for small models on a CPU (four tested), with no GPU or API key
+> objective; it searches the web, reads pages, records findings with their sources and writes a cited report, on
+> your own computer. Local by default and built for small models on a CPU (four tested), with no GPU or API key
 > needed; optional cloud models through OpenRouter with your own key.
 
 Key facts:
@@ -20,12 +20,15 @@ Key facts:
 - Windows: an installer (LocalAgentBrowser-<version>-setup.exe on the GitHub releases) with its own Python, a choice of
   the four tested models during setup, and Start-menu shortcuts; the report opens by itself when a run ends.
 - Cloud models (optional, 1.65): through OpenRouter with the user's own key; much faster, but prompts and pages read
-  leave the computer.
+  leave the computer. The Windows installer sets them up; otherwise set LMSTUDIO_BASE_URL to
+  https://openrouter.ai/api/v1, LMSTUDIO_MODEL to an OpenRouter model (qwen/qwen-2.5-7b-instruct) and
+  LMSTUDIO_API_KEY to the key (the README's FAQ has the full settings).
 - Honesty by design: rules in code check the model's claims. Findings must be on the page shown. Before finishing,
   each part of the objective is checked against the findings. What was not found is reported as not found, and
   things the pages didn't prove are marked ("not shown in the pages read to be open-source").
 - Privacy: searches, written from your objective, go to DuckDuckGo, and pages are read from the web like any browser;
-  the objective itself, the model and the report stay on your computer.
+  by default the objective itself, the model and the report stay on your computer (with cloud models turned on,
+  the objective, the prompts and the pages read go to OpenRouter and the model's provider).
 - License: MIT.
 
 ## Docs
