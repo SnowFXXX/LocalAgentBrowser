@@ -22,3 +22,4 @@ dist/
 
 # Regression runs (tools/regression.py)
 regression_runs/
+installer/build/

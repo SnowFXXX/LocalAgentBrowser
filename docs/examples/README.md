@@ -1,26 +1,36 @@
 # Example reports
 
-Two reports exactly as the agent wrote them, unedited, from the 1.62 regression run of 2026-10-25. Both runs used
-Qwen2.5-7B-Instruct (Q4_K_M) in LM Studio on a 6-core CPU with no GPU. Each report has the final result, the
-objective's checklist with the findings recorded for each part, and every finding with the page it came from.
+Three reports exactly as the agent wrote them, unedited, from the test run of the released 1.64 code on
+2026-11-07. All three used Qwen2.5-7B-Instruct (Q4_K_M), the default model, in LM Studio on a 6-core CPU with no GPU.
+Each report has the final result, the objective's checklist with the findings recorded for each part, and every
+finding with the page it came from.
 
 | Report | Objective | Turns | Model time |
 |---|---|---|---|
-| [documentation-venv.md](documentation-venv.md) | Using the official Python documentation: create a virtual environment with venv, activate it on Windows and on macOS or Linux, install packages into it | 5 | 16.4 min |
-| [comparison-sqlite-postgresql.md](comparison-sqlite-postgresql.md) | Compare SQLite and PostgreSQL for a small web application, then recommend one for a hobby project | 8 | 35.3 min |
+| [explanation-photosynthesis.md](explanation-photosynthesis.md) | How photosynthesis works: what goes in and what comes out, the light-dependent reactions and the Calvin cycle, and where each takes place in the plant cell | 13 | 72.7 min |
+| [howto-cold-brew.md](howto-cold-brew.md) | How to make cold brew coffee at home: what you need with quantities, the steps in order, how long it keeps in the fridge | 10 | 50.4 min |
+| [comparison-sqlite-postgresql.md](comparison-sqlite-postgresql.md) | Compare SQLite and PostgreSQL for a small web application, then recommend one for a hobby project with a few hundred users | 9 | 49.2 min |
 
 ## What to notice, good and bad
 
-**The documentation report** is the clean case. Every finding comes from docs.python.org, as the objective asked,
-and every step cites the finding it came from. One slip: the Windows command is given as `\venv\Scripts\activate`,
-with a leading backslash; from the folder that holds the environment it is `venv\Scripts\activate`.
+**The explanation** is the clean case. Every part of the question is answered, inputs and outputs (oxygen included),
+both stages and where each takes place, and every sentence cites the finding it came from. Two small things: finding
+[3] largely repeats [2] from the same page, and finding [4] (common misconceptions) isn't used.
 
-**The comparison report** shows how the agent handles a gap, and where a 7B model still falls short.
-- The part it could not find, how each database handles many simultaneous users, is said plainly ("No specific
-  information was found ...") instead of being filled in from the model's own knowledge.
-- Every other claim cites a finding, and the findings are quoted from the page.
-- The "My view" paragraph still leans on PostgreSQL's "better scalability for handling many simultaneous users",
-  the very thing the findings didn't cover, though it says so in the same sentence.
-- The first finding is the single word "administration", which adds nothing.
+**The how-to** copies the page's amounts and steps faithfully: 1 cup of coarse coffee to 4 cups of water, 16 hours in
+the fridge, 7 to 14 days to keep. But steps 1 to 4 and 6 carry no citation, although they come from finding [2], so
+a reader has to look them up. The test suite flags them as uncited lines.
+
+**The comparison** shows the limit of checking against the page.
+- Every claim cites a finding, and the findings are copied from the page. But one of them repeats the page's own
+  mistake: it says SQLite "lacks some advanced SQL features like partial indexes, check constraints, and triggers",
+  and SQLite has all three. The checks prove a claim is on the page, not that the page is right.
+- All three findings come from one page, so there is no second source to catch that.
+- The recommendation, PostgreSQL for a hobby project with a few hundred users, leans on the page's "hundreds to
+  thousands of concurrent users"; many would pick SQLite at that size. It is labelled as the model's view.
+
+The documentation task (Python virtual environments) ran out of time for the 7B in this run; the
+[regression history](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md) has every
+task and model.
 
 Check any result against its listed findings before relying on it. That's what the report is laid out for.

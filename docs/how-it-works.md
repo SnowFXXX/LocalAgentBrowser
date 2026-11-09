@@ -18,7 +18,7 @@ current page, and answers with exactly one JSON action:
 ```mermaid
 flowchart LR
     O[Objective] --> P[Build prompt]
-    P --> M[Local model<br/>LM Studio]
+    P --> M[Model<br/>LM Studio or cloud]
     M -->|JSON action| C{Rule checks}
     C -->|refused: cheap retry| M
     C -->|accepted| B[Playwright<br/>Chromium]
@@ -32,7 +32,7 @@ The code is in the `localagentbrowser` package, one file per job, each depending
 
 | File | What it holds |
 |---|---|
-| `config.py` | Settings: the LM Studio connection (from environment variables) and every limit and threshold |
+| `config.py` | Settings: the model server connection, LM Studio or a cloud model (from environment variables), and every limit and threshold |
 | `prompts.py` | Every fixed text the model reads: the system prompt, turn instructions, the checklist, coverage and final-result prompts |
 | `text.py` | Small word helpers the checks share |
 | `pages.py` | Reading the web: search results, page parts, the outline and its pointer, links |
@@ -43,7 +43,8 @@ The code is in the `localagentbrowser` package, one file per job, each depending
 | `report.py` | The journal, the research log, the final result and the report file |
 | `agent.py` | The loop: each turn's conversation with the model, in-turn retries, and `main()` |
 
-`agent_browser.py` keeps `python agent_browser.py` working from a clone.
+`agent_browser.py` keeps `python agent_browser.py` working from a clone. The Windows installer is built from
+`installer/` (see [CONTRIBUTING.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/CONTRIBUTING.md)).
 
 ## Keeping a small model on track
 
@@ -129,7 +130,7 @@ Measured on an Intel i5-9500 (6 cores, no GPU) with Qwen2.5-7B-Instruct Q4_K_M a
 
 Whole runs vary with the pages a search turns up. In the regression runs since 1.53, a factual question took 9 to
 19 minutes of model time; the list, comparison, how-to, opinion and documentation tasks 17 to 44 when they finished;
-and the explanation 13 to 59. A whole suite of seven tasks took 171 to 272 minutes. A GPU or a smaller model will be much faster.
+and the explanation 13 to 59. A whole suite of seven tasks took 171 to 272 minutes up to 1.63, and 262 to 361 minutes for the 7B on 1.64 (stricter checks, two PCs). A GPU or a smaller model will be much faster, and so is a cloud model (1.65).
 
 ## Limitations
 
@@ -137,7 +138,7 @@ and the explanation 13 to 59. A whole suite of seven tasks took 171 to 272 minut
   research, an opinion from several sources, a factual question, a comparison, a how-to, a list and an
   explanation of a topic. Each one
   exposed something that did not generalise and was fixed; other kinds of tasks may expose more.
-- **Judging whether a finding covers an item is the weakest area.** The model's verdict is unreliable both ways:
+- **Whether a finding covers an item is judged by the model, and it can be wrong.** Its verdict is unreliable both ways:
   on 1.53 the explanation finished from one overview paragraph without oxygen or water, and in the regression runs
   since 1.54 about half of the coverage check's send-backs were for gaps that were not real ("missing official
   documentation" on a comparison that did not ask for it, "H2O, O2" already recorded). Since 1.58 the agent is sent
@@ -169,4 +170,6 @@ and the explanation 13 to 59. A whole suite of seven tasks took 171 to 272 minut
 - **Reading only.** The agent searches, opens pages and reads them. It does not click, fill in forms or sign in.
 - **Web pages go into the prompt.** A page can contain text written to manipulate the model (prompt
   injection), so treat findings as unverified. See [SECURITY.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/SECURITY.md).
+- **Cloud models are not measured on the suite yet.** They run the same code and checks, but every measurement
+  here is with a local model in LM Studio.
 - **One search provider.** DuckDuckGo's HTML search occasionally returns an error page; the agent retries once.

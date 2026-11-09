@@ -7,8 +7,8 @@ requests are all welcome.
 
 - **Report a bug** or **suggest a feature** using the [issue templates](https://github.com/SnowFXXX/LocalAgentBrowser/issues/new/choose).
 - **Share a run.** Results with other models, hardware or kinds of objectives are especially useful: the
-  agent has been tuned on seven kinds of objectives (see the README's results table), all with Qwen2.5-7B on
-  a CPU.
+  agent has been tuned on seven kinds of objectives and measured on four models (Qwen2.5 3B, 7B and 14B, and
+  Llama 3.1 8B), all on CPUs (see the README's "Tested on four models").
 - **Send a pull request.** For anything bigger than a small fix, please open an issue first so we can agree
   on the approach.
 
@@ -36,6 +36,19 @@ pull request:
 ```bash
 python tools/live_test.py "Your objective here" --minutes 25
 ```
+
+## Building the Windows installer
+
+You need [Inno Setup 6](https://jrsoftware.org/isinfo.php) (`winget install JRSoftware.InnoSetup --scope user`) and
+Python 3.13 (the `py` launcher). From the repository:
+
+```bash
+powershell -ExecutionPolicy Bypass -File installer\build.ps1
+```
+
+It builds `installer\build\LocalAgentBrowser-<version>-setup.exe` with its own Python and the exact package versions
+in `requirements.txt`; `BUILD.txt` in the installed folder records what went in. The setup script is
+`installer/LocalAgentBrowser.iss`.
 
 ## Guidelines
 

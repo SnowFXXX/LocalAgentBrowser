@@ -1,6 +1,6 @@
 # Results by kind of task
 
-Live runs on the development machine (CPU only, Qwen2.5-7B), from the README before 1.65. Every step since 1.53, on all models, is in [regression-history.md](regression-history.md).
+Live runs on the development machine (CPU only, Qwen2.5-7B), from the README before 1.64.1. Every step since 1.53, on all models, is in [regression-history.md](regression-history.md).
 
 ## Single runs, by kind of task
 
@@ -23,7 +23,7 @@ does not generalise; the [changelog](https://github.com/SnowFXXX/LocalAgentBrows
 
 ## The regression suite, by version
 
-Since 1.53, every change is measured on the same seven objectives, one of each kind above, run one after the other
+Since 1.53, every change to how the agent works is measured on the same seven objectives, one of each kind above, run one after the other
 with a time limit each (`tools/regression.py`, see [Testing](../README.md#testing)). Single runs vary with the pages a search
 turns up, so the suite compares versions on all seven at once. 1.54 to 1.56 and 1.58 to 1.60 were internal steps
 measured this way and released with 1.57 and 1.61; [docs/regression-history.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md)

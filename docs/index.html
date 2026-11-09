@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LocalAgentBrowser</title>
-<meta name="description" content="An autonomous web research agent driven by a small local AI model on your own computer. Code checks every finding against the page it came from; what wasn't found is reported as not found.">
+<meta name="description" content="An autonomous web research agent on your own computer, with a local AI model or, if you choose, a cloud one. Code checks every finding against the page it came from; what wasn't found is reported as not found.">
 <meta property="og:title" content="LocalAgentBrowser">
-<meta property="og:description" content="A small AI that can't cover up: a local web research agent where code, not the model, decides what counts.">
+<meta property="og:description" content="An AI that can't cover up: a web research agent where code, not the model, decides what counts.">
 <meta property="og:image" content="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/social-preview.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b111b'/%3E%3Cpath d='M9 22V10h3v9.5h6V22z' fill='%23e8eef5'/%3E%3Ccircle cx='22' cy='20' r='3' fill='%235fd3a6'/%3E%3C/svg%3E">
@@ -52,6 +52,9 @@
   .flow i { color: var(--muted); font-style: normal; }
   .flow span.end { background: var(--mint-bg); border-color: var(--mint-line); color: var(--mint-hi); }
   .ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
+  .new { margin: 26px 0 0; padding: 10px 16px; border-left: 4px solid var(--mint); background: rgba(18,49,43,.45);
+         border-radius: 0 10px 10px 0; color: var(--sub); font-size: 17px; max-width: 760px; }
+  .new strong { color: var(--ink); }
   .btn { display: inline-block; padding: 12px 22px; border-radius: 10px; font-weight: 700; text-decoration: none;
          border: 1.5px solid var(--chip-line); color: var(--ink); background: var(--chip); }
   .btn.primary { background: var(--mint); border-color: var(--mint); color: #08241a; }
@@ -159,19 +162,22 @@
   <div class="wrap">
     <div class="kicker">Autonomous web agent</div>
     <h1>LocalAgent<b>Browser</b></h1>
-    <p class="tagline">A small AI that can't cover up. Give it a question: a local model searches the web, reads
+    <p class="tagline">An AI that can't cover up. Give it a question: a model, local by default, searches the web, reads
       pages and copies what it finds, and code checks every copy against the page before it counts.</p>
     <div class="flow" aria-label="The five actions: search, navigate, read more, discover, finish">
       <span>SEARCH</span><i>→</i><span>NAVIGATE</span><i>→</i><span>READ_MORE</span><i>→</i><span>DISCOVER</span><i>→</i><span class="end">FINISH</span>
     </div>
+    <p class="new"><strong>New in 1.65:</strong> a Windows installer with a choice of tested models, and optional cloud
+      models for fast answers.</p>
     <div class="ctas">
-      <a class="btn primary" href="#install">Get started</a>
+      <a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest">Download for Windows</a>
+      <a class="btn" href="#install">Other ways to install</a>
       <a class="btn" href="https://github.com/SnowFXXX/LocalAgentBrowser">View on GitHub</a>
       <a class="btn" href="#article">Read the article</a>
     </div>
     <div class="pills">
-      <span class="pill">No cloud AI</span><span class="pill">Four models tested on a CPU</span>
-      <span class="pill">Windows shortcuts</span>
+      <span class="pill">Local by default</span><span class="pill">Cloud optional</span>
+      <span class="pill">Four models tested on a CPU</span><span class="pill">Windows installer</span>
       <span class="pill">Free and open source (MIT)</span><span class="pill">LM Studio + Playwright</span>
     </div>
   </div>
@@ -223,8 +229,9 @@
   <div class="wrap">
     <div class="kicker">Tested on four models</div>
     <h2>Pick the model that fits <em>your PC.</em></h2>
-    <p class="lead">The same seven tasks, the same code, 90 minutes per task, on an ordinary 6-core office PC with no
-      graphics card. None of them filled a gap in a finished answer from its own knowledge.</p>
+    <p class="lead">Measured on version 1.64: the same seven tasks, the same code, 90 minutes per task, on an ordinary
+      6-core office PC with no graphics card. None of them filled a gap in a finished answer from its own knowledge.
+      1.65 doesn't change how the agent works with a local model, so these results still apply.</p>
     <div class="models">
       <div class="model best">
         <div class="tag">The default</div>
@@ -255,6 +262,10 @@
         <p>For PCs with little memory. One finished answer has a claim the checks missed.</p>
       </div>
     </div>
+    <p class="lead" style="font-size:17px;margin-top:22px"><strong>Or a cloud model, for fast answers.</strong> In 1.65
+      the same code can use a model in the cloud through your own OpenRouter account: a few minutes instead of an hour,
+      but it costs money, and your prompts and the pages read leave your computer. Off unless you turn it on; not yet
+      measured on the test suite.</p>
     <p class="note">On version 1.63 the same models finished 6, 2, 2 and 0 of 7.
       <a href="https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md">Every run, measured.</a></p>
   </div>
@@ -283,21 +294,29 @@
     <div class="kicker">Install</div>
     <h2>Runs on the computer <em>you already have.</em></h2>
     <p class="lead">No graphics card needed. A run takes from about 10 minutes to an hour on a CPU, so start it and
-      let it work. You'll need <a href="https://lmstudio.ai">LM Studio</a> (free), which runs the model.</p>
+      let it work. You'll need <a href="https://lmstudio.ai">LM Studio</a> (free), which runs the model on your computer,
+      unless you use cloud models.</p>
     <div class="two">
       <div>
-        <h3>Windows: shortcuts</h3>
+        <h3>Windows: the installer</h3>
         <ol class="start">
-          <li>Install <a href="https://lmstudio.ai">LM Studio</a>, load a model with a context length of 8192, and
-            start its local server.</li>
-          <li>Clone the repository and install its packages in a <code>venv</code> folder inside it.</li>
-          <li>Run <code>tools\windows\make_shortcuts.ps1</code>: LocalAgentBrowser appears in the Start menu and on the
-            desktop.</li>
-          <li>Open it and type your question. Each run gets its own folder in Documents, and the report opens in your
-            browser when it's done.</li>
+          <li>Install <a href="https://lmstudio.ai">LM Studio</a> (not needed if you'll only use cloud models).</li>
+          <li>Download <strong>LocalAgentBrowser-1.65-setup.exe</strong> from the latest release and run it. If Windows
+            says it protected your PC, click <strong>More info → Run anyway</strong>: the installer isn't code-signed yet.</li>
+          <li>Pick what to install and one of the four tested models; setup downloads it through LM Studio, and the
+            browser the agent uses. Cloud models are optional and off unless you tick them. No administrator rights,
+            no Python needed.</li>
+          <li>In LM Studio, load the model with a context length of 8192 and start the local server (Developer tab →
+            Start Server). With cloud models, set your key in the <code>OPENROUTER_API_KEY</code> environment variable
+            instead.</li>
+          <li>Open <strong>LocalAgentBrowser</strong> from the Start menu and type your question. The report opens in
+            your browser when it's done.</li>
         </ol>
-        <p class="note">Coming in the next release: a Windows installer that brings its own Python and lets you pick
-          one of the four tested models during setup.</p>
+        <div class="two" style="margin-top:20px;gap:14px">
+          <figure style="margin:0"><a href="assets/installer/3-model.png"><img src="assets/installer/3-model.png" alt="Setup: choose one of the four tested models"></a><figcaption>Choose a tested model</figcaption></figure>
+          <figure style="margin:0"><a href="assets/installer/4-cloud-option.png"><img src="assets/installer/4-cloud-option.png" alt="Setup: cloud models, off unless ticked"></a><figcaption>Cloud models: your choice</figcaption></figure>
+        </div>
+        <div class="ctas"><a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest">Download for Windows</a></div>
       </div>
       <div>
         <h3>Any system: pip</h3>
@@ -307,7 +326,8 @@ venv\Scripts\activate
 pip install localagentbrowser
 python -m playwright install chromium
 localagentbrowser</code></pre>
-        <p class="lead" style="font-size:16px">On macOS or Linux, activate with <code>source venv/bin/activate</code>.
+        <p class="lead" style="font-size:16px">On macOS or Linux, activate with <code>source venv/bin/activate</code>. Cloud models without the
+          installer: the settings are in the <a href="https://github.com/SnowFXXX/LocalAgentBrowser#faq">README's FAQ</a>.
           In LM Studio, load the model with a context length of 8192 and start the local server.</p>
       </div>
     </div>
@@ -320,19 +340,21 @@ localagentbrowser</code></pre>
           <li>How-tos and explanations</li>
           <li>Views from several sources</li>
           <li>Looking things up in official documentation</li>
+          <li><strong>Fast answers, with cloud models turned on</strong></li>
         </ul>
       </div>
       <div>
         <h3>Not yet</h3>
         <ul class="list">
           <li>Anything behind a form, a login or a button. It reads pages; clicking is still to come.</li>
-          <li>Fast answers. A small model on a CPU takes its time.</li>
+          <li>Fast answers on a CPU alone. A small local model takes its time; turn on cloud models for speed.</li>
         </ul>
         <p class="lead" style="font-size:16px">Local by default: searches go to DuckDuckGo and pages load like in any
-          browser, while the model and the report stay on your computer.</p>
+          browser, while the model and the report stay on your computer. Cloud models are an option you turn on
+          yourself, with your own key; then your prompts and the pages read go to the cloud provider.</p>
       </div>
     </div>
-    <p class="lead" style="margin-top:30px">See <a href="https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/examples/README.md">two
+    <p class="lead" style="margin-top:30px">See <a href="https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/examples/README.md">three
       example reports</a>, unedited, with what each got right and wrong.</p>
   </div>
 </section>
@@ -348,7 +370,7 @@ localagentbrowser</code></pre>
 python tools/regression.py --model qwen2.5-7b-instruct --minutes 90</code></pre>
     <div class="ctas">
       <a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/issues/11">Help with silent omissions</a>
-      <a class="btn" href="https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md">Every version, measured</a>
+      <a class="btn" href="https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md">Every measured version</a>
       <a class="btn" href="https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/CHANGELOG.md">Changelog</a>
     </div>
     <figure>
@@ -378,7 +400,8 @@ python tools/regression.py --model qwen2.5-7b-instruct --minutes 90</code></pre>
       <a href="https://pypi.org/project/localagentbrowser/">PyPI</a> ·
       <a href="llms.txt">llms.txt</a></p>
     <p>Built by SnowFX with <a href="https://www.anthropic.com/claude">Claude</a> in Claude Code, on
-      <a href="https://lmstudio.ai">LM Studio</a> and <a href="https://playwright.dev/python/">Playwright</a>.
+      <a href="https://lmstudio.ai">LM Studio</a> and <a href="https://playwright.dev/python/">Playwright</a>, with
+      optional cloud models through <a href="https://openrouter.ai">OpenRouter</a>.
       The agent's checks trust no model's word, including the one that helped build it.</p>
   </div>
 </footer>

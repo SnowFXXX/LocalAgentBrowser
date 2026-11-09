@@ -15,9 +15,13 @@ Only the latest version is supported with fixes.
   clicks, fills in forms, signs in or runs downloaded files. Even so, treat its findings as
   unverified, especially from unfamiliar sites.
 - **It browses the real web.** Search queries go to DuckDuckGo, and the pages the agent chooses are loaded in a
-  normal Chromium window, just as if you visited them yourself. Nothing is sent to any cloud AI service; the
+  normal Chromium window, just as if you visited them yourself. By default nothing is sent to any cloud AI service (if you turn on cloud models, your prompts and the pages read go
+  to OpenRouter and the model's provider); the
   model runs on your own LM Studio server.
 - **Keep LM Studio's server local.** The agent talks to the address in `LMSTUDIO_BASE_URL` (by default
   `localhost`). If you expose LM Studio on a network, protect it as you would any other service.
+- **Your OpenRouter key (cloud models only).** Keep it in the `OPENROUTER_API_KEY` environment variable of your
+  own account. Setup never asks for it and never stores it: the cloud settings file it writes holds no key, and the
+  agent sends the key only to OpenRouter. A spending limit in your OpenRouter account caps what a run can cost.
 - **The log and report are plain text.** `research_log.txt` and `research_report.md` contain your objective
   and everything the agent found. They stay on your machine and are excluded from git by `.gitignore`.
