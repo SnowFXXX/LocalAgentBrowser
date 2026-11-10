@@ -108,17 +108,17 @@ program, and the program checks every claim.</p>
 <p>The project is called LocalAgentBrowser. It's free and open source, and it runs on your own computer.</p>
 <p>Most of the research I've since read tries to make small models smarter by training them. That's valuable work. We
 went a different way: we didn't change the model at all. We changed what it's allowed to get away with. As far as we
-know, nobody has published a test quite like ours: a small model on an ordinary PC, doing research on the open web,
+know, nobody has published a test quite like ours: a small model on an ordinary PC with no graphics card, doing research on the open web,
 scored on whether it fills the gaps with things it &quot;just knows.&quot;</p>
 <h2>What we found</h2>
-<p>Here's the controversial part, so I'll say it outright: <strong>our data proves claims about our system.</strong> Not vibes. Not
+<p>Here's the controversial part, so I'll say it outright: <strong>our data backs up claims about our system.</strong> Not vibes. Not
 a demo that went well once. Claims, backed by numbers you can check.</p>
 <h3>Claim 1: The AI did not fill in the blanks with things it &quot;just knows&quot;</h3>
 <p>We ran the same test suite on four different AI models, all using the exact same code. Across all of them, no
 finished answer filled a gap with the model's own knowledge, by the suite's measures.</p>
 <figure><a href="assets/2026-10-chart1.png"><img src="assets/2026-10-chart1.png" alt="Four models on the same code: Qwen 2.5 7B finished 6 of 7 tasks, Qwen 2.5 14B 2 of 7, Llama 3.1 8B 2 of 7, each with 0 gaps filled from its own knowledge; Qwen 2.5 3B finished 0 of 7, running out of time on every task." ></a></figure>
 <p>Bigger wasn't more honest, and smaller wasn't less. The bigger model was about two and a half times slower, and the
-time limit decided its score: it ran out of time while writing three more answers, so those don't count. The smallest one ran out of time on every task, so it never handed in an
+time limit decided its score: on 1.63 it ran out of time while writing three more answers, so those don't count. The smallest one ran out of time on every task on 1.63, so it never handed in an
 answer to score. The checks held for all of them, because the checks don't care which model is
 talking.</p>
 <p>Our measures aren't perfect, either. In a later check run, an answer named where each stage of photosynthesis
@@ -135,8 +135,10 @@ paragraph.</p>
 without a word:</p>
 <ul>
 <li><strong>Windows was left out of the setup steps</strong> in two runs that looked up Python's documentation.</li>
-<li><strong>Oxygen was missing</strong> from an explanation of photosynthesis.</li>
-<li><strong>A third culture was dropped</strong> from an answer about how cultures have viewed owls.</li>
+<li><strong>Oxygen was missing</strong> from an explanation of photosynthesis. (Fixed since: code now sends the agent
+back when a concrete term like "O2" is missing from every finding.)</li>
+<li><strong>A third culture was dropped</strong> from an answer about how cultures have viewed owls. (Its cause was
+fixed after that run.)</li>
 </ul>
 <p>Our test suite doesn't count these yet. Nothing was made up in any of them. But a missing piece that goes unmentioned can still mislead you. You'd walk away
 thinking you had the whole picture. That kind of inaccuracy is exactly what this whole project is fighting, and it's

@@ -46,6 +46,8 @@
       pre { margin-top:22px; background:var(--chip); border:1px solid var(--chip-line); border-radius:10px; padding:14px 16px; overflow-x:auto; }
       pre code { background:none; border:none; padding:0; }
       figure img { width:100%; height:auto; display:block; border-radius:12px; border:1px solid var(--chip-line); }
+      figcaption { margin:10px 60px 0; font-size:16px; line-height:1.5; color:var(--sub); font-style:italic; }
+      @media (max-width:900px) { figcaption { margin:10px 0 0; } }
       footer { border-top:1px solid rgba(47,85,119,.3); font:15px/1.6 "Segoe UI", system-ui, sans-serif; color:var(--muted); }
       footer div { max-width:760px; margin:0 auto; padding:32px 24px 56px; }
       @media (max-width:900px) { figure { margin:30px 0 0; } }
@@ -346,7 +348,9 @@ rather than hours.</p>
 <h3>4.6 Scale</h3>
 <p>From 2026-10-16 to 2026-10-29 we ran 44 suite runs on one machine. They comprised 205 task runs, recorded 525
 findings and took 118.7 hours of model time. Every run folder keeps the prompts, the model's replies, the journal and
-the report.</p>
+the report (Figure 1).</p>
+<figure><a href="assets/2026-10-chart2.png"><img src="assets/2026-10-chart2.png" alt="The testing behind the claims: 44 full test-suite runs, 205 tasks, 525 findings checked against their page, 118.7 hours of the AI working, on one office PC from October 16 to 29, 2026."></a>
+<figcaption>Figure 1. The testing behind the claims, 2026-10-16 to 2026-10-29: 44 suite runs, 205 task runs, 525 findings checked against their page, 118.7 hours of model time, one PC.</figcaption></figure>
 <h2>5. Results</h2>
 <h3>5.1 Progress over versions (Qwen2.5-7B)</h3>
 <div class="tbl"><table>
@@ -403,14 +407,18 @@ the report.</p>
 </tr>
 </tbody>
 </table></div>
-<p><em>Figure 3 (2026-10-chart3.png). Version 1.62 changed no behaviour (a code reorganisation verified by golden-prompt tests), so
+<figure><a href="assets/2026-10-chart3.png"><img src="assets/2026-10-chart3.png" alt="Tasks finished out of 7 by the default 7B model, version by version: 2, 5, 4, 5, 5, 4, 4, 5, 5, 6, 6, 7, 6, and 7 of 7 for version 1.63 with no time limit."></a>
+<figcaption>Figure 2. Tasks finished out of 7 by Qwen2.5-7B, version by version (the table above), and 7 of 7 for 1.63 without a time limit (Section 5.3).</figcaption></figure>
+<p><em>Version 1.62 changed no behaviour (a code reorganisation verified by golden-prompt tests), so
 its 7 of 7 against 1.61's 6 of 7 is run-to-run variance. One run per version cannot separate small effects from
 variance, and we do not claim it does.</em></p>
 <p>The large steps were the fixed checklist (1.53: 2 → 5) and sending the agent back only for gaps the code verifies
 (1.58). Several versions finished fewer tasks because they were stricter: a check that refuses more costs turns, and
 each turn costs minutes.</p>
 <h3>5.2 Four models, identical code</h3>
-<p><em>Figure 1 (2026-10-chart1.png).</em> Round 3, 90 minutes per task:</p>
+<figure><a href="assets/2026-10-chart1.png"><img src="assets/2026-10-chart1.png" alt="Four models on the same code: Qwen 2.5 7B finished 6 of 7 tasks, Qwen 2.5 14B 2 of 7, Llama 3.1 8B 2 of 7, each with 0 gaps filled from its own knowledge; Qwen 2.5 3B finished 0 of 7, running out of time on every task."></a>
+<figcaption>Figure 3. Four models on identical code (round 3, 90 minutes per task): tasks finished, and gaps filled from the model's own knowledge.</figcaption></figure>
+<p>Round 3, 90 minutes per task:</p>
 <div class="tbl"><table>
 <thead>
 <tr>
@@ -540,7 +548,9 @@ in a finding).</li>
 &quot;To install packages into the virtual environment, use <code>pip install package_name</code> inside the activated venv folder&quot;,
 followed by two commands it really copied. The invented sentence scored 60% word-pair overlap with the page, higher
 than the copied <code>pip freeze &gt; requirements.txt</code> (50%) and <code>pip install -r requirements.txt</code> (42%). Its words echoed
-the objective (&quot;install packages into it&quot;). <em>(Figure 4, chart4.png.)</em></p>
+the objective (&quot;install packages into it&quot;) (Figure 4).</p>
+<figure><a href="assets/chart4.png"><img src="assets/chart4.png" alt="The made-up command pip install package_name scored 60% on a word-matching check, above the two commands the AI really copied, pip freeze &gt; requirements.txt at 50% and pip install -r requirements.txt at 42%. A new exact-match rule caught 21 of 525 past findings, every one a real problem."></a>
+<figcaption>Figure 4. Word-pair overlap with the page: the invented command (60%) scored above the two commands really copied (50%, 42%). The exact-text rule caught 21 of 525 saved findings.</figcaption></figure>
 <p>No overlap threshold can separate these, so commands got their own rule: exact text (Section 3.2). Applied to every
 saved run, the rule flags 21 of 525 findings and 5 of 119 final results, all on the documentation task, and each one
 real when read by hand. <code>pip install package_name</code> alone was invented in five documentation runs, including a 14B result

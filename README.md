@@ -69,8 +69,11 @@ without changing how the agent works with a local model, so these results still 
 - On 1.63 the same models finished 6, 2, 2 and 0 of 7. Every step and run is in the
   [regression history](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md).
 
-**Cloud models** (1.65) run the same code much faster, through your own OpenRouter account; they aren't measured
-on the suite yet.
+**Cloud models** (1.65) run the same code much faster, through your own OpenRouter account. A first suite run on
+1.65 with the cloud version of the default model (`qwen/qwen-2.5-7b-instruct`) finished 7 of 7 in 2.3 minutes of
+model time, with no gaps filled from the model's own knowledge by the suite's measures. Read by hand, two results
+leave lines uncited that their findings do support, and the documentation answer came from a tutorial instead of
+the official docs it was asked to use, without saying so. That's one run: a first look, not a measurement.
 
 **Which to pick:** the 7B for most PCs, Llama if you have the same 8 GB and want it to finish more often, the 3B for
 a PC with little memory. Any instruction-tuned model LM Studio serves should work.
@@ -211,6 +214,10 @@ Four turns and 17.2 minutes of model time. The report it wrote:
 > 1. Turn 3, from https://en.wikipedia.org/wiki/Mount_Kilimanjaro: *Mount Kilimanjaro is the highest mountain
 >    in Africa, rising to 5,895 m (19,341 ft) at Uhuru Peak.*
 
+The answer is right and every fact in it is in the finding, but it isn't polished: the second sentence has no
+citation mark, and the third repeats the height. We show the run as it came out. Small writing slips like these are
+on the list; invented facts are what the checks are there to stop.
+
 ## How it works
 
 Each turn, the model sees the objective, what it has found so far, its recent actions and the current page, and
@@ -268,8 +275,9 @@ The Windows installer writes the model you chose, and the cloud setting if you t
 **Does it need a GPU?** No. It was developed and tested entirely on a CPU. A GPU makes each turn faster. With cloud
 models turned on, the model runs on the provider's computers instead of yours.
 
-**Why does a turn take minutes with no GPU, or Cloud API?** On a CPU the model reads the prompt slowly (about 8 tokens a second on the
+**Why does a turn take minutes on a CPU?** On a CPU the model reads the prompt slowly (about 8 tokens a second on the
 development PC), so a turn that brings in a new page takes a few minutes. Most other turns reuse LM Studio's cache.
+With cloud models turned on, a turn takes seconds.
 
 **Is anything sent to the internet?** By default no AI service is involved and nothing about your run is uploaded.
 The agent does browse the real web: searches, written from your objective, go to DuckDuckGo, and pages load
