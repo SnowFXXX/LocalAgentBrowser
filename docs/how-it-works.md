@@ -170,6 +170,8 @@ and the explanation 13 to 59. A whole suite of seven tasks took 171 to 272 minut
 - **Reading only.** The agent searches, opens pages and reads them. It does not click, fill in forms or sign in.
 - **Web pages go into the prompt.** A page can contain text written to manipulate the model (prompt
   injection), so treat findings as unverified. See [SECURITY.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/SECURITY.md).
-- **Cloud models are not measured on the suite yet.** They run the same code and checks, but every measurement
-  here is with a local model in LM Studio.
+- **Cloud models have one suite run so far.** They run the same code and checks. One run on 1.65 with
+  `qwen/qwen-2.5-7b-instruct` finished 7 of 7 with no gaps filled from the model's own knowledge by the suite's
+  measures; read by hand, the documentation answer came from a tutorial, not the official docs it was asked for.
+  Every other measurement here is with a local model in LM Studio.
 - **One search provider.** DuckDuckGo's HTML search occasionally returns an error page; the agent retries once.
