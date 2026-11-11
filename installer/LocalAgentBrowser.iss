@@ -78,7 +78,7 @@ Type: filesandordirs; Name: "{app}\python\Lib\site-packages\__pycache__"
 [Code]
 const
   ModelCount = 4;
-  CloudModel = 'qwen/qwen-2.5-7b-instruct';
+  CloudModel = 'microsoft/phi-4';
 var
   ModelPage: TInputOptionWizardPage;
   OptionalPage: TInputOptionWizardPage;

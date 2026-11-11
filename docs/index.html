@@ -264,10 +264,10 @@
     </div>
     <p class="lead" style="font-size:17px;margin-top:22px"><strong>Or a cloud model, for fast answers.</strong> In 1.65
       the same code can use a model in the cloud through your own OpenRouter account: a few minutes instead of an hour,
-      but it costs money, and your prompts and the pages read leave your computer. Off unless you turn it on. Its first
-      suite run (the cloud version of the 7B) finished 7 of 7 in about 4 minutes with no gaps filled from its own
-      knowledge; read by hand, its documentation answer came from a tutorial, not the official docs it was asked for.
-      One run so far.</p>
+      but it costs money, and your prompts and the pages read leave your computer. Off unless you turn it on. On five
+      cloud models (Phi-4, the default; GPT-4o-mini; Llama 3.1 8B; Qwen 2.5 72B; Gemma 3 4B) the suite finished 7 of 7 on
+      four and 6 of 7 on one, in 4 to 21 minutes for 3 to 14 cents, with no gaps filled from the model's own knowledge.
+      One run each.</p>
     <p class="note">On version 1.63 the same models finished 6, 2, 2 and 0 of 7.
       <a href="https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md">Every run, measured.</a></p>
   </div>
@@ -303,7 +303,7 @@
         <h3>Windows: the installer</h3>
         <ol class="start">
           <li>Install <a href="https://lmstudio.ai">LM Studio</a> (not needed if you'll only use cloud models).</li>
-          <li>Download <strong>LocalAgentBrowser-1.65-setup.exe</strong> from the latest release and run it. If Windows
+          <li>Download <strong>LocalAgentBrowser-1.65.1-setup.exe</strong> from the latest release and run it. If Windows
             says it protected your PC, click <strong>More info → Run anyway</strong>: the installer isn't code-signed yet.</li>
           <li>Pick what to install and one of the four tested models; setup downloads it through LM Studio, and the
             browser the agent uses. Cloud models are optional and off unless you tick them. No administrator rights,

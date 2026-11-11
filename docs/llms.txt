@@ -21,7 +21,7 @@ Key facts:
   the four tested models during setup, and Start-menu shortcuts; the report opens by itself when a run ends.
 - Cloud models (optional, 1.65): through OpenRouter with the user's own key; much faster, but prompts and pages read
   leave the computer. The Windows installer sets them up; otherwise set LMSTUDIO_BASE_URL to
-  https://openrouter.ai/api/v1, LMSTUDIO_MODEL to an OpenRouter model (qwen/qwen-2.5-7b-instruct) and
+  https://openrouter.ai/api/v1, LMSTUDIO_MODEL to an OpenRouter model (microsoft/phi-4) and
   LMSTUDIO_API_KEY to the key (the README's FAQ has the full settings).
 - Honesty by design: rules in code check the model's claims. Findings must be on the page shown. Before finishing,
   each part of the objective is checked against the findings. What was not found is reported as not found, and

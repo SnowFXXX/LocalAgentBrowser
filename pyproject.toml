@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "localagentbrowser"
-version = "1.65"
+version = "1.65.1"
 description = "An autonomous web research agent with checked answers: a local LLM (LM Studio) by default, cloud models optional, and Playwright."
 readme = "README.md"
 license = "MIT"
