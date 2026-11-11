@@ -1,10 +1,25 @@
 # Changelog
 
-Every version of LocalAgentBrowser, newest first. Each released version is also a tagged commit (`v1.11` … `v1.65`); 1.54 to 1.56 and 1.58 to 1.60 were internal steps
+Every version of LocalAgentBrowser, newest first. Each released version is also a tagged commit (`v1.11` … `v1.65.1`); 1.54 to 1.56 and 1.58 to 1.60 were internal steps
 measured on the regression suite and released as part of 1.57 and 1.61 (see
 [docs/regression-history.md](docs/regression-history.md)).
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
+
+## [1.65.1] - 2026-11-10
+Cloud mode works again, and works with OpenAI models. The agent's behaviour with a local model is unchanged.
+### Fixed
+- **Cloud models from OpenAI failed on every call** ("400 - Provider returned error"). OpenAI's strict JSON mode
+  requires every object in a format to set `additionalProperties: false`; the agent's six formats (action,
+  checklist, coverage and its items, cited, final result) now do. LM Studio and other providers accept it as before.
+  With the fix, `openai/gpt-4o-mini` finished the suite 7 of 7.
+- **The cloud default model is now `microsoft/phi-4`** (installer, README, llms.txt). 1.65's default,
+  `qwen/qwen-2.5-7b-instruct`, has no OpenRouter provider any more, so every cloud call failed.
+### Measured
+- The suite on five cloud models, one run each (November 10): Phi-4 7 of 7 (5.1 model min, 4 uncited lines, $0.03),
+  GPT-4o-mini 7 of 7 (7.2 min, $0.06), Llama 3.1 8B 7 of 7 (3.6 min, $0.12), Qwen 2.5 72B 7 of 7 (13.4 min, $0.14),
+  Gemma 3 4B 6 of 7 (20.8 min, $0.03). No finished result filled a gap from the model's own knowledge, by the
+  suite's measures. GPT-4o-mini ran with this fix; the others on 1.65's code, which the fix doesn't change for them.
 
 ## [1.65] - 2026-11-09
 ### Added

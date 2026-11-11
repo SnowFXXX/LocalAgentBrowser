@@ -523,7 +523,7 @@ def main():
     parser.add_argument("--list", action="store_true", help="list the tasks and exit")
     parser.add_argument("--cloud", action="store_true",
                         help="run on OpenRouter instead of LM Studio, with the key in OPENROUTER_API_KEY "
-                             "(model names as OpenRouter lists them, e.g. qwen/qwen-2.5-7b-instruct)")
+                             "(model names as OpenRouter lists them, e.g. microsoft/phi-4)")
     args = parser.parse_args()
 
     tasks = [t for t in TASKS if args.suite == "all" or t["core"]]

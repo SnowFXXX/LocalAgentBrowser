@@ -45,15 +45,15 @@ CITED_QUESTION = ("First copy the words of the DISCOVERY that give what the ITEM
                   "or \"no\".")
 CITED_FORMAT = {"type": "json_schema", "json_schema": {"name": "cited", "strict": True, "schema": {
     "type": "object", "properties": {"quote": {"type": "string"}, "answer": {"type": "string", "enum": ["yes", "no"]}},
-    "required": ["quote", "answer"]}}}
+    "required": ["quote", "answer"], "additionalProperties": False}}}
 
 COVERAGE_FORMAT = {"type": "json_schema", "json_schema": {"name": "coverage", "strict": True, "schema": {
     "type": "object", "properties": {
         "evidence": {"type": "string"}, "missing": {"type": "string"},
         "conditions": {"type": "array", "items": {"type": "string"}},
         "things": {"type": "array", "items": {"type": "object", "properties": {
-            "name": {"type": "string"}, "proof": {"type": "string"}}, "required": ["name", "proof"]}}},
-    "required": ["evidence", "missing", "conditions", "things"]}}}
+            "name": {"type": "string"}, "proof": {"type": "string"}}, "required": ["name", "proof"], "additionalProperties": False}}},
+    "required": ["evidence", "missing", "conditions", "things"], "additionalProperties": False}}}
 
 CHECKLIST_SPLIT = ("Split the OBJECTIVE into the separate things the final result must contain, as a short checklist. "
                    "One item per thing to find or to write; keep the objective's own wording; include every condition it "
@@ -61,7 +61,7 @@ CHECKLIST_SPLIT = ("Split the OBJECTIVE into the separate things the final resul
                    "applies to; do not add anything the objective does not ask for. Reply with JSON: {\"parts\": [\"...\", ...]}")
 
 CHECKLIST_FORMAT = {"type": "json_schema", "json_schema": {"name": "checklist", "strict": True, "schema": {
-    "type": "object", "properties": {"parts": {"type": "array", "items": {"type": "string"}}}, "required": ["parts"]}}}
+    "type": "object", "properties": {"parts": {"type": "array", "items": {"type": "string"}}}, "required": ["parts"], "additionalProperties": False}}}
 
 SYSTEM_PROMPT = """You are an autonomous web discovery agent. Your job is to achieve the high-level OBJECTIVE by executing sequential actions.
 On every turn, evaluate the CURRENT ENVIRONMENT and your RESEARCH JOURNAL. You must output exactly ONE valid JSON block matching this structure:
@@ -102,7 +102,8 @@ RESPONSE_FORMAT = {
                 "parameter": {"type": "string"},
                 "checklist_items": {"type": "array", "items": {"type": "integer"}}
             },
-            "required": ["thought_process", "action", "parameter", "checklist_items"]
+            "required": ["thought_process", "action", "parameter", "checklist_items"],
+            "additionalProperties": False
         }
     }
 }
@@ -122,7 +123,7 @@ COMPOSE_SYSTEM = ("You write the final result of a web research task, using only
 # The final result comes back in a required field, as every browsing reply does: asked for plain text, a model
 # trained for tool use (Llama 3.1 8B) answered with a made-up tool call in 3 of 6 results
 RESULT_FORMAT = {"type": "json_schema", "json_schema": {"name": "final_result", "strict": True, "schema": {
-    "type": "object", "properties": {"result": {"type": "string"}}, "required": ["result"]}}}
+    "type": "object", "properties": {"result": {"type": "string"}}, "required": ["result"], "additionalProperties": False}}}
 RESULT_REPLY = ("Reply with JSON: {\"result\": \"...\"}, with the whole final result as plain text in \"result\" "
                 "(line breaks, lists and headings as needed).")
 RESULT_RETRY = ("That reply was not the final result: it repeated the prompt or was not plain text. Write the final "

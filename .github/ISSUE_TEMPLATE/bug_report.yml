@@ -37,7 +37,7 @@ body:
     id: model
     attributes:
       label: Model (and LM Studio version, if you use LM Studio)
-      placeholder: "qwen2.5-7b-instruct Q4_K_M, LM Studio 0.4.x (or the cloud model, e.g. qwen/qwen-2.5-7b-instruct on OpenRouter)"
+      placeholder: "qwen2.5-7b-instruct Q4_K_M, LM Studio 0.4.x (or the cloud model, e.g. microsoft/phi-4 on OpenRouter)"
     validations:
       required: true
   - type: input

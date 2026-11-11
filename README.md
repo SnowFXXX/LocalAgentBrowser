@@ -69,11 +69,20 @@ without changing how the agent works with a local model, so these results still 
 - On 1.63 the same models finished 6, 2, 2 and 0 of 7. Every step and run is in the
   [regression history](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md).
 
-**Cloud models** (1.65) run the same code much faster, through your own OpenRouter account. A first suite run on
-1.65 with the cloud version of the default model (`qwen/qwen-2.5-7b-instruct`) finished 7 of 7 in 2.3 minutes of
-model time, with no gaps filled from the model's own knowledge by the suite's measures. Read by hand, two results
-leave lines uncited that their findings do support, and the documentation answer came from a tutorial instead of
-the official docs it was asked to use, without saying so. That's one run: a first look, not a measurement.
+**Cloud models** (1.65) run the same code much faster, through your own OpenRouter account. The suite ran once on
+each of five cloud models (November 10, 2026; GPT-4o-mini needs the 1.65.1 fix), and no finished result filled a gap
+from the model's own knowledge on any of them, by the suite's measures:
+
+| Cloud model | Tasks finished | Model time | Uncited lines | Cost of the suite |
+|---|---|---|---|---|
+| `microsoft/phi-4` (the cloud default) | 7 of 7 | 5.1 min | 4 | $0.03 |
+| `openai/gpt-4o-mini` | 7 of 7 | 7.2 min | 12 | $0.06 |
+| `meta-llama/llama-3.1-8b-instruct` | 7 of 7 | 3.6 min | 21 | $0.12 |
+| `qwen/qwen-2.5-72b-instruct` | 7 of 7 | 13.4 min | 17 | $0.14 |
+| `google/gemma-3-4b-it` | 6 of 7 | 20.8 min | 9 | $0.03 |
+
+One run each, scored by the suite's word checks, not read by hand. Phi-4 is the cloud default for its clean results;
+1.65 named `qwen/qwen-2.5-7b-instruct`, which no OpenRouter provider serves now.
 
 **Which to pick:** the 7B for most PCs, Llama if you have the same 8 GB and want it to finish more often, the 3B for
 a PC with little memory. Any instruction-tuned model LM Studio serves should work.
@@ -84,7 +93,7 @@ a PC with little memory. Any instruction-tuned model LM Studio serves should wor
 
 1. Install [LM Studio](https://lmstudio.ai) (free). You don't need to download a model in it yet. (Not needed if
    you'll only use cloud models.)
-2. Download **`LocalAgentBrowser-1.65-setup.exe`** from the
+2. Download **`LocalAgentBrowser-1.65.1-setup.exe`** from the
    [latest release](https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest) and run it.
    - Windows may say **"Windows protected your PC"**, because the installer isn't code-signed yet. Click
      **More info → Run anyway**.
@@ -297,7 +306,7 @@ the same window before you start the agent. In Windows' command prompt:
 
 ```bat
 set "LMSTUDIO_BASE_URL=https://openrouter.ai/api/v1"
-set "LMSTUDIO_MODEL=qwen/qwen-2.5-7b-instruct"
+set "LMSTUDIO_MODEL=microsoft/phi-4"
 set "LMSTUDIO_API_KEY=%OPENROUTER_API_KEY%"
 set "LMSTUDIO_EXTRA_BODY={"provider": {"require_parameters": true, "data_collection": "deny"}}"
 ```
@@ -306,7 +315,7 @@ On macOS or Linux:
 
 ```bash
 export LMSTUDIO_BASE_URL=https://openrouter.ai/api/v1
-export LMSTUDIO_MODEL=qwen/qwen-2.5-7b-instruct
+export LMSTUDIO_MODEL=microsoft/phi-4
 export LMSTUDIO_API_KEY="$OPENROUTER_API_KEY"
 export LMSTUDIO_EXTRA_BODY='{"provider": {"require_parameters": true, "data_collection": "deny"}}'
 ```
@@ -369,7 +378,7 @@ To measure a change on all seven kinds of task (several hours on a CPU), on any 
 python tools/regression.py --model qwen2.5-7b-instruct --baseline regression_runs/<earlier run>/summary.json
 ```
 
-With `--cloud --model qwen/qwen-2.5-7b-instruct` the same suite runs on OpenRouter, with your key in
+With `--cloud --model microsoft/phi-4` the same suite runs on OpenRouter, with your key in
 `OPENROUTER_API_KEY` (those runs are listed under LocalAgentBrowser in OpenRouter's app rankings).
 
 Each run gets a folder in `regression_runs/` (or in the folder `LAB_RUNS_DIR` names; the installer's "Run the test
