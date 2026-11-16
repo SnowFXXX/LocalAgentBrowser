@@ -2,15 +2,16 @@
 import asyncio
 import json
 import re
-from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, BadRequestError, InternalServerError
+from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, BadRequestError, InternalServerError, NotFoundError, RateLimitError
 from playwright.async_api import async_playwright
-from .config import API_KEY, BASE_URL, EXTRA_BODY, EXTRA_HEADERS, MAX_CHEAP_RETRIES, MAX_CONVERSATION_TOKENS, MAX_DISCOVERY_PROMPT_CHARS, MAX_FOLLOWUPS, MAX_JSON_RETRIES, MAX_QUERY_WORDS, MAX_VISITS_PER_URL, MODEL, MODEL_RETRY_WAITS, MODEL_TIMEOUT_SECONDS, TURN_MAX_TOKENS, OBJECTIVE_CHECK_EVERY, REPORT_FILE, STALL_TURNS, TURN_PAUSE_SECONDS
+from .config import API_KEY, BASE_URL, EXTRA_BODY, EXTRA_HEADERS, MAX_CHEAP_RETRIES, MAX_CONVERSATION_TOKENS, MAX_DISCOVERY_PROMPT_CHARS, MAX_FOLLOWUPS, MAX_JSON_RETRIES, MAX_QUERY_WORDS, MAX_VISITS_PER_URL, MODEL, MODEL_RETRY_WAITS, MODEL_TIMEOUT_SECONDS, RATE_LIMIT_WAITS, TURN_MAX_TOKENS, OBJECTIVE_CHECK_EVERY, REPORT_FILE, STALL_TURNS, TURN_PAUSE_SECONDS
 from .prompts import CUT_OFF, FINAL_RESULT, FIRST_TURN_INSTRUCTION, GIVE_UP_RULE, READ_FIRST, RESPONSE_FORMAT, SYSTEM_PROMPT, TURN_INSTRUCTIONS
 from .text import extract_message_content, was_cut_off
-from .pages import build_environment, count_search_results, determine_url, is_search_page, load_page, normalize_url, read_more_target, render_part, search_query, section_heading, where_you_are, with_inner_headings
+from .pages import build_environment, count_search_results, determine_url, is_search_page, load_page, normalize_url, read_more_target, render_part, search_query, section_heading, where_you_are, with_inner_headings, mark_refusing, site_of, site_refusal
 from .checklist import after_discovery_advice, check_parts, checklist_lines, link_discovery, split_objective
-from .coverage import amounts_not_found, coverage_refusal, not_found_items
+from .coverage import amounts_not_found, coverage_refusal, not_found_items, record_install_line, remember_install_lines
 from .checks import check_decision, escalation_message, numbered_discoveries, numbered_lines, refusal_correction, source_note
+from . import windows
 from .report import compact_journal, compose_final_result, visited_summary, write_report, write_research_log
 
 def new_conversation():
@@ -195,6 +196,43 @@ async def request_decision(client, messages, journal, tried, page_state, current
             correction = escalation_message(len(refused), action, refusal[1], page_state, current_url) + "\nReply with only the JSON object."
         messages += [{"role": "assistant", "content": original_content}, {"role": "user", "content": correction}]
 
+class ModelRefused(Exception):
+    """The model service answered with nothing because its content filter stopped the reply."""
+
+def is_local_server():
+    return bool(re.match(r"https?://(localhost|127\.0\.0\.1|\[::1\])(:|/|$)", BASE_URL))
+
+def retry_after(err):
+    """The wait a rate-limited service asks for (its Retry-After header, in seconds), or None."""
+    headers = getattr(getattr(err, "response", None), "headers", None) or {}
+    try:
+        return min(float(headers.get("retry-after")), max(RATE_LIMIT_WAITS))
+    except (TypeError, ValueError):
+        return None
+
+def failure_advice(err):
+    """What a failed model call means and what to do, for the server the run actually uses. Every failure used to
+    say "Check that LM Studio is running at https://openrouter.ai/api/v1", which is wrong for a cloud run."""
+    if is_local_server():
+        return f"Check that LM Studio is running at {BASE_URL} and model '{MODEL}' is loaded."
+    if isinstance(err, ModelRefused):
+        return (f"The service's content filter stopped '{MODEL}''s reply; the same prompt gets the same answer, so the run "
+                "ends here instead of paying for repeats. Try another model, or another provider for this one.")
+    if isinstance(err, RateLimitError):
+        return (f"'{MODEL}' was still rate-limited after {len(RATE_LIMIT_WAITS)} waits (new OpenRouter accounts get fewer "
+                "requests a minute on some models). Run it again later, or add credits to raise the limit.")
+    status = getattr(err, "status_code", None)
+    if status in (401, 403):
+        return "The service refused the key: check OPENROUTER_API_KEY."
+    if status == 402:
+        return "The account has run out of credits."
+    if status == 404:
+        return f"No provider for '{MODEL}' can take this request: check the model name on the service's model list."
+    return f"The model service at {BASE_URL} failed the call for '{MODEL}'."
+
+# Sent once and refused by every provider of the model: dropped for the rest of the run (see with_retries)
+UNSUPPORTED_PARAMETERS = set()
+
 def with_retries(client):
     """The client, with each model call tried again when the server fails it (no connection, or a server error).
 
@@ -204,22 +242,62 @@ def with_retries(client):
     it is read, as before. A model unloaded in the middle of a call does not drop the connection: LM Studio answers
     that call with "400 - Model unloaded by user or API request", so that refusal is retried too. A timeout is not
     retried: the server is up but the model has not finished, and a 3B model that kept writing for 10 minutes kept
-    writing when the same request was sent again."""
+    writing when the same request was sent again.
+
+    Cloud services fail in other ways, and three of eleven cloud models lost tasks to them in one week:
+    - 429, rate limited: GPT-4o and Opus 5.5 hit OpenRouter's 20 requests a minute for new accounts, and each task
+      after that ended on its first call. A 429 is waited out (the service's Retry-After, or RATE_LIMIT_WAITS).
+    - 400 "Provider returned error": Gemma 3 4B lost a task to one, on a provider that answered the next call. It
+      is the provider failing, not the request, so it is tried again like a server error.
+    - 404 "No endpoints found that can handle the requested parameters": Opus 5.5's providers stopped taking a
+      temperature, and with the cloud rule that every parameter be honoured, no provider was left. The parameter is
+      dropped for the rest of the run, said once on the console, and the call sent again.
+    - An empty reply stopped by the content filter: Opus 5.5 got 18 of them, each read as invalid JSON, retried and
+      billed. The same prompt gets the same answer, so it is not retried: ModelRefused ends the run with that reason.
+    """
     create = client.chat.completions.create
 
     async def create_with_retries(*args, **kwargs):
         if EXTRA_BODY:
             kwargs["extra_body"] = {**EXTRA_BODY, **(kwargs.get("extra_body") or {})}
-        for attempt, wait in enumerate((*MODEL_RETRY_WAITS, None), start=1):
+        server_waits = iter(MODEL_RETRY_WAITS)
+        rate_waits = iter(RATE_LIMIT_WAITS)
+        while True:
+            for name in UNSUPPORTED_PARAMETERS:
+                kwargs.pop(name, None)
             try:
-                return await create(*args, **kwargs)
+                response = await create(*args, **kwargs)
+            except RateLimitError as err:
+                wait = next(rate_waits, None)
+                if wait is None:
+                    raise
+                wait = retry_after(err) or wait
+                print(f"⏳ Rate limited by the model service ({err}). Waiting {wait:g} s before trying again.")
+                await asyncio.sleep(wait)
+                continue
+            except NotFoundError as err:
+                if "temperature" in kwargs and not is_local_server() and re.search(r"requested parameters", str(err), re.I):
+                    UNSUPPORTED_PARAMETERS.add("temperature")
+                    print(f"⚠️ No provider of '{MODEL}' takes a temperature setting; sending calls without it from now on "
+                          "(the model's own default is used).")
+                    continue
+                raise
             except (APIConnectionError, InternalServerError, BadRequestError) as err:
                 unloaded = isinstance(err, BadRequestError) and re.search(r"\b(unloaded|not loaded)\b", str(err), re.I)
-                if wait is None or isinstance(err, APITimeoutError) or (isinstance(err, BadRequestError) and not unloaded):
+                provider = isinstance(err, BadRequestError) and re.search(r"provider returned error", str(err), re.I)
+                wait = next(server_waits, None)
+                if wait is None or isinstance(err, APITimeoutError) or (isinstance(err, BadRequestError) and not (unloaded or provider)):
                     raise
-                print(f"⚠️ The model server failed the call ({type(err).__name__}: {err}). Trying again in {wait} s "
-                      f"({attempt}/{len(MODEL_RETRY_WAITS)}); LM Studio loads the model again by itself if it was unloaded.")
+                hint = ("LM Studio loads the model again by itself if it was unloaded." if is_local_server()
+                        else "The provider may answer the next call.")
+                print(f"⚠️ The model server failed the call ({type(err).__name__}: {err}). Trying again in {wait} s; {hint}")
                 await asyncio.sleep(wait)
+                continue
+            choice = (getattr(response, "choices", None) or [None])[0]
+            if getattr(choice, "finish_reason", None) == "content_filter" and not extract_message_content(response):
+                raise ModelRefused(f"the content filter of {getattr(response, 'provider', None) or 'the provider'} "
+                                   f"stopped the reply (empty, finish reason content_filter)")
+            return response
 
     client.chat.completions.create = create_with_retries
     return client
@@ -235,6 +313,8 @@ async def main():
         default_headers=EXTRA_HEADERS or None
     ))
 
+    # A person's run (not a test run): the console full size until the browser opens beside it
+    windows.maximize_console()
     print("🤖 ==================================================== 🤖")
     print("🚀 Initializing Autonomous Discovery Agent Setup...")
     objective = input("🎯 Define the Agent's High-Level Objective: ").strip()
@@ -258,13 +338,17 @@ async def main():
     consecutive_refusals = 0
     turns_without_discovery = 0
     turns_since_objective_check = 0
+    stop_reason = None
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)
+        # Side by side for a person watching: the browser on the right half and the console on the left, with the
+        # page zoomed out so it is laid out about as wide as in a test run (windows.py); test runs are unchanged
+        side_by_side = windows.browser_args()
+        browser = await p.chromium.launch(headless=False, args=side_by_side)
         # No user_agent override: headed Chromium already reports a real, version-matched Chrome UA
         context = await browser.new_context(
             java_script_enabled=True,
-            viewport={"width": 1280, "height": 720}
+            **({"no_viewport": True} if side_by_side else {"viewport": {"width": 1280, "height": 720}})
         )
         page = await context.new_page()
 
@@ -272,6 +356,7 @@ async def main():
             while turn_counter <= max_turns:
                 print(f"\n🧠 [TURN {turn_counter}/{max_turns}] Active reasoning cycle executing...")
                 tried["finish_confirmed"] = False  # The finish check runs once per turn
+                remember_install_lines(tried, page_state)
 
                 try:
                     decision, refused = await run_agent_turn(client, page, objective, journal, current_url, tried, page_state, conversation, loop_warning=loop_msg)
@@ -285,8 +370,9 @@ async def main():
                     turn_counter += 1
                     continue
                 except Exception as err:
-                    print(f"❌ Local AI API transaction failed: {err}")
-                    print(f"💡 Check that LM Studio is running at {BASE_URL} and model '{MODEL}' is loaded.")
+                    print(f"❌ The model call failed: {err}")
+                    print(f"💡 {failure_advice(err)}")
+                    stop_reason = f"the model call failed ({str(err)[:300]})"
                     break
 
                 # Replies refused and retried within this turn stay in the journal so the model sees what failed;
@@ -319,6 +405,11 @@ async def main():
                     # unchecked FINISH text
                     finish_entry = {"turn": turn_counter, "thought": thought, "action": "FINISH", "finding": parameter,
                                     "writing": True}
+                    remember_install_lines(tried, page_state)
+                    added = record_install_line(tried, journal, turn_counter)
+                    if added:
+                        print(f"📝 Recorded by the code: the install command the page gives ({added['source']}): "
+                              f"{added['extracted_data'][:120]}")
                     journal.append(finish_entry)
                     try:
                         missing, unproven = await not_found_items(client, objective, tried, journal)
@@ -359,7 +450,18 @@ async def main():
                             tried["urls"].append(target_url)
                             if normalize_url(current_url) != normalize_url(target_url):
                                 tried["urls"].append(current_url)  # Also remember where redirects landed
-                            if status >= 400:
+                            refused = await site_refusal(page, status)
+                            if refused:
+                                # The site turned the browser away (403, 429 or a "verify you are human" page): every
+                                # later visit to it is refused in code and it leaves the search results. Gemma 3 4B
+                                # went back to alternativeto.net six times after its first 403, each a lost turn
+                                mark_refusing(current_url, refused)
+                                mark_refusing(target_url, refused)
+                                print(f"⛔ {site_of(target_url)} refused the visit ({refused}); it is blocked for the rest of this run.")
+                                journal.append({"turn": turn_counter, "thought": thought, "action": "FAILED_NAVIGATE", "requested": parameter,
+                                                "error": f"The site refused the visit ({refused}). It will refuse again, so "
+                                                         f"{site_of(target_url)} is blocked for the rest of this run: use another site."})
+                            elif status >= 400:
                                 # Often a guessed URL; reported as a failure so the model does not treat the
                                 # error page as content (and is not asked to record something from it)
                                 print(f"❌ The page returned HTTP {status}.")
@@ -479,7 +581,7 @@ async def main():
         finally:
             # Always saved, however the run ends: FINISH, the turn limit, Ctrl+C or an outside time limit
             write_research_log(objective, journal, tried.get("checklist"))
-            write_report(objective, journal, tried.get("checklist"))
+            write_report(objective, journal, tried.get("checklist"), stop_reason)
 
         print(f"\n🔒 Shutting down browser instance. Report: {REPORT_FILE}; full journal: research_log.txt.")
         await browser.close()

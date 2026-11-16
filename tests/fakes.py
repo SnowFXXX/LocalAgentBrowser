@@ -57,8 +57,10 @@ class FakeSite:
     results: DuckDuckGo results as {"title", "href", "snippet"} dicts
     """
 
-    def __init__(self, pages, results):
+    def __init__(self, pages, results, statuses=None):
         self.pages, self.results = pages, results
+        self.statuses = statuses or {}  # {url: HTTP status} for pages that answer with an error
+        self.visits = []
 
     def playwright(self):
         site = self
@@ -75,6 +77,9 @@ class FakeSite:
 
             async def goto(self, url, **kwargs):
                 self.url = url
+                site.visits.append(url)
+                if url in site.statuses:
+                    return types.SimpleNamespace(status=site.statuses[url])
                 known = "duckduckgo" in url or url.split("#")[0].rstrip("/") in site.pages
                 return types.SimpleNamespace(status=200 if known else 404)
 

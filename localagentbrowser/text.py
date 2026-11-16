@@ -24,8 +24,10 @@ MEASURE_WORDS = {"second", "seconds", "minute", "minutes", "hour", "hours", "day
 def asked_count(text):
     """The number of things an item asks for ("three ...", "5 ..."), or None. "At least three" counts as three.
 
-    A number of time units or amounts ("the first two weeks", "2 cups") is not a number of things to find."""
-    words = plain_words(text)
+    A number of time units or amounts ("the first two weeks", "2 cups") is not a number of things to find. Nor is a
+    number in a name: "the Yamaha SHS-10" was read as ten things asked for, and a right answer ended "nine more (only
+    one of the ten were found)". A word joined to others by a hyphen, a dot or a slash stays one word here."""
+    words = re.findall(r"[a-z0-9]+(?:[-./][a-z0-9]+)*", str(text).lower())
     for word, after in zip(words, words[1:] + [""], strict=True):
         if after in MEASURE_WORDS:
             continue

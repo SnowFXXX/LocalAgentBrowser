@@ -95,6 +95,9 @@ TURN_MAX_TOKENS = 600
 MODEL_TIMEOUT_SECONDS = 1800
 MAX_EVIDENCE_CHARS = 200  # Longest evidence quote per item shown to the final result
 MODEL_RETRY_WAITS = (5, 15, 30, 60, 120)  # Seconds waited before each new try of a model call the server failed (about 4 min in all)
+# Seconds waited before each new try of a rate-limited call (429), when the service does not say how long: a limit of
+# 20 requests a minute frees up within a minute, so the waits cover a few minutes of a busy limit
+RATE_LIMIT_WAITS = (20, 30, 60, 60, 90, 120)
 
 STALL_TURNS = 4          # Turns without a new discovery before the model is asked to check its progress
 

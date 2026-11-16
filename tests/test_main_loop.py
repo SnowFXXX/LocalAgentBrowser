@@ -159,3 +159,31 @@ def test_a_coverage_send_back_starts_the_next_turn_fresh(monkeypatch, tmp_path):
     next_turn = calls[7]
     assert len(next_turn) == 2 and "Your FINISH was refused. Before finishing, each checklist item" in next_turn[1]["content"]
     assert journal[-1]["action"] == "FINISH"
+
+
+def test_a_site_that_refuses_the_browser_is_not_visited_again(monkeypatch, tmp_path):
+    # Gemma 3 4B went back to alternativeto.net six times after its first 403, each a lost turn
+    from localagentbrowser import pages
+    pages.REFUSING_SITES.clear()
+    first, second = "https://blocked.example/list", "https://blocked.example/other-list"
+    site = FakeSite(pages=SITE.pages, results=SITE.results, statuses={first: 403})
+    monkeypatch.setattr(agent, "async_playwright", site.playwright)
+    script = [
+        reply("SEARCH", "docs a"),
+        reply("NAVIGATE", first),          # 403: the site is marked as refusing
+        reply("NAVIGATE", second),         # another address on it: refused in code, not loaded
+        reply("NAVIGATE", second), reply("NAVIGATE", second),
+    ]
+    client, model = fake_client([CHECKLIST_REPLY] + script, prompt_tokens=None)
+    monkeypatch.setattr(agent, "AsyncOpenAI", lambda **kwargs: client)
+    real_sleep = asyncio.sleep
+    monkeypatch.setattr(ab.asyncio, "sleep", lambda seconds, *a, **k: real_sleep(0, *a, **k))
+    monkeypatch.setattr(builtins, "input", lambda prompt="": "test objective")
+    monkeypatch.chdir(tmp_path)
+    asyncio.run(ab.main())
+    journal = ab.read_research_log(tmp_path / "research_log.txt")[2]
+    failed = [e for e in journal if e["action"] == "FAILED_NAVIGATE"]
+    assert len(failed) == 1 and "refused the visit (HTTP 403)" in failed[0]["error"]
+    assert second not in site.visits, "the second address on the refusing site was never loaded"
+    assert any("refused this browser" in e.get("reason", "") for e in journal)
+    pages.REFUSING_SITES.clear()
