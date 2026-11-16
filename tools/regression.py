@@ -29,6 +29,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 import urllib.request
 from collections import Counter
 from urllib.parse import urlparse
@@ -420,6 +421,7 @@ def write_run_info(folder, meta):
 
 
 CLOUD_URL = "https://openrouter.ai/api/v1"
+FAILURE_PAUSE_SECONDS = 60  # Wait after a task ended by a failed model call, so a rate limit can clear
 # Only providers that honour the JSON format the agent asks for, and none that store or train on prompts
 CLOUD_RULES = {"provider": {"require_parameters": True, "data_collection": "deny"}}
 # OpenRouter's app attribution: cloud runs are listed under LocalAgentBrowser (no request content is shared)
@@ -578,6 +580,12 @@ def main():
         write_summary(folder, meta, scores, baseline)
         print(f"\n===== RESULT {task['id']}: {'finished' if score['finished'] else 'not finished'}, {score['turns']} turns, "
               f"{score['model_minutes']} model min; problems: {'; '.join(score['problems']) or 'none'} =====", flush=True)
+        # One rate-limited task used to end every task after it on its first call (GPT-4o lost 3, Opus 5.5 lost 6):
+        # after a task ended by a failed model call, the next one waits for the limit to clear
+        with open(os.path.join(folder, task["id"], "console.txt"), encoding="utf-8", errors="replace") as console:
+            if "❌ The model call failed" in console.read() and number < len(tasks):
+                print(f"The model call failed in this task; waiting {FAILURE_PAUSE_SECONDS} s before the next one.", flush=True)
+                time.sleep(FAILURE_PAUSE_SECONDS)
     print("\n" + summary_markdown(meta, scores, baseline))
     print(f"Summary: {os.path.join(folder, 'summary.md')}")
 

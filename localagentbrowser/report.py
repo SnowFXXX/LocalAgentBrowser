@@ -9,7 +9,8 @@ from .text import MISSING_STOPWORDS, NUMBER_WORDS, OPINION_REQUEST, SPELLED_NUMB
 from .pages import normalize_url
 from .grounding import code_text, invented_code
 from .checklist import checklist_lines
-from .coverage import cited_answer, quoted_from
+from .coverage import INSTALL_ASKED, INSTALL_COMMAND, cited_answer, one_site, quoted_from
+from .dates import span_numbers, span_section, span_working
 
 def compact_journal(journal):
     # Dropping old entries in batches (not one per turn) keeps the start of the journal unchanged
@@ -87,6 +88,10 @@ def unverified_numbers(text, discoveries, objective=""):
     # The objective's own numbers too: a repotting result headed "Care During First Two Weeks" from the question
     sources = [e["extracted_data"] for e in discoveries] + [str(objective)]
     known = {n.replace(",", "") for t in sources for n in NUMBER_PATTERN.findall(with_digits(t))}
+    # An age or a length of time the code worked out from the discoveries' dates is checked arithmetic, not a guess
+    # (dates.py): three right SimpleQA answers per run were cut for want of it
+    spans = span_numbers(discoveries, objective)
+    known |= {n for n, _ in spans}
     unverified = []
     for number in NUMBER_PATTERN.findall(text):
         if number.replace(",", "") not in known and number not in unverified:
@@ -98,7 +103,7 @@ def unverified_numbers(text, discoveries, objective=""):
             unverified.append(match.group())
     # A time must be given as a time: a cold brew result said it keeps "up to 2 weeks [1]", and its discovery had a
     # "2" only in "a 2L mason jar"
-    durations = {(n.replace(",", ""), unit) for t in sources for n, unit in durations_in(with_digits(t))}
+    durations = {(n.replace(",", ""), unit) for t in sources for n, unit in durations_in(with_digits(t))} | spans
     for number, unit in durations_in(with_digits(text)):
         amount = f"{number} {unit}" + ("" if number == "1" else "s")
         if number.replace(",", "") in known and (number.replace(",", ""), unit) not in durations \
@@ -209,6 +214,40 @@ SENTENCE_OPENERS = {"the", "this", "these", "that", "those", "its", "it's", "bot
                     "you", "your", "for", "with", "when", "while", "after", "before", "then", "also", "and", "but",
                     "however", "use", "using", "all", "some", "most", "one", "two", "three", "step", "note"}
 
+SECTION_START = re.compile(r"\s*(?:#+\s|\d+[.)]\s|\*\*\d)")
+SECTION_SHARE = 0.8  # Share of a line's content words that must be in one discovery its section cites
+SECTION_STOPWORDS = {"this", "that", "these", "which", "into", "used", "uses", "also", "such", "process", "details",
+                     "inputs", "outputs", "main", "strengths", "supporting", "discovery", "discoveries"}
+
+def section_words(text):
+    return {w.rstrip("s") for w in plain_words(text) if len(w) > 2 and not w.isdigit()} - MISSING_STOPWORDS - SECTION_STOPWORDS
+
+def with_section_citations(text, discoveries):
+    """The result with an uncited line cited by the code to a discovery its section already cites, when at least 80%
+    of the line's content words are in that discovery.
+
+    Phi-4 cited by section ("**Supporting Discoveries:** [1], [3]" under each part) instead of by line, and 25 lines
+    of its suite counted as uncited. The section's citations say where to look; the words decide. At 60% a line
+    whose second half was the model's own wording would have been cited too; at 80%, replayed on that suite, every
+    line the code cited had its words in the discovery (25 uncited lines became 16)."""
+    lines = str(text).split("\n")
+    starts = [i for i, line in enumerate(lines) if SECTION_START.match(line)]
+    for begin, end in zip([0] + starts, starts + [len(lines)], strict=True):
+        cited = sorted({int(n) for line in lines[begin:end] for marker in CITATION.findall(line)
+                        for n in re.findall(r"\d+", marker) if 0 < int(n) <= len(discoveries)})
+        for i in range(begin, end) if cited else ():
+            line = lines[i]
+            if CITATION.search(line) or line.strip().rstrip("*_ ").endswith(":") or line.lstrip().startswith("#"):
+                continue
+            words = section_words(line)
+            if len(words) < 3:
+                continue
+            match = next((n for n in cited if len(words & section_words(discoveries[n - 1]["extracted_data"]))
+                          >= SECTION_SHARE * len(words)), None)
+            if match:
+                lines[i] = f"{line.rstrip()} [{match}]"
+    return "\n".join(lines)
+
 def with_matched_citations(text, discoveries):
     """The result with a citation added by the code to each line most of whose wording is in one discovery.
 
@@ -286,6 +325,10 @@ def without_named_clause(sentence, pattern):
 LABELLED_LINE = re.compile(r"^(?P<lead>\s*(?:[-*]|\d+[.)])\s*)\*\*(?P<label>[^*\n:]{2,40}?):?\*\*:?\s*(?P<body>.+)$")
 SWAP_SHARE = 0.5
 
+SECTION_LABELS = CLAUSE_OPENERS | {"process", "inputs", "input", "outputs", "output", "location", "purpose", "function",
+                                    "role", "how", "why", "what", "where", "when", "key", "points", "background",
+                                    "definition", "products", "reactants", "stage", "stages", "mechanism"}
+
 def swapped_sentences(text, discoveries):
     """(line number, sentence, label, other) for each sentence under a bold label ("- **PostgreSQL**: ...") copied
     from a discovery sentence that names another label of the result ("SQLite") and not this one.
@@ -305,6 +348,10 @@ def swapped_sentences(text, discoveries):
     swaps = []
     for i, m in labelled.items():
         label = m.group("label").strip().lower()
+        # A label naming a kind of text ("**Process:**", "**Details:**", "**Inputs:**") is not a subject: Phi-4's
+        # photosynthesis result lost "Details" and "Process" lines for being "said of Light-dependent reactions"
+        if set(plain_words(label)) <= SECTION_LABELS:
+            continue
         for sentence in re.split(r"(?<=[.!?])\s+", m.group("body")):
             pairs = word_pairs(" ".join(plain_words(sentence)))
             if len(pairs) < 5:
@@ -406,6 +453,30 @@ def with_code_closed(text):
     end = text.find("\n\n", start)
     return text + "\n```" if end < 0 else text[:end] + "\n```" + text[end:]
 
+def without_empty_code_blocks(text):
+    """The text without code blocks that have nothing left in them, fences paired in order.
+
+    A pattern for "a fence, a line break, a fence" also matched one block's closing fence and the next block's
+    opening "```powershell": the two blocks merged and "powershell" became a line of code, reported as a command no
+    discovery gives."""
+    lines, kept, block = str(text).split("\n"), [], None
+    for line in lines:
+        if line.strip().startswith("```"):
+            if block is None:
+                block = [line]
+                continue
+            if any(b.strip() for b in block[1:]):
+                kept += block + [line]
+            block = None
+            continue
+        if block is not None:
+            block.append(line)
+        else:
+            kept.append(line)
+    if block is not None:  # An unclosed block is kept as it was
+        kept += block
+    return "\n".join(kept)
+
 def without_invented_code(text, discoveries):
     """The final result with each sentence giving a command no discovery contains cut, and those commands named.
 
@@ -430,10 +501,24 @@ def without_invented_code(text, discoveries):
             kept.append(" ".join(s for s in re.split(r"(?<=[.!?])\s+", line) if not invented_code(s, found)))
     note = ("Left out, because no discovery gives them (the pages read may still have them): "
             + ", ".join(f"`{c}`" for c in invented) + ".")
-    text = re.sub(r"```[^\n]*\n\s*```\n?", "", "\n".join(kept))  # A code block left empty
+    text = with_lead_ins_closed(without_empty_code_blocks("\n".join(kept)))
     return re.sub(r"\n{3,}", "\n\n", text).strip() + "\n\n" + note
 
-def write_report(objective, journal, checklist=None):
+LEAD_IN = re.compile(r"^(?!\s*#).*:\s*$")  # "To activate it, use the following command:"
+
+def with_lead_ins_closed(text):
+    """A line introducing a command whose command was cut says so: Phi-4's docs result read "To activate it, use the
+    following command:" with nothing under it, after the made-up path it gave was left out."""
+    lines = str(text).split("\n")
+    for i, line in enumerate(lines):
+        if not LEAD_IN.match(line) or not re.search(r"\bcommands?\b", line, re.I):
+            continue
+        following = next((x.strip() for x in lines[i + 1:] if x.strip() and not CITATION.fullmatch(x.strip())), "")
+        if not following or following.startswith("#"):
+            lines[i] = line.rstrip().rstrip(":") + ": not given in the pages read (the one written was left out)."
+    return "\n".join(lines)
+
+def write_report(objective, journal, checklist=None, stop_reason=None):
     """A readable report with the final result and every discovery, so nothing depends on the model's
     summary being complete. Written however the run ends."""
     finish = next((e for e in reversed(journal) if e.get("action") == "FINISH"), None)
@@ -456,14 +541,18 @@ def write_report(objective, journal, checklist=None):
             lines += ["", f"> ⚠️ Commands not found in the recorded discoveries: {', '.join(f'`{c}`' for c in code)}. "
                           "Check them before running them."]
     else:
-        lines += [f"**Status:** stopped before the agent finished (after turn {last_turn})", "", "## Final result", "",
+        # A run ended by a failed model call says why: its report read the same as a timed-out run's
+        reason = f": {stop_reason}" if stop_reason else ""
+        lines += [f"**Status:** stopped before the agent finished (after turn {last_turn}){reason}", "", "## Final result", "",
                   "_(The agent did not finish; see the discoveries below.)_"]
     if checklist and len(checklist) > 1:
         lines += ["", "## Checklist", "", "The parts of the objective, with the discoveries recorded for each:", "",
                   checklist_lines(checklist)]
     lines += ["", f"## Discoveries ({len(found)})"]
     for i, e in enumerate(found, start=1):
-        lines += ["", f"### {i}. Turn {e.get('turn')}, from {e.get('source') or 'unknown page'}", "", e["extracted_data"]]
+        by_code = " (recorded by the code: the install command this page gives)" if e.get("by_code") else ""
+        lines += ["", f"### {i}. Turn {e.get('turn')}, from {e.get('source') or 'unknown page'}{by_code}", "",
+                  e["extracted_data"]]
     with open(REPORT_FILE, "w", encoding="utf-8") as report:
         report.write("\n".join(lines) + "\n")
 
@@ -515,7 +604,7 @@ async def compose_final_result(client, objective, journal, checklist=None, not_f
         parts += ("### NOT SHOWN TO MEET THE CONDITIONS (the discoveries do not show these meet them; if you list one, "
                   "say so right after it)\n" + "\n".join(f"- {name}: not shown to be {cond}" for name, cond in unproven)
                   + "\n\n")
-    request = (f"### OBJECTIVE\n{objective}\n\n{parts}### DISCOVERIES\n{listing}\n\n"
+    request = (f"### OBJECTIVE\n{objective}\n\n{parts}{span_section(found, objective)}### DISCOVERIES\n{listing}\n\n"
                "Write the complete final result the OBJECTIVE asks for: do exactly what it asks (for example answer "
                "the question, write the summary or the plan, or give the opinion). Rules:\n"
                "1. Use only the information in the DISCOVERIES. Do not fill gaps from your own knowledge or with "
@@ -585,6 +674,11 @@ async def compose_final_result(client, objective, journal, checklist=None, not_f
             text = again
         else:
             text = with_matched_citations(text, found)
+    # Lines left uncited where the rest of the result is cited are cited by the code too, where their words are in a
+    # discovery: Phi-4 put one "Supporting Discoveries: [1], [2]" line under each section, and 25 lines of a suite
+    # counted as uncited (in its run two hours before, with each line cited, 7)
+    if text != NO_RESULT and found:
+        text = with_section_citations(with_matched_citations(text, found), found)
     if text != NO_RESULT:
         text = await without_false_gaps(client, text, found, answered)
     # Asked to "give your own opinion" about owls, the result listed the traditions and ended without one,
@@ -601,6 +695,11 @@ async def compose_final_result(client, objective, journal, checklist=None, not_f
                                             "yet. Write only that, as one short paragraph that starts with 'My view:', "
                                             "based on the RESULT. " + RESULT_REPLY}])
         paragraph = result_text(extract_message_content(view))
+        # GPT-4o-mini sent the whole result back with its view at the end: the view was there, but the reply as a
+        # whole repeated the result and was left out, and the owl result ended with no view and no word about it
+        at = paragraph.lower().find("my view:") if paragraph else -1
+        if at > 0:
+            paragraph = paragraph[at:].strip()
         # Asked for its view after a result that already recommended SQLite ("I recommend using SQLite"), Llama
         # wrote the whole result again under "My view:"; a paragraph mostly repeating the result is left out
         mine = word_pairs(paragraph.lower()) if paragraph else set()
@@ -611,15 +710,43 @@ async def compose_final_result(client, objective, journal, checklist=None, not_f
     # After the filled gaps are cut, so "does not specify how long it keeps, but ... within 1-2 weeks" keeps its gap
     if text != NO_RESULT:
         text = with_lone_citations_joined(with_code_closed(with_citations_outside_code(text)))
+        # The counts the code itself gave ("only 2 of 3 found") written in words: GPT-4o-mini's owl result said "Only
+        # 2 of the 3 cultures or religions could be found", as asked, and the number check cut it as no page's number
+        for k, wanted in {(k, wanted) for _, k, wanted in fewer}:
+            text = re.sub(rf"\b{k}(\s+(?:out\s+)?of\s+(?:the\s+)?){wanted}\b",
+                          lambda m, k=k, wanted=wanted: f"{in_words(k)}{m.group(1)}{in_words(wanted)}", text)
         text = without_invented_numbers(without_filled_gaps(without_missing_citations(text, len(found))), found, objective)
         text = without_swapped_subjects(without_unnamed_names(text, found, objective), found)
+        # The working for every worked-out number the result gives, so a reader can check the sum
+        working = span_working(text, found, objective)
+        if working:
+            text += "\n\n" + working
     # Reported by the code as well, whatever the result says
     unfound_lines = ([f"- {t}" for t in unfound] + [f"- {t}: the amounts it asks for" for t in amountless]
                      + [f"- {t}: {in_words(wanted - k)} more (only {in_words(k)} of the {in_words(wanted)} were found)"
                         for t, k, wanted in fewer])
     if unfound_lines:
         text += "\n\nNot found in the pages read:\n" + "\n".join(unfound_lines)
-    return with_caveats(without_invented_code(without_filled_gaps(text), found), unproven)
+    # A comparison or view that still rests on one website after the agent was sent back for a second says so
+    only_site = one_site(objective, journal)
+    if only_site and text != NO_RESULT:
+        text += f"\n\nEvery discovery here comes from one website, {only_site}: no second source was found."
+    return with_install_command(with_caveats(without_invented_code(without_filled_gaps(text), found), unproven),
+                                checklist, found)
+
+def with_install_command(text, checklist, found):
+    """The result with the install command a discovery gives, added by the code when an item asks how to install
+    packages and the result has none: given "pip install -r requirements.txt" as checked evidence, Phi-4 wrote
+    `pip install <package>` instead, which no page gives and the command check cut, and the result had no command."""
+    if text == NO_RESULT or not any(INSTALL_ASKED.search(item["text"]) for item in checklist or []):
+        return text
+    if INSTALL_COMMAND.search(LEFT_OUT_NOTE.sub("", text)):
+        return text
+    given = next(((n, e["extracted_data"]) for n, e in enumerate(found, 1) if INSTALL_COMMAND.search(e["extracted_data"])),
+                 None)
+    if not given:
+        return text
+    return f"{text}\n\nInstalling packages, as the page gives it (added by the code): \"{given[1]}\" [{given[0]}]"
 
 # "X is not specified ..., but <a claim>": every such sentence in the suite's finished results filled the gap from the
 # model's own knowledge ("not explicitly stated but generally, it can be stored for several weeks", while the page
@@ -647,9 +774,127 @@ def without_filled_gaps(text):
     """The final result with what follows "not stated ..., but" cut: the gap stays reported, the filling goes."""
     return FILLED_GAP.sub(lambda m: m.group(1).rstrip(" ,") + ".", text)
 
+# The prompt's own section names, as a reply may repeat them back
+PROMPT_SECTION = re.compile(r"^#+\s*(?:OBJECTIVE|CHECKLIST|DISCOVERIES|WHERE THE DISCOVERIES ANSWER|NOT FOUND|NO AMOUNTS "
+                            r"FOUND|FEWER FOUND THAN ASKED|NOT SHOWN TO MEET|WORKED OUT FROM THE DATES|RESULTS?)\b", re.I)
+
+MAX_OBJECTIVE_ECHO_CHARS = 400  # An objective heading longer than this has the answer run on after it
+
+def without_echoed_prompt(text):
+    """A reply with the prompt's own sections it repeated back taken out, keeping what it wrote after them.
+
+    Llama 3.1 8B answered the writing step with "### OBJECTIVE ...", "### CHECKLIST ...", "### DISCOVERIES ..." copied
+    from its prompt and then "### RESULTS" with a cited answer under it; the whole reply was refused as a repeat, three
+    times in one suite, and the reports said no final result was written. A section heading named like one of the
+    prompt's goes with its text; a "RESULTS" heading goes alone, its text stays."""
+    # Sections run together on one line ("... ### CHECKLIST 1. ... ### DISCOVERIES [1] ... ### RESULTS ...", as in
+    # Llama's owl reply) are taken apart first
+    text = re.sub(r"(?<=\S)[ \t]+(#{2,6}\s)", r"\n\1", str(text))
+    lines = text.split("\n")
+    if not any(PROMPT_SECTION.match(line.strip()) for line in lines):
+        return text
+    # What a repeated section holds: the objective is one line ("### OBJECTIVE: Find out ..." on the heading itself,
+    # or the line under it), the lists are list lines, the discoveries run to the next heading. Text the model wrote
+    # after them stays: Llama's owl answer followed "### OBJECTIVE: ..." with no heading of its own
+    kept, mode = [], None
+    for line in lines:
+        bare = line.strip()
+        if bare.startswith("#"):
+            section = PROMPT_SECTION.match(bare)
+            after = bare[len(section.group()):].lstrip(" :") if section else ""
+            title = section.group().lstrip("#").strip().upper() if section else ""
+            # "### RESULTS <the answer>" on one line: the answer stays. "### OBJECTIVE: <the objective> <the answer>":
+            # the rest stays for without_echoed_objective, which knows the objective, when it is longer than an
+            # objective (a heading that is only the objective, reworded, goes)
+            if title.startswith("RESULT") and after:
+                kept.append(after)
+                mode = None
+                continue
+            if title == "OBJECTIVE" and len(after) > MAX_OBJECTIVE_ECHO_CHARS:
+                kept.append(after)
+                mode = None
+                continue
+            if section:
+                name = section.group().lstrip("#").strip().upper()
+                mode = ("objective" if name == "OBJECTIVE" and not bare.split(None, 2)[2:] and ":" not in bare
+                        else "discoveries" if name == "DISCOVERIES" else None if name.startswith("RESULT") or name == "OBJECTIVE"
+                        else "list")
+                continue
+            mode = None
+        elif mode == "objective" and bare:
+            mode = None
+            continue
+        elif mode == "discoveries":
+            continue
+        elif mode == "list":
+            if not bare or re.match(r"(?:\d+[.)]|[-*])\s", bare):
+                continue
+            mode = None
+        kept.append(line)
+    # Short headings left with nothing under them ("### MY VIEW" at the end) go too; a heading line that carries the
+    # text itself ("### 1. Find out how ... Egyptian records connect owls with death ...") stays
+    out = [line for i, line in enumerate(kept) if not (line.lstrip().startswith("#") and len(line.strip()) <= 80 and
+                                                        not any(x.strip() and not x.lstrip().startswith("#") for x in kept[i + 1:i + 2]))]
+    return "\n".join(out).strip()
+
 def result_text(raw):
     """The text of a final-result reply: the "result" field, read leniently (a server may ignore the format, and a
-    reply cut off at the token limit is not valid JSON)."""
+    reply cut off at the token limit is not valid JSON), without prompt sections the reply repeated back."""
+    return without_repeated_sections(without_echoed_prompt(raw_text(raw)))
+
+LEFTOVER_HEADING = re.compile(r"^#+\s*\**\s*(?:summary|recap|in summary|overview|results?|conclusion)\s*\**:?\s*$", re.I)
+SAME_HEADING_SIZE = 0.75  # The smaller heading's words, as a share of the larger's, for two to be the same part
+MIN_HEADING_WORDS = 3  # Shorter headings ("Features", "Strengths") repeat legitimately, under each thing
+
+def heading_words(line):
+    return {w for w in plain_words(line) if len(w) > 1 and not w.isdigit()} - MISSING_STOPWORDS
+
+def without_repeated_sections(text):
+    """The result with a block of sections that repeats the parts already written cut, with its text: the first copy
+    is kept.
+
+    Llama 3.1 8B wrote a comparison's four parts, then "### SUMMARY" and the four parts again, and the copies
+    disagreed: the second said "many simultaneous users" was not found, the first answered it with a citation. Only
+    a run of two or more headings repeating earlier ones counts, each with all the words of the one it repeats or
+    all its words in it ("... users in PostgreSQL" and "... users in SQLite and PostgreSQL"), standing right after
+    the first copy or under a "Summary" heading. Replayed on every saved result, a looser rule (word pairs) cut the
+    feet beside the meters, macOS beside Windows and Darktable beside Krita; a heading under a new subject ("##
+    PostgreSQL" after "## SQLite") is not a repeat."""
+    lines = str(text).split("\n")
+    heads = [(i, heading_words(line)) for i, line in enumerate(lines) if line.strip().startswith("#")]
+
+    def match(k):
+        words = heads[k][1]
+        if len(words) < MIN_HEADING_WORDS:
+            return None
+        # Close in size too: "Height of the Tallest Mountain in Africa in Meters" holds every word of "Tallest
+        # Mountain in Africa" and is another part, not a repeat
+        return next((j for j in range(k) if len(heads[j][1]) >= MIN_HEADING_WORDS
+                     and (words <= heads[j][1] or heads[j][1] <= words)
+                     and min(len(words), len(heads[j][1])) >= SAME_HEADING_SIZE * max(len(words), len(heads[j][1]))), None)
+
+    matched = [match(k) for k in range(len(heads))]
+    cut = set()
+    k = 0
+    while k < len(heads):
+        if matched[k] is None:
+            k += 1
+            continue
+        run_end = k
+        while run_end + 1 < len(heads) and matched[run_end + 1] is not None:
+            run_end += 1
+        earlier = {matched[m] for m in range(k, run_end + 1)}
+        before = k - 1
+        summary = before >= 0 and bool(LEFTOVER_HEADING.match(lines[heads[before][0]].strip()))
+        if run_end > k and (summary or before in earlier or before == max(earlier)):
+            stop = heads[run_end + 1][0] if run_end + 1 < len(heads) else len(lines)
+            cut.update(range(heads[before][0] if summary else heads[k][0], stop))
+        k = run_end + 1
+    if not cut:
+        return text
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(line for i, line in enumerate(lines) if i not in cut)).strip()
+
+def raw_text(raw):
     raw = str(raw or "").strip()
     if not raw.startswith("{"):
         return raw
@@ -708,7 +953,15 @@ def without_echoed_objective(text, objective):
     began with the objective word for word."""
     first, _, rest = str(text).strip().partition("\n")
     same = " ".join(first.lower().split()).rstrip(" .:?") == " ".join(str(objective).lower().split()).rstrip(" .:?")
-    return rest.strip() if same and rest.strip() else text
+    if same and rest.strip():
+        return rest.strip()
+    # The objective run straight into the answer on one line ("Find out how ... meanings. In ancient Greece, ..."):
+    # Llama's owl reply was one line starting "### OBJECTIVE: " and the objective word for word
+    goal = " ".join(str(objective).split()).rstrip(" .:?")
+    line = " ".join(first.split())
+    if goal and line.lower().startswith(goal.lower()) and len(line) > len(goal) + 40:
+        return (line[len(goal):].lstrip(" .:?") + ("\n" + rest if rest.strip() else "")).strip()
+    return text
 
 # "X is not specified", "X was not found": the result saying the discoveries lack something
 # "These reactions do not specify a particular location" slipped past the passive form only

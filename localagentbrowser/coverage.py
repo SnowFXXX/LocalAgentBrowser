@@ -2,10 +2,12 @@
 items, counts, proof of conditions), and what is reported as not found or not proven."""
 import json
 import re
+from urllib.parse import urlparse
 from .config import COVERAGE_MAX_TOKENS, MAX_CONDITION_WORDS, MAX_MISSING_CLAIM_WORDS, MAX_THING_NAME_WORDS, MODEL
 from .prompts import CITED_FORMAT, CITED_QUESTION, COVERAGE_FORMAT, COVERAGE_ITEM_CHECK, COVERAGE_QUOTE, SYSTEM_PROMPT
 from .text import MISSING_STOPWORDS, OPINION_REQUEST, asked_count, extract_message_content, plain_words, word_pairs
 from .pages import ITEM_VERBS
+from .dates import SPAN_QUESTION, dates_in
 
 UNANSWERED_GAP = "nothing in DISCOVERIES SO FAR answers it"
 # Items asking for amounts, and what an amount looks like: a cold brew result listed "coffee beans, water, a strainer"
@@ -111,9 +113,51 @@ def really_missing(missing, found):
     return ", ".join(kept)
 
 def states(text, condition):
-    """Whether the text contains every word of a condition ("open-source" matches "open source")."""
-    words = set(plain_words(text))
-    return all(w in words for w in plain_words(condition) if len(w) > 2)
+    """Whether the text contains every word of a condition ("open-source" matches "open source").
+
+    "Free" in "free, open-source" is met by "open source": an open-source licence lets anyone have the program at no
+    cost, and lists of "open-source alternatives" do not repeat the word. Phi-4 listed GIMP, Krita and Darktable
+    from such a list, each with the caution "not shown in the pages read to be free and open-source"."""
+    words = plain_words(text)
+    pairs = set(zip(words, words[1:], strict=False))
+    return all(w in words or (w == "free" and ("open", "source") in pairs)
+               for w in plain_words(condition) if len(w) > 2)
+
+def page_states(source, condition):
+    """Whether the address of the page a thing was copied from states the condition for everything the page lists:
+    "itsfoss.com/open-source-photoshop-alternatives/" for each program on it. The page's claim, like its text."""
+    try:
+        address = urlparse(source or "")
+    except ValueError:
+        return False
+    # A list filtered by licence says it too: alternativeto.net/software/adobe-photoshop/?license=opensource
+    claim = f"{address.path} {address.query}".replace("opensource", "open source")
+    return bool(address.path.strip("/") or address.query) and states(claim, condition)
+
+def site(url):
+    try:
+        name = urlparse(url or "").hostname or ""
+    except ValueError:
+        return ""
+    return name.removeprefix("www.")
+
+# Objectives a single website cannot settle: a comparison, a view or recommendation, or "several sources"
+SECOND_SOURCE_ASKED = re.compile(r"\bcompar\w*|\bversus\b|\bvs\.?\s|\b(?:several|multiple|different|various|other) "
+                                 r"sources\b", re.I)
+ONE_SITE_GAP = ("asks for a comparison, a view or several sources, and every discovery so far comes from one website, "
+                "{site}: SEARCH for a second, independent source and DISCOVER what it says on the same points, then FINISH")
+
+def one_site(objective, journal):
+    """The one website every discovery came from, when the objective needs more than one; otherwise None.
+
+    Phi-4 used exactly one website for each of its 14 finished suite tasks, the owl task that asks for "several
+    sources" among them, and so did GPT-4o-mini and Gemini. Every line was cited, but a comparison or a view resting
+    on one page is that page's view. The agent is sent back once to find a second source; a run that still finishes
+    with one says so in its result."""
+    if not (SECOND_SOURCE_ASKED.search(objective) or OPINION_REQUEST.search(objective)):
+        return None
+    sites = {site(e.get("source")) for e in journal if e.get("action") == "DISCOVER"}
+    return sites.pop() or None if len(sites) == 1 else None
 
 async def coverage_gaps(client, objective, checklist, journal, only=None, evidence=None):
     """What the discoveries still lack for each checklist item, judged item by item just before finishing.
@@ -198,6 +242,14 @@ async def coverage_gaps(client, objective, checklist, journal, only=None, eviden
         # Nothing copied for the item, not even a discovery number, means nothing recorded answers it: on a how-to
         # the check gave empty evidence and nothing missing for "care in the first two weeks", the agent had linked
         # that item to "the best time to repot is spring and summer", and the final result invented a care routine
+        # An item asking how to install packages is answered by an install command, decided in code: Phi-4's docs run
+        # had "The ExtendedEnvBuilder class installs setuptools and pip into the virtual environment" accepted for "how
+        # to install packages into a virtual environment", was never sent back, and finished without `pip install`
+        # Decided both ways: with "pip install -r requirements.txt" recorded, the model's verdict still called the item
+        # unanswered, and the result said "not found" over the discovery that gave the command
+        if INSTALL_ASKED.search(item["text"]):
+            commands = [e["extracted_data"] for e in found if INSTALL_COMMAND.search(e["extracted_data"])]
+            verdict["evidence"] = commands[0] if commands else ""
         if not re.search(r"\w", str(verdict.get("evidence", ""))):
             unanswered.append(n)
             gaps.append(f"Item {n} ({item['text']}): {UNANSWERED_GAP}")
@@ -237,7 +289,18 @@ async def coverage_gaps(client, objective, checklist, journal, only=None, eviden
             name = {w for w in plain_words(thing["name"]) if len(w) > 2}
             copied = any(quoted_from(proof, e["extracted_data"]) and name & set(plain_words(e["extracted_data"]))
                          for e in found)
-            unmet = [c for c in conditions if not (copied and states(proof, c))]
+            # Or a discovery about this thing alone states it, checked by the code: Phi-4's list had "GIMP: Free
+            # open-source suite ..." recorded, the check's proof did not copy those words, and GIMP got the caution
+            # "not shown to be free and open-source". A discovery naming another listed thing too is not used: "OnlyOffice
+            # is free and open source" said of LibreOffice must not prove it
+            others = [{w for w in plain_words(t["name"]) if len(w) > 2} - name for t in things]
+            about = [e for e in found if name & set(plain_words(e["extracted_data"]))
+                     and not any(o and o <= set(plain_words(e["extracted_data"])) for o in others)]
+            # Or the page the thing was copied from says it of everything it lists, in its address
+            listed_on = [e.get("source") for e in found if name & set(plain_words(e["extracted_data"]))]
+            unmet = [c for c in conditions if not ((copied and states(proof, c))
+                                                   or any(states(e["extracted_data"], c) for e in about)
+                                                   or any(page_states(s, c) for s in listed_on))]
             if unmet:
                 condition = " and ".join(unmet)
                 unproven.append((str(thing["name"]).strip(), condition))
@@ -268,6 +331,18 @@ def units_written(text):
     found = {UNIT_WORDS[m.group(1).lower()] for m in UNIT_AFTER_NUMBER.finditer(str(text))}
     return found | ({"foot"} if "feet" in found else set())
 
+# Only words that point at the things another item finds: "his" in "the start date of his tenure" names the person
+# Installing software packages, and the commands that do it as pages write them ("python -m pip install",
+# "$ pip install -r requirements.txt", "npm install", "sudo apt install")
+INSTALL_ASKED = re.compile(r"\binstall\w*\b.*\b(?:packages?|librar(?:y|ies)|modules?|dependenc(?:y|ies))\b|"
+                           r"\b(?:packages?|librar(?:y|ies)|modules?|dependenc(?:y|ies))\b.*\binstall", re.I)
+INSTALL_COMMAND = re.compile(r"\b(?:pip3?|python3?(?:\.\d+)?\s+-m\s+pip|py\s+-m\s+pip|npm|pnpm|yarn|apt(?:-get)?|brew|"
+                             r"conda|choco|winget|dnf|yum|gem|cargo|go)\s+(?:install|add)\b", re.I)
+
+REFERS_BACK = re.compile(r"\b(?:each one|each of them|each of these|of each|for each|each item)\b", re.I)
+DATE_ASKED = re.compile(r"\b(?:date|dates|when|year)\b", re.I)
+DATE_PART_ASKED = re.compile(r"\b(?:day|month|year)\b", re.I)
+
 def shared_evidence_items(answered_with, checklist):
     """Items whose only evidence is the same words given for other items, none of its own words in them.
 
@@ -288,6 +363,24 @@ def shared_evidence_items(answered_with, checklist):
                 if m != n and quoted_from(words, other) and quoted_from(other, words)]
         if not same or any((texts[n] & texts[m]) - common for m in same):
             continue
+        # An item about the things another item finds ("Summarize the main strengths of each one" after "Find three
+        # free, open-source alternatives") is answered by the same discoveries: Phi-4's list said its strengths were
+        # "not found" over feature lists it had cited for each program
+        if REFERS_BACK.search(checklist[n - 1]["text"]):
+            continue
+        # Items asking for dates may share a sentence that gives a date for each: "from 12 July 1985 until his
+        # retirement on 20 December 1986" answered both the start and the end of a tenure, and both were reported
+        # "not found"
+        # (A length worked out from those dates may share it too: "Calculate the length of his tenure" had the same one)
+        dated = [m for m in [n] + same if DATE_ASKED.search(checklist[m - 1]["text"])]
+        if (n in dated or SPAN_QUESTION.search(checklist[n - 1]["text"])) and \
+                len({d or y for _, d, y in dates_in(words)}) >= max(len(dated), 2 if n not in dated else 1):
+            continue
+        # Items asking for one part of a date each: one full date answers all of them. q10 asked "What day ...",
+        # "What month ...", "What year ..." over "July 9, 2016", and the day and month were reported "not found"
+        parts = [m for m in [n] + same if DATE_PART_ASKED.search(checklist[m - 1]["text"])]
+        if len(parts) == len(same) + 1 and any(d for _, d, _ in dates_in(words)):
+            continue
         given = item_words(words) | units_written(words)
         overlap = {m: len(item_words(checklist[m - 1]["text"], checklist) & given) for m in [n] + same}
         if overlap[n] == 0 or overlap[n] < max(overlap.values()):
@@ -303,14 +396,23 @@ def short_counts(gaps):
 async def coverage_refusal(client, objective, tried, journal):
     # Once per run, so a noisy verdict costs one turn at most and a gap that cannot be filled never blocks finishing
     checklist = tried.get("checklist")
+    if tried.get("coverage_checked") and not tried.get("search_exhausted") and checklist:
+        return looked_nowhere_else(tried, journal)
     if tried.get("coverage_checked") or tried.get("search_exhausted") or not checklist:
         return None
     tried["coverage_checked"] = True
+    tried["coverage_at"] = len(journal)
     if any(e.get("action") == "DISCOVER" for e in journal):
         print("🔎 Checking each checklist item against the discoveries before finishing...")
         gaps, tried["unanswered"], unproven = await coverage_gaps(client, objective, checklist, journal,
                                                                     evidence=tried.setdefault("evidence", {}))
         tried["short_counts"] = short_counts(gaps)
+        # Open again until something new is linked to it: after "nothing answers item 4", the read-on check told Phi-4
+        # "every item of the OBJECTIVE CHECKLIST already has the discoveries it asks for. Choose FINISH now", because
+        # the discovery the check had rejected was still linked to the item
+        for n in tried["unanswered"]:
+            if 0 < n <= len(checklist):
+                checklist[n - 1]["unanswered"] = True
         # Items whose named things lacked proof of a condition are checked again before the final result
         tried["unproven_items"] = sorted({n for n, item in enumerate(checklist, 1) if any(
             g.startswith(f"Item {n}: ") and "no words in DISCOVERIES SO FAR show it is" in g for g in gaps)})
@@ -319,6 +421,9 @@ async def coverage_refusal(client, objective, tried, journal):
         # final result said the amounts were not found, because nothing made it record the card that gave them
         gaps += [f"Item {n} ({checklist[n - 1]['text']}): {AMOUNT_GAP}"
                  for n in amounts_not_found(checklist, journal, skip=set(tried["unanswered"]))]
+        only_site = one_site(objective, journal)
+        if only_site:
+            gaps.append("The objective " + ONE_SITE_GAP.format(site=only_site))
     else:
         # A factual run finished with nothing recorded (its answer was refused as not on the page shown) and its
         # final result said nothing was found
@@ -329,7 +434,7 @@ async def coverage_refusal(client, objective, tried, journal):
     # four suite runs ("missing official documentation" on a comparison, "H2O, O2" already recorded, "free" on a
     # correct list of open-source suites) and cost a finish each; those verdicts now only shape the final result
     hard = [g for g in gaps if g.endswith(UNANSWERED_GAP) or re.search(r"\): only \d+ of \d+ found", g)
-            or g.startswith("Nothing has been recorded") or g.endswith(AMOUNT_GAP)
+            or g.startswith("Nothing has been recorded") or g.endswith(AMOUNT_GAP) or g.startswith("The objective asks")
             or g.endswith(CONFIRMED_MISSING + ")")]
     if gaps:
         print("⚠️ Gaps found:\n" + "\n".join(f"   - {g}{'' if g in hard else ' (not sent back)'}" for g in gaps))
@@ -341,7 +446,89 @@ async def coverage_refusal(client, objective, tried, journal):
                                 "the missing information, or words that show a condition is met, from the current page if "
                                 "it has them, or look for them elsewhere; replace a thing that does not meet a condition "
                                 "with one that does. If something cannot be found, FINISH again and say so in the final "
-                                "result.")
+                                "result." + search_suggestions(checklist, tried.get("unanswered")))
+
+def remember_install_lines(tried, page_state):
+    """Keeps the first line giving an install command on each page read, by address, for record_install_line."""
+    lines = tried.setdefault("install_lines", {})
+    if not page_state.get("url") or page_state["url"] in lines:
+        return
+    for part in page_state.get("parts") or []:
+        for sentence in re.split(r"(?<=[.!?:])\s+|\n+", part):
+            if INSTALL_COMMAND.search(sentence):
+                lines[page_state["url"]] = sentence.strip()
+                return
+    lines[page_state["url"]] = None
+
+def record_install_line(tried, journal, turn):
+    """At FINISH, records by code an install command from a page the agent read, for an install item no discovery
+    answers with one; returns the entry, or None.
+
+    The venv reference page gives "pip install -r requirements.txt" in its "How venvs work" part. Phi-4 read past it
+    in five runs of seven, recorded the EnvBuilder example instead, and finished without an install command; named
+    to it in the prompt, the line was still not recorded. The line is the page's own text, so the code records it
+    itself, marked as recorded by the code, rather than leaving it to the model."""
+    checklist = tried.get("checklist") or []
+    items = [n for n, item in enumerate(checklist, 1) if INSTALL_ASKED.search(item["text"])]
+    found = [e for e in journal if e.get("action") == "DISCOVER"]
+    if not items or any(INSTALL_COMMAND.search(e["extracted_data"]) for e in found):
+        return None
+    source, line = next(((u, t) for u, t in (tried.get("install_lines") or {}).items() if t), (None, None))
+    if not line:
+        return None
+    entry = {"turn": turn, "action": "DISCOVER", "source": source, "extracted_data": line, "checklist_items": items,
+             "by_code": True}
+    journal.append(entry)
+    for n in items:
+        checklist[n - 1]["discoveries"].append(len(found) + 1)
+        checklist[n - 1].pop("unanswered", None)
+    return entry
+
+def looked_nowhere_else(tried, journal):
+    """One more send-back, at most, for an agent that finished again without looking anywhere for an item nothing
+    answers: no SEARCH, no other page, and no discovery linked to the item since it was sent back.
+
+    Sent back for "how to install packages", with a query to try, Phi-4 stayed on the venv reference page in two
+    runs out of two, recorded the EnvBuilder example again, and finished with the item "not found". The page it
+    needed was one search away. A gap it has looked for is not pushed again: finishing then says what was not found."""
+    if tried.get("search_pushed") or "coverage_at" not in tried:
+        return None
+    since = journal[tried["coverage_at"]:]
+    if any(e.get("action") in ("SEARCH", "NAVIGATE") for e in since):
+        return None
+    # Only gaps the code confirms, never the model's verdict alone: the once-per-run rule keeps a wrong verdict from
+    # costing more than one turn, and an install item with no install command in any discovery is not a verdict
+    found = [e for e in journal if e.get("action") == "DISCOVER"]
+    if any(INSTALL_COMMAND.search(e.get("extracted_data", "")) for e in found):
+        return None
+    checklist = tried["checklist"]
+    still = [n for n in tried.get("unanswered") or [] if 0 < n <= len(checklist)
+             and INSTALL_ASKED.search(checklist[n - 1]["text"])]
+    suggestions = search_suggestions(checklist, still)
+    if not suggestions:
+        return None
+    tried["search_pushed"] = True
+    return "BLOCKED_COVERAGE", ("Nothing answers these checklist items yet, and you have not looked anywhere else since "
+                                "they were named: " + ", ".join(map(str, still)) + ". Before finishing, SEARCH for "
+                                "them once (the current page does not have them, or they would be recorded by now)."
+                                + suggestions + "\nIf that search finds nothing, FINISH and say they were not found.")
+
+def search_suggestions(checklist, unanswered):
+    """A query to start from for each item nothing answers, from the item's own wording.
+
+    Sent back with "nothing answers item 4 (install packages into a virtual environment)", Phi-4 stayed on the venv
+    reference page, which has no pip command, re-reading its parts until it finished without one; the run before, a
+    second search had found the tutorial page that gives it. "Look elsewhere" named no place to start."""
+    lines = []
+    for n in unanswered or []:
+        if not (0 < n <= len(checklist)) or OPINION_REQUEST.search(checklist[n - 1]["text"]):
+            continue
+        words = [w for w in re.findall(r"[\w'-]+", checklist[n - 1]["text"])
+                 if w.lower() not in ITEM_VERBS | {"out", "how", "to", "the", "a", "an", "and", "using", "into", "of"}]
+        if words:
+            lines.append(f"- Item {n}: if the pages read so far do not have it, SEARCH for it, for example: "
+                         f"{' '.join(words[:10])}")
+    return ("\nWhere to look:\n" + "\n".join(lines)) if lines else ""
 
 async def not_found_items(client, objective, tried, journal):
     """The checklist items no discovery answers, and the things not shown to meet an item's conditions, decided in

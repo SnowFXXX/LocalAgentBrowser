@@ -12,6 +12,7 @@ from localagentbrowser.prompts import *  # noqa: F403
 from localagentbrowser.text import *  # noqa: F403
 from localagentbrowser.pages import *  # noqa: F403
 from localagentbrowser.grounding import *  # noqa: F403
+from localagentbrowser.dates import *  # noqa: F403
 from localagentbrowser.checklist import *  # noqa: F403
 from localagentbrowser.coverage import *  # noqa: F403
 from localagentbrowser.checks import *  # noqa: F403

@@ -317,6 +317,30 @@ What's next: false caveats and false "not found" lines, citations on the neighbo
 from link cards and tables of contents, moving the deciding into code wherever a model's judgement has stopped
 improving with better wording.
 
+### 1.65 and 1.66 (cloud models; 1.66 runs 2026-11-15)
+1.65 added optional cloud models through OpenRouter. 1.66 was measured on four of them, one run each, one model at a
+time, on the released code; the time limit is the same, but a cloud suite takes minutes, not hours. The local models
+have not been re-run on 1.66 yet.
+
+| Model | Finished | Model time | Uncited lines (1.65 → 1.66) | Expected words missing (1.65 → 1.66) | Outside knowledge | Cost |
+|---|---|---|---|---|---|---|
+| Phi-4 | 7 of 7 | 5.6 min | 4 → 1 | 1 → 0 | 0 | $0.04 |
+| GPT-4o-mini | 7 of 7 | 7.4 min | 12 → 1 | 0 → 0 | 0 | $0.06 |
+| Llama-3.1-8B | 7 of 7 | 4.0 min | 21 → 3 | 8 → 1 | 0 | $0.14 |
+| Gemma-3-4B | 7 of 7 (6 on 1.65) | 23.6 min | 9 → 5 | 6 → 3 | 0 | $0.06 |
+
+- **Uncited lines fell on every model.** Two fixes aimed at them: the code cites a line its section already cites
+  (Phi-4 cited by section), and a reply that repeated the prompt before answering is kept without the repeat (three
+  of Llama's 1.65 results were lost to that).
+- **Read by hand,** one finished answer is wrong in a way no check caught: Gemma gave a glacier's elevation on
+  Kilimanjaro's page (3,200 m) as the mountain's height. Left as found: Llama's cold brew steps without the steeping
+  time, Gemma's owl result without "wise" or a "My view:" paragraph, and Phi-4's recommendation under a heading
+  rather than "My view:". Phi-4's one "number not in discoveries" is "1,5" in a chemical name, a checker quirk.
+- **50 SimpleQA questions on Phi-4** (the same 50 each time, graded by hand, one grader): alone, 1 correct; 1.65.1,
+  38 and 39; 1.66, 45 correct, 4 wrong, 1 not answered, in 28.6 minutes and 634 model calls, for $0.13. One of the
+  four wrong answers credits a fencer with foil where the page lists him only for épée: the right page, the wrong
+  word.
+
 ## What the steps showed overall
 
 - **The fixed checklist was the big step** (1.53). The model no longer invents parts of the objective or loses
@@ -329,6 +353,14 @@ improving with better wording.
   second. Fresh prompts are now the most expensive kind of turn.
 - **A site can decide a task.** The repotting guide could not answer one part of the objective in any run; the suite
   now flags a task that fails again on the same site.
+
+## Next steps (after 1.66)
+
+- **Re-run the local models on 1.66,** one at a time, adding Phi-4 and Gemma 3 4B in LM Studio.
+- **Key words, not just page words:** check that a finding's key word matches the question's (height, not a
+  glacier's elevation; foil, not épée).
+- **Search failures:** do more than retry once when DuckDuckGo returns an error page.
+- **Clean Room (Privacy Mode),** planned for 1.67.
 
 ## Next steps (after 1.64)
 

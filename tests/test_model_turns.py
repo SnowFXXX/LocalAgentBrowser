@@ -234,7 +234,7 @@ class TestServerFailures:
         async def create(**kwargs):
             calls.append(kwargs)
             outcome = outcomes.pop(0)
-            if outcome in errors:
+            if isinstance(outcome, str) and outcome in errors:
                 raise errors[outcome]
             return outcome
 
@@ -279,3 +279,115 @@ class TestServerFailures:
         with pytest.raises(openai.BadRequestError):
             asyncio.run(client.chat.completions.create(model="m", messages=[]))
         assert len(calls) == 1 and waits == []
+
+
+class TestCloudFailures:
+    """How a cloud service fails: rate limits, provider errors, parameters no provider takes, and content filters.
+    Three of eleven cloud models lost tasks to these in one week of testing, none because of the model's work."""
+
+    @staticmethod
+    def client(outcomes, monkeypatch, cloud=True):
+        import openai
+        try:
+            import httpx2 as httpx
+        except ImportError:
+            import httpx
+
+        request = httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions")
+        errors = {
+            # The text OpenRouter sent GPT-4o and Opus 5.5 on 2026-11-11
+            "429": openai.RateLimitError("Error code: 429 - Rate limit exceeded: new-account-rpm/openai/gpt-4o",
+                                         response=httpx.Response(429, request=request), body=None),
+            "429-retry-after": openai.RateLimitError("Error code: 429", body=None,
+                                                     response=httpx.Response(429, request=request, headers={"retry-after": "7"})),
+            # Gemma 3 4B's lost task
+            "provider": openai.BadRequestError("Error code: 400 - Provider returned error",
+                                               response=httpx.Response(400, request=request), body=None),
+            # Opus 5.5 on 2026-11-15, once its providers stopped taking a temperature
+            "404-params": openai.NotFoundError("Error code: 404 - No endpoints found that can handle the requested parameters.",
+                                               response=httpx.Response(404, request=request), body=None),
+        }
+        calls, waits = [], []
+
+        async def create(**kwargs):
+            calls.append(dict(kwargs))
+            outcome = outcomes.pop(0)
+            if isinstance(outcome, str) and outcome in errors:
+                raise errors[outcome]
+            return outcome
+
+        async def fake_sleep(seconds):
+            waits.append(seconds)
+
+        monkeypatch.setattr(agent.asyncio, "sleep", fake_sleep)
+        monkeypatch.setattr(agent, "BASE_URL", "https://openrouter.ai/api/v1" if cloud else "http://localhost:1234/v1")
+        monkeypatch.setattr(agent, "UNSUPPORTED_PARAMETERS", set())
+        client = types.SimpleNamespace(chat=types.SimpleNamespace(completions=types.SimpleNamespace(create=create)))
+        return agent.with_retries(client), calls, waits
+
+    @staticmethod
+    def filtered(content=""):
+        message = types.SimpleNamespace(content=content)
+        return types.SimpleNamespace(choices=[types.SimpleNamespace(message=message, finish_reason="content_filter")])
+
+    def test_a_rate_limit_is_waited_out(self, monkeypatch):
+        client, calls, waits = self.client(["429", "429", "reply"], monkeypatch)
+        assert asyncio.run(client.chat.completions.create(model="m", messages=[])) == "reply"
+        assert len(calls) == 3 and waits == list(ab.RATE_LIMIT_WAITS[:2])
+
+    def test_the_services_own_wait_is_used_when_it_gives_one(self, monkeypatch):
+        client, calls, waits = self.client(["429-retry-after", "reply"], monkeypatch)
+        assert asyncio.run(client.chat.completions.create(model="m", messages=[])) == "reply"
+        assert waits == [7]
+
+    def test_a_rate_limit_that_does_not_clear_ends_the_call(self, monkeypatch):
+        import openai
+
+        client, calls, waits = self.client(["429"] * (len(ab.RATE_LIMIT_WAITS) + 1), monkeypatch)
+        with pytest.raises(openai.RateLimitError):
+            asyncio.run(client.chat.completions.create(model="m", messages=[]))
+        assert waits == list(ab.RATE_LIMIT_WAITS)
+
+    def test_a_provider_error_is_tried_again(self, monkeypatch):
+        client, calls, waits = self.client(["provider", "reply"], monkeypatch)
+        assert asyncio.run(client.chat.completions.create(model="m", messages=[])) == "reply"
+        assert waits == [ab.MODEL_RETRY_WAITS[0]]
+
+    def test_a_temperature_no_provider_takes_is_dropped_for_the_rest_of_the_run(self, monkeypatch):
+        client, calls, waits = self.client(["404-params", "reply", "reply"], monkeypatch)
+        create = client.chat.completions.create
+        assert asyncio.run(create(model="m", messages=[], temperature=0.2)) == "reply"
+        assert asyncio.run(create(model="m", messages=[], temperature=0.3)) == "reply"
+        assert "temperature" in calls[0] and "temperature" not in calls[1] and "temperature" not in calls[2]
+        assert waits == []
+
+    def test_a_404_on_lm_studio_is_not_taken_for_a_parameter_problem(self, monkeypatch):
+        import openai
+
+        client, calls, waits = self.client(["404-params"], monkeypatch, cloud=False)
+        with pytest.raises(openai.NotFoundError):
+            asyncio.run(client.chat.completions.create(model="m", messages=[], temperature=0.2))
+
+    def test_an_empty_reply_stopped_by_the_content_filter_is_not_retried(self, monkeypatch):
+        client, calls, waits = self.client([self.filtered(), "reply"], monkeypatch)
+        with pytest.raises(agent.ModelRefused):
+            asyncio.run(client.chat.completions.create(model="m", messages=[]))
+        assert len(calls) == 1
+
+    def test_a_filtered_reply_with_content_is_kept(self, monkeypatch):
+        # Only an empty reply is a refusal; a reply cut short by the filter is still read like any other
+        reply_ = self.filtered('{"action": "SEARCH"}')
+        client, calls, waits = self.client([reply_], monkeypatch)
+        assert asyncio.run(client.chat.completions.create(model="m", messages=[])) is reply_
+
+    def test_the_failure_advice_names_the_cloud_problem_not_lm_studio(self, monkeypatch):
+        import openai
+        import httpx
+
+        monkeypatch.setattr(agent, "BASE_URL", "https://openrouter.ai/api/v1")
+        response = httpx.Response(429, request=httpx.Request("POST", "https://openrouter.ai/api/v1"))
+        advice = agent.failure_advice(openai.RateLimitError("429", response=response, body=None))
+        assert "LM Studio" not in advice and "rate-limited" in advice
+        assert "content filter" in agent.failure_advice(agent.ModelRefused("x"))
+        monkeypatch.setattr(agent, "BASE_URL", "http://localhost:1234/v1")
+        assert "LM Studio" in agent.failure_advice(RuntimeError("x"))
