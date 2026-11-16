@@ -1,0 +1,6 @@
+{
+ "sample": "sample.json",
+ "model": "qwen2.5-7b-instruct (Q4_K_M, LM Studio)",
+ "where": "local, no browsing",
+ "completed": "Completed 2026-11-10T18:16:34, 50 answers, 3.3 min."
+}

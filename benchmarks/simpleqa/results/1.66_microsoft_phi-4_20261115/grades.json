@@ -1,0 +1,172 @@
+{
+ "_grader": {
+  "note": "Claude (Master session), 2026-11-16, by hand against the reference answers with SimpleQA's three grades. One grader; judgement calls are noted. Not yet reviewed by the user."
+ },
+ "1": {
+  "grade": "CORRECT"
+ },
+ "2": {
+  "grade": "CORRECT"
+ },
+ "3": {
+  "grade": "CORRECT"
+ },
+ "4": {
+  "grade": "CORRECT"
+ },
+ "5": {
+  "grade": "CORRECT",
+  "note": "Judgement call: 'at the beginning of the Infinite Crisis storyline', citing Infinite Crisis vol. 1, no. 1 (reference Infinite Crisis #1)."
+ },
+ "6": {
+  "grade": "INCORRECT",
+  "note": "Says Lucien Gaudin (the 1921 World Championships' épée winner); reference Andrea Borella."
+ },
+ "7": {
+  "grade": "CORRECT"
+ },
+ "8": {
+  "grade": "CORRECT"
+ },
+ "9": {
+  "grade": "CORRECT"
+ },
+ "10": {
+  "grade": "CORRECT"
+ },
+ "11": {
+  "grade": "CORRECT"
+ },
+ "12": {
+  "grade": "CORRECT"
+ },
+ "13": {
+  "grade": "CORRECT"
+ },
+ "14": {
+  "grade": "CORRECT"
+ },
+ "15": {
+  "grade": "CORRECT",
+  "note": "'A' (reference A major)."
+ },
+ "16": {
+  "grade": "CORRECT"
+ },
+ "17": {
+  "grade": "CORRECT"
+ },
+ "18": {
+  "grade": "INCORRECT",
+  "note": "Says October 2016; reference December 2018. Same in every Phi-4 run."
+ },
+ "19": {
+  "grade": "CORRECT"
+ },
+ "20": {
+  "grade": "CORRECT"
+ },
+ "21": {
+  "grade": "CORRECT"
+ },
+ "22": {
+  "grade": "CORRECT"
+ },
+ "23": {
+  "grade": "CORRECT"
+ },
+ "24": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Judgement call: 'near Gulmarg in the Baramulla district' (true of Rambodh, but no village named); no contradiction."
+ },
+ "25": {
+  "grade": "CORRECT"
+ },
+ "26": {
+  "grade": "CORRECT"
+ },
+ "27": {
+  "grade": "CORRECT"
+ },
+ "28": {
+  "grade": "CORRECT"
+ },
+ "29": {
+  "grade": "CORRECT"
+ },
+ "30": {
+  "grade": "CORRECT",
+  "note": "1.06 (right)."
+ },
+ "31": {
+  "grade": "CORRECT"
+ },
+ "32": {
+  "grade": "CORRECT",
+  "note": "'Maneater' (right; not attempted in the two runs before)."
+ },
+ "33": {
+  "grade": "CORRECT"
+ },
+ "34": {
+  "grade": "CORRECT"
+ },
+ "35": {
+  "grade": "CORRECT"
+ },
+ "36": {
+  "grade": "CORRECT"
+ },
+ "37": {
+  "grade": "CORRECT"
+ },
+ "38": {
+  "grade": "CORRECT"
+ },
+ "39": {
+  "grade": "CORRECT"
+ },
+ "40": {
+  "grade": "CORRECT"
+ },
+ "41": {
+  "grade": "CORRECT"
+ },
+ "42": {
+  "grade": "INCORRECT",
+  "note": "Says founded 13 June 1853; reference 1761."
+ },
+ "43": {
+  "grade": "INCORRECT",
+  "note": "Judgement call: '33 or 34' (the page gives only the year 1873); SimpleQA grades a hedge between candidates as INCORRECT."
+ },
+ "44": {
+  "grade": "CORRECT"
+ },
+ "45": {
+  "grade": "CORRECT"
+ },
+ "46": {
+  "grade": "CORRECT"
+ },
+ "47": {
+  "grade": "CORRECT"
+ },
+ "48": {
+  "grade": "CORRECT"
+ },
+ "49": {
+  "grade": "CORRECT"
+ },
+ "50": {
+  "grade": "CORRECT"
+ },
+ "_summary": {
+  "correct": 45,
+  "incorrect": 4,
+  "not_attempted": 1,
+  "minutes": 28.6,
+  "model_calls": 634,
+  "model": "microsoft/phi-4 via OpenRouter, LocalAgentBrowser 1.66 (frozen, uncommitted), data run 2026-11-15 23:36 to 2026-11-16 00:05"
+ }
+}

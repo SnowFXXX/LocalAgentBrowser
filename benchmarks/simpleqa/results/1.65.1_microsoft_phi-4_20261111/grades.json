@@ -1,0 +1,179 @@
+{
+ "_grader": {
+  "note": "Claude (Master session), 2026-11-15, by hand against the reference answers with SimpleQA's three grades. One grader; judgement calls are noted. Not yet reviewed by the user."
+ },
+ "1": {
+  "grade": "CORRECT"
+ },
+ "2": {
+  "grade": "CORRECT"
+ },
+ "3": {
+  "grade": "CORRECT"
+ },
+ "4": {
+  "grade": "CORRECT"
+ },
+ "5": {
+  "grade": "CORRECT"
+ },
+ "6": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says the winner was not found."
+ },
+ "7": {
+  "grade": "CORRECT",
+  "note": "Georgia Bulldogs and Alabama Crimson Tide (right)."
+ },
+ "8": {
+  "grade": "CORRECT"
+ },
+ "9": {
+  "grade": "CORRECT"
+ },
+ "10": {
+  "grade": "CORRECT"
+ },
+ "11": {
+  "grade": "CORRECT"
+ },
+ "12": {
+  "grade": "CORRECT"
+ },
+ "13": {
+  "grade": "INCORRECT",
+  "note": "Says 2008; reference 2009."
+ },
+ "14": {
+  "grade": "CORRECT"
+ },
+ "15": {
+  "grade": "CORRECT",
+  "note": "'A major' (right)."
+ },
+ "16": {
+  "grade": "CORRECT"
+ },
+ "17": {
+  "grade": "CORRECT"
+ },
+ "18": {
+  "grade": "INCORRECT",
+  "note": "Says October 2016; reference December 2018."
+ },
+ "19": {
+  "grade": "CORRECT"
+ },
+ "20": {
+  "grade": "CORRECT"
+ },
+ "21": {
+  "grade": "CORRECT"
+ },
+ "22": {
+  "grade": "CORRECT"
+ },
+ "23": {
+  "grade": "CORRECT"
+ },
+ "24": {
+  "grade": "INCORRECT",
+  "note": "Says the village of Baba Reshi (Baramulla); reference Rambodh. Same Wikipedia wording as the 7B's."
+ },
+ "25": {
+  "grade": "CORRECT"
+ },
+ "26": {
+  "grade": "CORRECT"
+ },
+ "27": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Gives birth and death dates; the number check cut the age (80 and 81 were both in the draft)."
+ },
+ "28": {
+  "grade": "CORRECT",
+  "note": "Judgement call: gives 'Series 5, Episode 3' (right) but also says season and episode were not found."
+ },
+ "29": {
+  "grade": "INCORRECT",
+  "note": "Says M. Ravisankar; reference P. Dhanapal."
+ },
+ "30": {
+  "grade": "CORRECT",
+  "note": "Judgement call: says Version 1.06 (right), but its only support is a patch note that 'some magic effects have been revised'; it says the Hornet Ring detail was not found."
+ },
+ "31": {
+  "grade": "CORRECT"
+ },
+ "32": {
+  "grade": "INCORRECT",
+  "note": "Says 'Fool's Idol'; reference 'Maneater'."
+ },
+ "33": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Gives the dates; the number check cut the length (161 days was in the draft)."
+ },
+ "34": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says the number was not found."
+ },
+ "35": {
+  "grade": "CORRECT"
+ },
+ "36": {
+  "grade": "CORRECT"
+ },
+ "37": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says the release date was not found."
+ },
+ "38": {
+  "grade": "CORRECT"
+ },
+ "39": {
+  "grade": "CORRECT"
+ },
+ "40": {
+  "grade": "CORRECT"
+ },
+ "41": {
+  "grade": "CORRECT"
+ },
+ "42": {
+  "grade": "INCORRECT",
+  "note": "Says 1582 (an earlier town, San Andrés de Cauca); reference 1761."
+ },
+ "43": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Gives birth date and 1873; the number check cut the age 34 (right)."
+ },
+ "44": {
+  "grade": "CORRECT"
+ },
+ "45": {
+  "grade": "CORRECT"
+ },
+ "46": {
+  "grade": "CORRECT"
+ },
+ "47": {
+  "grade": "CORRECT"
+ },
+ "48": {
+  "grade": "CORRECT"
+ },
+ "49": {
+  "grade": "CORRECT"
+ },
+ "50": {
+  "grade": "CORRECT"
+ },
+ "_summary": {
+  "correct": 38,
+  "incorrect": 6,
+  "not_attempted": 6,
+  "minutes": 28.4,
+  "cost_usd": 0.1205,
+  "model": "microsoft/phi-4 via OpenRouter (DeepInfra), LocalAgentBrowser 1.65.1"
+ }
+}

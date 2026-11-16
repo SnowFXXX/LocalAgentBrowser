@@ -68,7 +68,7 @@ where a fix below says so.
   "Recommendation" heading rather than "My view:".
 - 50 SimpleQA questions on Phi-4 (the same 50 as before): 45 correct (90%), 4 wrong, 1 not answered, in 28.6 minutes
   and 634 model calls, for $0.13; on 1.65.1 the same model answered 38 and 39, and alone, with no browsing, 1. Graded
-  by hand against SimpleQA's answers, one grader. Of the 4 wrong, 2 give what the page read says (a news page's
+  by Claude against SimpleQA's reference answers, one question at a time; the author is reviewing the judgement calls. Of the 4 wrong, 2 give what the page read says (a news page's
   date, in every run, and a founding date that differs from SimpleQA's answer key); 1 is "33 or 34" for an age where
   only the year of the second date is given, which SimpleQA counts as wrong; and 1 is a finding the checks should
   have refused: Phi-4 recorded that Lucien Gaudin won the men's foil in 1921, from a page that lists him only for

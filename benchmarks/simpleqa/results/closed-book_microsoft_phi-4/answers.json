@@ -1,0 +1,357 @@
+{
+ "model": "microsoft/phi-4",
+ "system_prompt": "Answer the question with a short, direct answer. If you are not sure of the answer, say \"I don't know\" instead of guessing.",
+ "temperature": 0,
+ "results": [
+  {
+   "n": 1,
+   "problem": "Who won the Gerard P. Kuiper Prize in 2001?",
+   "reference": "Bruce W. Hapke",
+   "answer": "The Gerard P. Kuiper Prize in 2001 was awarded to David Jewitt and Jane Luu.",
+   "seconds": 0.7
+  },
+  {
+   "n": 2,
+   "problem": "How many original artworks were shown in the Society of Illustrators' first \"Annual Exhibition\"?",
+   "reference": "350",
+   "answer": "The Society of Illustrators' first \"Annual Exhibition\" in 1901 featured 1,200 original artworks.",
+   "seconds": 0.5
+  },
+  {
+   "n": 3,
+   "problem": "From which dealer's shop did the Florentine authorities buy the \"Pitti Tondo\" in 1823?",
+   "reference": "Fedele Acciai",
+   "answer": "The Florentine authorities bought the \"Pitti Tondo\" from the dealer Giuseppe Pelli Bencivenni in 1823.",
+   "seconds": 0.5
+  },
+  {
+   "n": 4,
+   "problem": "What is the surname of the individual who won the Gordon E. Moore Medal, an award given yearly by the Society of Chemical Industry to someone who has displayed early career success involving innovation in chemical industries, in 2006?",
+   "reference": "Jonathan M. McConnachie",
+   "answer": "I don't know the surname of the individual who won the Gordon E. Moore Medal in 2006.",
+   "seconds": 0.6
+  },
+  {
+   "n": 5,
+   "problem": "In which specific issue did Black Condor II perish?",
+   "reference": "Infinite Crisis #1",
+   "answer": "Black Condor II perished in \"All-Star Squadron\" #25, published in 1984.",
+   "seconds": 0.5
+  },
+  {
+   "n": 6,
+   "problem": "Who won the gold medal in men's foil at the first European Fencing Championships?",
+   "reference": "Andrea Borella",
+   "answer": "The first European Fencing Championships were held in 1910. The gold medal in men's foil was won by Philippe Cattiau of France.",
+   "seconds": 0.7
+  },
+  {
+   "n": 7,
+   "problem": "What two football teams were mentioned in the libel case against \"The Saturday Evening Post\" in 1963?",
+   "reference": "University of Georgia and University of Alabama",
+   "answer": "The two football teams mentioned in the libel case against \"The Saturday Evening Post\" in 1963 were the Green Bay Packers and the New York Giants.",
+   "seconds": 0.6
+  },
+  {
+   "n": 8,
+   "problem": "In 1993, Vaughan Jones was elected to which academy?",
+   "reference": " American Academy of Arts and Science.",
+   "answer": "In 1993, Vaughan Jones was elected to the Royal Society.",
+   "seconds": 0.5
+  },
+  {
+   "n": 9,
+   "problem": "The superfamily Nematocarcinoidea is part of what infraorder?",
+   "reference": "Caridea",
+   "answer": "The superfamily Nematocarcinoidea is part of the infraorder Nematocarcoidea.",
+   "seconds": 1.6
+  },
+  {
+   "n": 10,
+   "problem": "What day, month, and year was Rosa Whitaker Day proclaimed by Rep. Charles Rangel?",
+   "reference": "July 9, 2016",
+   "answer": "Rosa Whitaker Day was proclaimed by Rep. Charles Rangel on February 27, 2007.",
+   "seconds": 0.5
+  },
+  {
+   "n": 11,
+   "problem": "Which president had a meeting with Kwame Nkrumah right before the Kulungugu bomb attack?",
+   "reference": "Maurice Yameogo",
+   "answer": "I don't know. The specific details of which U.S. president met with Kwame Nkrumah right before the Kulungugu bomb attack are not widely documented in available sources.",
+   "seconds": 0.7
+  },
+  {
+   "n": 12,
+   "problem": "What is the surname of the individual who won the Victor A. Prather Award in 1968?",
+   "reference": "Forbes",
+   "answer": "I don't know the surname of the individual who won the Victor A. Prather Award in 1968.",
+   "seconds": 0.5
+  },
+  {
+   "n": 13,
+   "problem": "In which year did Maryam Mirzakhani (an Iranian mathematician) become a professor at Stanford University?",
+   "reference": "2009",
+   "answer": "Maryam Mirzakhani became a professor at Stanford University in 2008.",
+   "seconds": 0.4
+  },
+  {
+   "n": 14,
+   "problem": "On what day, month, and year did Taiwanese conductor and violinist Felix Chen die?",
+   "reference": "April 9, 2018",
+   "answer": "I don't know the exact date of Felix Chen's death.",
+   "seconds": 0.4
+  },
+  {
+   "n": 15,
+   "problem": "What key signature was \"Sing Out\" by Ron Kenoly recorded in?",
+   "reference": "A Major",
+   "answer": "I don't know the key signature in which \"Sing Out\" by Ron Kenoly was recorded.",
+   "seconds": 0.5
+  },
+  {
+   "n": 16,
+   "problem": "Who wrote the drama \"HUM KAHAN K SACHAY THAY\"? In which year and month was it released?",
+   "reference": "Umera Ahmad, 2021, August",
+   "answer": "The drama \"Hum Kahan Kahan Se Aaye Thay\" was written by Gulzar. It was released in 1977.",
+   "seconds": 0.6
+  },
+  {
+   "n": 17,
+   "problem": "In what year did the physicist Alexei Abrikosov win the Fritz London Prize?",
+   "reference": "1972",
+   "answer": "Alexei Abrikosov won the Fritz London Prize in 1991.",
+   "seconds": 0.5
+  },
+  {
+   "n": 18,
+   "problem": "Which month and year was ex-president of Ghana, J.J. Rawlings enstooled as Togbuiga Nutifafa I of Anlo?",
+   "reference": "December 2018",
+   "answer": "J.J. Rawlings was enstooled as Togbuiga Nutifafa I of Anlo in November 2007.",
+   "seconds": 0.5
+  },
+  {
+   "n": 19,
+   "problem": "The pulsar PSR J0437−4715 is located in which constellation?",
+   "reference": "Pictor",
+   "answer": "The pulsar PSR J0437−4715 is located in the constellation of Gemini.",
+   "seconds": 0.8
+  },
+  {
+   "n": 20,
+   "problem": "In what month and year was the Azad Kashmir Plebiscite Front formed in Muzaffarabad?",
+   "reference": "April 1965",
+   "answer": "The Azad Kashmir Plebiscite Front was formed in April 1948.",
+   "seconds": 0.5
+  },
+  {
+   "n": 21,
+   "problem": "Where was the first Battle of the Nations tournament held?",
+   "reference": "Khotyn Fortress, Ukraine",
+   "answer": "The first Battle of the Nations tournament was held in Leipzig, Germany, in 1999.",
+   "seconds": 0.4
+  },
+  {
+   "n": 22,
+   "problem": "What is the name of Nobita Nobi's paternal grandfather?",
+   "reference": "Nobiru Nobi",
+   "answer": "Nobita Nobi's paternal grandfather is named Nobisuke Nobi.",
+   "seconds": 0.4
+  },
+  {
+   "n": 23,
+   "problem": "What day, month, and year did the Christchurch, New Zealand, real estate agent Yanfei Bao go missing?",
+   "reference": "19 of July of 2023",
+   "answer": "I don't know the specific day, month, and year when Yanfei Bao went missing.",
+   "seconds": 0.5
+  },
+  {
+   "n": 24,
+   "problem": "In which village is Bab Reshi Shrine located in Jammu & Kashmir?",
+   "reference": "Rambodh Village",
+   "answer": "The Bab Reshi Shrine is located in the village of Reshipora in the Kulgam district of Jammu & Kashmir.",
+   "seconds": 0.6
+  },
+  {
+   "n": 25,
+   "problem": "What is the surname of the individual who won the Victor A. Prather Award in 1992?",
+   "reference": "Sullivan",
+   "answer": "I don't know the surname of the individual who won the Victor A. Prather Award in 1992.",
+   "seconds": 0.5
+  },
+  {
+   "n": 26,
+   "problem": "What year did Ollie Johnston sell his locomotive named Marie E.?",
+   "reference": "1993",
+   "answer": "I don't know the specific year Ollie Johnston sold his locomotive named Marie E.",
+   "seconds": 0.5
+  },
+  {
+   "n": 27,
+   "problem": "How old was the Brazilian physicist Cesar Lattes when he died?",
+   "reference": "80",
+   "answer": "César Lattes was 75 years old when he died. He was born on December 11, 1924, and passed away on February 8, 2000.",
+   "seconds": 0.6
+  },
+  {
+   "n": 28,
+   "problem": "In which season and episode of Peaky Blinders does Thomas smash a nun's glasses?",
+   "reference": "Season 5, Episode 3.",
+   "answer": "Thomas Shelby smashes a nun's glasses in Season 3, Episode 1 of Peaky Blinders.",
+   "seconds": 1.2
+  },
+  {
+   "n": 29,
+   "problem": "Who was the Deputy Speaker of the Tamil Nadu Legislative Assembly when D. Jayakumar was the Speaker during 2011-2012?",
+   "reference": "P. Dhanapal",
+   "answer": "During 2011-2012, when D. Jayakumar was the Speaker of the Tamil Nadu Legislative Assembly, the Deputy Speaker was P. H. Pandian.",
+   "seconds": 0.7
+  },
+  {
+   "n": 30,
+   "problem": "Which patch for the original Dark Souls reduced the effectiveness of the Hornet Ring?",
+   "reference": "1.06",
+   "answer": "Patch 1.04 for the original Dark Souls reduced the effectiveness of the Hornet Ring.",
+   "seconds": 1.0
+  },
+  {
+   "n": 31,
+   "problem": "Who was the coach of Eintracht Frankfurt in 1970?",
+   "reference": "Erich Ribbeck",
+   "answer": "In 1970, the coach of Eintracht Frankfurt was Helmut Schneider.",
+   "seconds": 0.5
+  },
+  {
+   "n": 32,
+   "problem": "What is the 14th song on the official Demon's Souls soundtrack CD released in 2009?",
+   "reference": "Maneater",
+   "answer": "The 14th song on the official Demon's Souls soundtrack CD released in 2009 is \"The First Steps.\"",
+   "seconds": 0.8
+  },
+  {
+   "n": 33,
+   "problem": "What was the length of Prafullachandra Natwarlal Bhagwati's tenure as the Chief Justice of India, in years and days?",
+   "reference": "1 year, 161 days",
+   "answer": "Prafullachandra Natwarlal Bhagwati served as the Chief Justice of India from July 12, 1985, to December 20, 1986. His tenure lasted 1 year and 162 days.",
+   "seconds": 0.7
+  },
+  {
+   "n": 34,
+   "problem": "In September 2022, biologists reported what number of Devils Hole Pupfish in Devils Hole, the most they'd observed in 19 years?",
+   "reference": "263.",
+   "answer": "In September 2022, biologists reported 35 Devils Hole Pupfish in Devils Hole, the most they had observed in 19 years.",
+   "seconds": 0.7
+  },
+  {
+   "n": 35,
+   "problem": "What day, month, and year did the singer and actress Vanessa Hudgens marry Cole Tucker?",
+   "reference": " 2 December 2023",
+   "answer": "I don't know the exact date of Vanessa Hudgens' marriage to Cole Tucker.",
+   "seconds": 0.7
+  },
+  {
+   "n": 36,
+   "problem": "What is the maximum width of Gangabal Lake in kilometers?",
+   "reference": "1 km",
+   "answer": "I don't know the exact maximum width of Gangabal Lake in kilometers.",
+   "seconds": 0.4
+  },
+  {
+   "n": 37,
+   "problem": "When, as in day, month, and year, was \"Stolen Mic's Dumb Kid\" released?",
+   "reference": "Dec 8, 2020",
+   "answer": "I don't know the release date of \"Stolen Mic's Dumb Kid.\"",
+   "seconds": 0.4
+  },
+  {
+   "n": 38,
+   "problem": "What was the name of the winner of the 1995 Scandinavian Masters golf tournament?",
+   "reference": "Jesper Parnevik",
+   "answer": "I don't know the name of the winner of the 1995 Scandinavian Masters golf tournament.",
+   "seconds": 0.5
+  },
+  {
+   "n": 39,
+   "problem": "What EP did Rosalía release in 2019?",
+   "reference": "Fucking Money Man",
+   "answer": "Rosalía released the EP \"El Mal Querer\" in 2018, but in 2019, she released the EP \"Con Altura\" featuring J Balvin.",
+   "seconds": 0.9
+  },
+  {
+   "n": 40,
+   "problem": "From which high school in Michigan did Dan Kloeffler graduate in 1994?",
+   "reference": "Algonac High School",
+   "answer": "I don't know which high school in Michigan Dan Kloeffler graduated from in 1994.",
+   "seconds": 0.5
+  },
+  {
+   "n": 41,
+   "problem": "What month, date, and year did Ana Hamilton first appear in Genoa City?",
+   "reference": "June 25, 2008",
+   "answer": "Ana Hamilton first appeared in Genoa City on March 1, 2011.",
+   "seconds": 0.6
+  },
+  {
+   "n": 42,
+   "problem": "What year was the municipality of San Andrés de Cuerquia, Antioquia, Colombia, founded?",
+   "reference": "1761",
+   "answer": "The municipality of San Andrés de Cuerquia, Antioquia, Colombia, was founded in 1777.",
+   "seconds": 0.5
+  },
+  {
+   "n": 43,
+   "problem": "How old was the American mathematician Josiah Willard Gibbs when he published his first work?",
+   "reference": "34",
+   "answer": "Josiah Willard Gibbs was 25 years old when he published his first work, \"On the Form of the Surface of the Liquid in Equilibrium with Its Vapor,\" in 1873.",
+   "seconds": 0.6
+  },
+  {
+   "n": 44,
+   "problem": "What is the Glottolog language code of the Aralle-Tabulahan language?",
+   "reference": "aral1243",
+   "answer": "The Glottolog language code for the Aralle-Tabulahan language is \"aral1240\".",
+   "seconds": 0.5
+  },
+  {
+   "n": 45,
+   "problem": "How many children did Welsh journalist Sir Trevor Maldwyn Evans have with his wife, Margaret?",
+   "reference": "2",
+   "answer": "I don't know how many children Sir Trevor Maldwyn Evans had with his wife, Margaret.",
+   "seconds": 0.4
+  },
+  {
+   "n": 46,
+   "problem": "How many operators does the oscillator of the Yamaha SHS-10 (1987) have?",
+   "reference": "2",
+   "answer": "The Yamaha SHS-10 has 2 operators.",
+   "seconds": 0.4
+  },
+  {
+   "n": 47,
+   "problem": "How many prints of Samuel Buckle, the early English photographer, did Sir Albert buy in 1854?",
+   "reference": "9",
+   "answer": "I don't know. There is no widely available information about Samuel Buckle, the early English photographer, or any specific transaction involving Sir Albert in 1854.",
+   "seconds": 0.9
+  },
+  {
+   "n": 48,
+   "problem": "What was the final score on February 6, 2022, in the rugby match between Georgia and Portugal that was part of the 2022 Rugby Europe Championship?",
+   "reference": "Geogia 25 - 25 Portugal",
+   "answer": "The final score of the rugby match between Georgia and Portugal on February 6, 2022, was Georgia 45, Portugal 7.",
+   "seconds": 0.5
+  },
+  {
+   "n": 49,
+   "problem": "What year was the Briggs & Stratton Raptor III engine released?",
+   "reference": "1995",
+   "answer": "The Briggs & Stratton Raptor III engine was released in 2006.",
+   "seconds": 0.6
+  },
+  {
+   "n": 50,
+   "problem": "How much (in USD) was Frida's self-portrait with loose hair sold for in an auction by Christie's, New York, in May of 1991?",
+   "reference": "1.65 million",
+   "answer": "Frida Kahlo's \"Self-Portrait with Loose Hair\" was sold for $1,546,500 at an auction by Christie's, New York, in May 1991.",
+   "seconds": 0.7
+  }
+ ]
+}

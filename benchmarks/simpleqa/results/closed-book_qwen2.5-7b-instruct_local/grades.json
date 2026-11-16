@@ -1,0 +1,205 @@
+{
+ "_grader": {
+  "note": "Claude (Master session), 2026-11-10, by hand against the references with SimpleQA's three grades. No answer was correct; every \"I don't know\" is NOT_ATTEMPTED; every other answer is INCORRECT. Not yet reviewed by the user."
+ },
+ "1": {
+  "grade": "INCORRECT",
+  "note": "Says Mike Brown."
+ },
+ "7": {
+  "grade": "INCORRECT",
+  "note": "Says Green Bay Packers and Cleveland Browns."
+ },
+ "8": {
+  "grade": "INCORRECT",
+  "note": "Says Royal Society."
+ },
+ "13": {
+  "grade": "INCORRECT",
+  "note": "Says 2008."
+ },
+ "14": {
+  "grade": "INCORRECT",
+  "note": "Says February 24, 2015."
+ },
+ "19": {
+  "grade": "INCORRECT",
+  "note": "Says Puppis."
+ },
+ "20": {
+  "grade": "INCORRECT",
+  "note": "Says October 1965."
+ },
+ "24": {
+  "grade": "INCORRECT",
+  "note": "Says village of Breshi."
+ },
+ "27": {
+  "grade": "INCORRECT",
+  "note": "Says 71."
+ },
+ "34": {
+  "grade": "INCORRECT",
+  "note": "Says 568."
+ },
+ "35": {
+  "grade": "INCORRECT",
+  "note": "Says July 13, 2019."
+ },
+ "39": {
+  "grade": "INCORRECT",
+  "note": "Says Histrionic."
+ },
+ "48": {
+  "grade": "INCORRECT",
+  "note": "Says Georgia won 31-7."
+ },
+ "2": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "3": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "4": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "5": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "6": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "9": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "10": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "11": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "12": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "15": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "16": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "17": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "18": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "21": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "22": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "23": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "25": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "26": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "28": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "29": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "30": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "31": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "32": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "33": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "36": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "37": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "38": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "40": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "41": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "42": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "43": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "44": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "45": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "46": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "47": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "49": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ },
+ "50": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it doesn't know."
+ }
+}

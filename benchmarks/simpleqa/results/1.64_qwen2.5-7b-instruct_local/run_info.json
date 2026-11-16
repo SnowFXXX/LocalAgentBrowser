@@ -1,0 +1,7 @@
+{
+ "sample": "sample.json",
+ "model": "qwen2.5-7b-instruct (Q4_K_M, LM Studio)",
+ "where": "local, CPU only (Intel i5-9500, no GPU), two PCs sharing the questions",
+ "version": "1.64",
+ "completed": "Completed 2026-11-10T13:24:18, attempt 2, 50 of 50 with a final result."
+}

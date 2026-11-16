@@ -1,2 +1,5 @@
 data/
 runs/
+results/*/q*/console.txt
+results/*/q*/prompt_trace.txt
+results/*/q*/research_log.txt

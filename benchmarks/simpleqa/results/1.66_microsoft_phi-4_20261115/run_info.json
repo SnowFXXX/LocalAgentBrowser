@@ -1,0 +1,6 @@
+{
+ "sample": "sample.json",
+ "model": "microsoft/phi-4 on OpenRouter",
+ "version": "1.66",
+ "completed": "done"
+}
