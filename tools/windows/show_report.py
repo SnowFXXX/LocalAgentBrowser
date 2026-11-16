@@ -8,6 +8,7 @@ import html
 import os
 import re
 import sys
+import time
 import webbrowser
 
 PAGE = """<!doctype html>
@@ -147,8 +148,29 @@ def main(folder):
     page = os.path.join(folder, "research_report.html")
     with open(page, "w", encoding="utf-8") as f:
         f.write(PAGE.format(body=body, source=html.escape(report)))
+    # Side by side (localagentbrowser/windows.py): the console, in front now, stays on the left half, and the browser
+    # window the report opens in, which comes to the front, goes to the right half
+    side = side_by_side()
+    if side:
+        side.console_window()
     webbrowser.open("file:///" + page.replace("\\", "/"))
+    if side:
+        time.sleep(REPORT_WINDOW_WAIT)
+        side.place_foreground_right()
     return 0
+
+
+REPORT_WINDOW_WAIT = 2.5  # Seconds for the browser to open the report and come to the front
+
+
+def side_by_side():
+    """The window-placing module from the program folder, when side-by-side windows apply; None otherwise."""
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    try:
+        from localagentbrowser import windows
+    except Exception:
+        return None
+    return windows if windows.enabled() else None
 
 
 if __name__ == "__main__":

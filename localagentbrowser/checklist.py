@@ -43,6 +43,8 @@ def checklist_lines(checklist):
 def every_item_has_discoveries(checklist):
     """Whether each item to find has at least the discoveries it asks for: one, or the number it names."""
     items = [item for item in checklist or [] if not OPINION_REQUEST.search(item["text"])]
+    if any(item.get("unanswered") for item in items):
+        return False
     needed = [asked_count(item["text"]) or 1 for item in items]
     # As many different discoveries as the items ask for in all: on 1.53 one overview paragraph was linked to all four
     # items of an explanation, and finishing from it gave a thin result
@@ -66,7 +68,7 @@ def after_discovery_advice(checklist):
 def open_items(checklist):
     """The checklist items nothing has been recorded for yet (opinions are written at FINISH), as one line for prompts."""
     return "; ".join(f"{n}. {item['text']}" for n, item in enumerate(checklist or [], 1)
-                     if not item["discoveries"] and not OPINION_REQUEST.search(item["text"]))
+                     if (not item["discoveries"] or item.get("unanswered")) and not OPINION_REQUEST.search(item["text"]))
 
 def link_discovery(checklist, items, number):
     """Records which checklist items a new discovery serves, as the model named them; returns the valid ones."""
@@ -75,6 +77,7 @@ def link_discovery(checklist, items, number):
         if isinstance(item, int) and not isinstance(item, bool) and 1 <= item <= len(checklist or []) and item not in linked:
             linked.append(item)
             checklist[item - 1]["discoveries"].append(number)
+            checklist[item - 1].pop("unanswered", None)  # A new discovery for it is checked again at FINISH
     return linked
 
 def check_parts(tried):
