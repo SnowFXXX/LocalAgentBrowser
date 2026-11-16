@@ -35,12 +35,14 @@ The code is in the `localagentbrowser` package, one file per job, each depending
 | `config.py` | Settings: the model server connection, LM Studio or a cloud model (from environment variables), and every limit and threshold |
 | `prompts.py` | Every fixed text the model reads: the system prompt, turn instructions, the checklist, coverage and final-result prompts |
 | `text.py` | Small word helpers the checks share |
+| `dates.py` | Dates and year spans in findings, so the code works out "how many years" itself instead of trusting the model's arithmetic |
 | `pages.py` | Reading the web: search results, page parts, the outline and its pointer, links |
 | `grounding.py` | Whether a finding is really on the page shown, or already recorded |
 | `checklist.py` | The objective split into a fixed checklist, and findings linked to its items |
 | `coverage.py` | The coverage check before finishing, verified in code, and what is reported as not found or not proven |
 | `checks.py` | Decisions refused or confirmed before they are carried out (leaving, reading on, finishing, ...) |
 | `report.py` | The journal, the research log, the final result and the report file |
+| `windows.py` | On Windows, placing the console and the browser side by side, and the report beside the console |
 | `agent.py` | The loop: each turn's conversation with the model, in-turn retries, and `main()` |
 
 `agent_browser.py` keeps `python agent_browser.py` working from a clone. The Windows installer is built from
@@ -102,6 +104,15 @@ The code is in the `localagentbrowser` package, one file per job, each depending
   it after the result if the result does not name it. The report flags any number in the final result that appears in
   none of the findings, the most harmful kind of slip in a how-to.
 - **Error pages are recognised.** A page answering 404, 403 and so on counts as a failed visit, not content.
+- **Sites that refuse, visited once.** A site that answers with a bot check or a 401, 403 or 429 is noted, and the
+  agent is not let back on it in the same run; its results are left out of later searches, as are sites' own search
+  pages.
+- **Code decides, where wording stopped helping (1.66).** A search result is refused while another result on the
+  same site is the page for the thing the question names, told apart by a bracketed word in its address (a
+  tournament, not the 1813 battle of the same name), until that page has been opened. Leaving a page is refused, at
+  most twice, while an unread part of it gives a name the objective asks about. "How many years" is worked out in
+  code from the dated findings. An install command the model read on a page is recorded by the code when the model
+  leaves it out. A final result that repeats the prompt or its own sections is trimmed before it is checked.
 - **Readable pages.** Navigation menus, footers, cookie banners and site notices such as fundraising banners are
   hidden; code blocks and tables are
   never split between parts; links already shown are not repeated. Long pages come with an outline of the
@@ -161,6 +172,10 @@ and the explanation 13 to 59. A whole suite of seven tasks took 171 to 272 minut
   minutes, but with thin findings and without naming what it could not find, so check the result against the
   objective. Since 1.57 the code lists checklist items no finding answers after the result; this has not been
   tested on a strict objective yet.
+- **Right page, wrong sentence.** A finding is checked against the page, not against the question: on 1.66 Gemma 3 4B
+  gave a glacier's elevation (3,200 m) as Kilimanjaro's height, and in a SimpleQA run Phi-4 credited a fencer with
+  foil when the page lists him only for épée. Both lines were on a real page; no check yet asks whether the key
+  word matches.
 - **Check the citations.** The final result is told to use only recorded findings, but a 7B model sometimes
   puts the wrong number on a citation, adds a line no finding supports, leaves out a step or misreads a part of
   the question (on 1.57 it answered "how long it keeps in the fridge" with the steeping time), so verify a claim
@@ -170,9 +185,9 @@ and the explanation 13 to 59. A whole suite of seven tasks took 171 to 272 minut
 - **Reading only.** The agent searches, opens pages and reads them. It does not click, fill in forms or sign in.
 - **Web pages go into the prompt.** A page can contain text written to manipulate the model (prompt
   injection), so treat findings as unverified. See [SECURITY.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/SECURITY.md).
-- **Cloud models have one suite run each.** They run the same code and checks. On five cloud models (Phi-4,
-  GPT-4o-mini, Llama 3.1 8B, Qwen 2.5 72B, Gemma 3 4B) the suite finished 7 of 7 on four and 6 of 7 on Gemma, with no
-  gaps filled from the model's own knowledge by the suite's measures. An earlier run on `qwen/qwen-2.5-7b-instruct`
+- **Cloud models have one suite run each.** They run the same code and checks. On 1.66 four cloud models (Phi-4,
+  GPT-4o-mini, Llama 3.1 8B, Gemma 3 4B) each finished 7 of 7, with no gaps filled from the model's own knowledge by
+  the suite's measures (on 1.65, Gemma finished 6 of 7 and Qwen 2.5 72B 7 of 7). An earlier run on `qwen/qwen-2.5-7b-instruct`
   (7 of 7) found its documentation answer came from a tutorial, not the official docs it was asked for. Every other
   measurement here is with a local model in LM Studio.
 - **One search provider.** DuckDuckGo's HTML search occasionally returns an error page; the agent retries once.

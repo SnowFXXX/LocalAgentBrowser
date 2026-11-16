@@ -1,10 +1,11 @@
 """Decisions refused or confirmed before they are carried out (leaving, reading on, re-reading, finishing, repeated
 searches, discoveries not on the page) and the notes that go with them."""
 import re
+import urllib.parse
 from .config import GAP_REFUSAL_LIMIT, LONG_PAGE_UNREAD, MAX_CHECK_DISCOVERY_CHARS, MAX_VISITS_PER_URL, OBJECTIVE_ECHO_SHARE
 from .prompts import FINAL_RESULT, GIVE_UP_RULE
-from .text import MISSING_STOPWORDS, shorten
-from .pages import blocked_site, determine_url, is_search_page, normalize_query, normalize_url, outline_pointer, read_more_target, search_query, where_you_are
+from .text import MISSING_STOPWORDS, plain_words, shorten
+from .pages import blocked_site, refusing_site, site_of, site_search_page, determine_url, is_search_page, normalize_query, normalize_url, outline_pointer, read_more_target, search_query, where_you_are
 from .grounding import DESCRIBES_PAGE, discovery_lines, grounded_share, grounding_check, is_known_discovery, page_hint
 from .checklist import check_parts, every_item_has_discoveries, open_items
 
@@ -69,6 +70,52 @@ def is_snippet_discovery(parameter, page_state):
     """True when every line of a discovery, URL lines aside, is a title or description from a results page."""
     lines = content_lines(parameter)
     return bool(lines) and lines <= discovery_lines("\n".join(page_state.get("snippets", ())))
+
+# A name the objective gives: two or more capitalized words in a row ("Rosa Whitaker Day", "Rep. Charles Rangel"),
+# with small joining words inside ("Battle of the Nations")
+NAME_RUN = re.compile(r"[A-Z][\w'’.-]*(?:\s+(?:(?:of|the|de|del|da|von|van|and|&)\s+)*[A-Z][\w'’.-]*)+")
+MATCHING_PART_REFUSALS = 2  # Leaving is refused this many times per page, then allowed: a check never traps a run
+
+def objective_names(objective):
+    """The names in the objective, every run of two or more of their words, longest first."""
+    names = set()
+    for run in NAME_RUN.findall(str(objective)):
+        words = run.split()
+        for size in range(len(words), 1, -1):
+            for start in range(len(words) - size + 1):
+                names.add(" ".join(words[start:start + size]).strip(".,'’"))
+    return sorted(names, key=len, reverse=True)
+
+def matching_part(objective, page_state):
+    """(part number, name) for an unread part of the page that gives a name from the objective which the parts read so
+    far do not, or None.
+
+    Phi-4 opened the Rosa Whitaker article for "What day, month, and year was Rosa Whitaker Day proclaimed ...", read
+    its first part, said the page "does not contain any direct information about the proclamation", and left; "Rosa
+    Whitaker Day ... July 9, 2016" was further down, under "Awards and recognition". It found the date on a copy of
+    the article 74 turns later."""
+    parts = page_state.get("parts") or []
+    seen = page_state.get("seen_parts", {0})
+    shown = " ".join(" ".join(parts[k].split()) for k in seen if k < len(parts)).lower()
+    for name in objective_names(objective):
+        if name.lower() in shown:
+            continue
+        for k, part in enumerate(parts):
+            if k not in seen and name.lower() in " ".join(part.split()).lower():
+                return k, name
+    return None
+
+def matching_part_check(action, objective, page_state, current_url):
+    """Refuses leaving a page while an unread part of it gives a name the objective asks about, at most twice per page."""
+    on_page = current_url and page_state.get("url") == normalize_url(current_url) and page_state.get("parts")
+    if not on_page or is_search_page(current_url) or page_state.get("matching_refusals", 0) >= MATCHING_PART_REFUSALS:
+        return None
+    match = matching_part(objective, page_state)
+    if not match:
+        return None
+    page_state["matching_refusals"] = page_state.get("matching_refusals", 0) + 1
+    return "BLOCKED_LEAVE", (f"Part {match[0] + 1} of this page gives '{match[1]}', which the OBJECTIVE names and the parts "
+                             f"you have read do not. READ_MORE {match[0] + 1} before you {action}.")
 
 def leave_check(action, page_state, current_url, journal=()):
     # The model often left content pages without recording what it needed from them. The first attempt to
@@ -151,6 +198,43 @@ def gap_check(thought, tried):
             "that part, for example with a SEARCH aimed at it. Only if you have already looked for it without success, "
             "FINISH and say in the final result what could not be found.")
 
+QUALIFIER = re.compile(r"\(([^()]{2,60})\)")
+
+def qualifier_of(url):
+    """The words a page's name is told apart by, in brackets in its address, as an encyclopedia names things that
+    share a name: .../wiki/Battle_of_the_Nations_(modern_tournament). Brackets in titles are not used: replayed on
+    176 choices of a result, "(Annual)", "(2009)" and "(List of Award Winners and Nominees)" would have asked 14 times
+    where only one choice was wrong."""
+    path = urllib.parse.unquote(urllib.parse.urlparse(url).path).replace("_", " ")
+    return {w for q in QUALIFIER.findall(path) for w in plain_words(q) if len(w) > 3 and not w.isdigit()}
+
+def same_name_check(tried, results, target):
+    """Refuses opening a result while another result on the same site is the page for the thing the question names,
+    told apart by a bracketed word the question uses, until that page has been opened. q21 asked where the first
+    Battle of the Nations "tournament" was held; the results listed "Battle of the Nations (modern tournament)", and
+    Phi-4 opened "Battle of Leipzig", the 1813 battle also called the Battle of the Nations, and answered with it.
+    Asked whether it was sure (a repeat would have gone ahead), it repeated the NAVIGATE and answered "Leipzig, 1813"
+    again, so a question is not enough. Once the named page has been opened, any page may be."""
+    visited = {normalize_url(u) for u in tried.get("urls") or []}
+    question = set(plain_words(tried.get("objective", "")))
+    chosen = next(((t, u) for t, u in results if normalize_url(u) == target), None)
+    if not chosen:
+        return None
+    chosen_words = set(plain_words(f"{chosen[0]} {urllib.parse.unquote(chosen[1])}"))
+    for i, (title, url) in enumerate(results, start=1):
+        # Same site only: on one encyclopedia two pages for one name are two things; another site may be about the
+        # very thing (the local 7B's q21 opened the tournament's own site, rightly)
+        if normalize_url(url) == target or urllib.parse.urlparse(url).netloc != urllib.parse.urlparse(chosen[1]).netloc \
+                or normalize_url(url) in visited:
+            continue
+        named = sorted((qualifier_of(url) & question) - chosen_words)
+        if named:
+            return "BLOCKED_SAME_NAME", (f"The OBJECTIVE asks about '{named[0]}', and result [{i}] '{shorten(title, 80)}' "
+                                         f"({url}) is the page for that one: its name is told apart by '{named[0]}'. "
+                                         "The page you chose does not say it, so it is likely about something else with "
+                                         f"the same name. NAVIGATE to result [{i}] first; after that you may open any page.")
+    return None
+
 def check_decision(action, parameter, journal, tried, page_state, current_url, thought=""):
     """Refusals that can be decided before acting. Returns (journal action, reason), or None if the decision may proceed."""
     if action == "SEARCH":
@@ -195,6 +279,16 @@ def check_decision(action, parameter, journal, tried, page_state, current_url, t
             return "BLOCKED_NAVIGATE", (f"'{shorten(address, 60)}' is not a URL. NAVIGATE needs a full URL from a link "
                                         "or a search result (such as https://example.org/page); to look something up, "
                                         "use SEARCH.")
+        if site_search_page(determine_url(action, parameter)):
+            return "BLOCKED_NAVIGATE", (f"That address is {site_of(determine_url(action, parameter))}'s own search page: it "
+                                        "lists that site's pages and repeats the words searched for, but it is not a "
+                                        "source. NAVIGATE to an article or document itself (from the search results or a "
+                                        "page's links), or SEARCH.")
+        refused = refusing_site(determine_url(action, parameter))
+        if refused:
+            return "BLOCKED_NAVIGATE", (f"{site_of(determine_url(action, parameter))} refused this browser earlier in this run "
+                                        f"({refused}) and will refuse again: it is blocked for the rest of the run. Use "
+                                        "another site from the search results, or SEARCH.")
         if blocked_site(determine_url(action, parameter)):
             return "BLOCKED_NAVIGATE", ("That site is excluded for this run (LAB_BLOCKED_SITES). Find the answer on "
                                         "another page: SEARCH, or NAVIGATE to a different result.")
@@ -210,8 +304,13 @@ def check_decision(action, parameter, journal, tried, page_state, current_url, t
         # Going back to an earlier page is allowed; the cap stops back-and-forth loops between pages
         if [normalize_url(u) for u in tried["urls"]].count(target) >= MAX_VISITS_PER_URL:
             return "BLOCKED_NAVIGATE", f"This URL was already visited {MAX_VISITS_PER_URL} times. Pick a different page."
+        if current_url and is_search_page(current_url):
+            same_name = same_name_check(tried, page_state.get("results") or [], target)
+            if same_name:
+                return same_name
     if action in ("SEARCH", "NAVIGATE"):
-        return leave_check(action, page_state, current_url, journal)
+        return (matching_part_check(action, tried.get("objective", ""), page_state, current_url)
+                or leave_check(action, page_state, current_url, journal))
     elif action == "READ_MORE":
         total = len(page_state["parts"])
         target = read_more_target(parameter, page_state)

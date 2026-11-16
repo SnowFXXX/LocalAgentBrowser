@@ -4,8 +4,13 @@
 decides when it's done, on your own computer, with a local model or, if you choose, a cloud one. It gives an answer
 you can check, or says honestly what it couldn't find.**
 
-**New in 1.65:** a [Windows installer](#windows-the-installer-recommended) with a choice of tested models, and optional
-cloud models through [OpenRouter](https://openrouter.ai) for fast answers.
+**L.A.B.** for short, and it wears a LAB COAT: **Citations Over Assumed Truth.** Every claim in an answer points to the
+page it came from, and code checks it is there, because the project's principle is **Verification Over Trust**.
+
+**New in 1.66:** sturdier cloud runs, more of every answer checked in code, and the console and browser
+[side by side](#first-run) on Windows, run after run. **In 1.65:** a
+[Windows installer](#windows-the-installer-recommended) with a choice of tested models, and optional cloud models
+through [OpenRouter](https://openrouter.ai) for fast answers.
 
 [![Tests](https://github.com/SnowFXXX/LocalAgentBrowser/actions/workflows/tests.yml/badge.svg)](https://github.com/SnowFXXX/LocalAgentBrowser/actions/workflows/tests.yml)
 [![PyPI](https://img.shields.io/pypi/v/localagentbrowser.svg)](https://pypi.org/project/localagentbrowser/)
@@ -50,9 +55,9 @@ can use a cloud model instead. Every claim in its answer points to the page it c
 
 Releases that change how the agent works are measured on the same seven tasks, one of each kind it's built for: a
 fact, a list with conditions, a comparison with a recommendation, a how-to, an explanation, views from several
-sources, and a lookup in official documentation. In 1.64, four models ran them with identical code, 90 minutes per
-task, on an ordinary 6-core PC with no GPU (Intel i5-9500). 1.65 adds the installer and optional cloud models
-without changing how the agent works with a local model, so these results still apply:
+sources, and a lookup in official documentation. In 1.64, four local models ran them with identical code, 90 minutes
+per task, on an ordinary 6-core PC with no GPU (Intel i5-9500). 1.66 changes the agent for every model, local ones
+included, and was measured on cloud models (below); these local results are 1.64's, not yet re-measured on 1.66:
 
 | Model (Q4_K_M) | Download | RAM | Tasks finished | Model time | Gaps filled from its own knowledge |
 |---|---|---|---|---|---|
@@ -69,20 +74,30 @@ without changing how the agent works with a local model, so these results still 
 - On 1.63 the same models finished 6, 2, 2 and 0 of 7. Every step and run is in the
   [regression history](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md).
 
-**Cloud models** (1.65) run the same code much faster, through your own OpenRouter account. The suite ran once on
-each of five cloud models (November 10, 2026; GPT-4o-mini needs the 1.65.1 fix), and no finished result filled a gap
-from the model's own knowledge on any of them, by the suite's measures:
+**Cloud models** run the same code much faster, through your own OpenRouter account. On 1.66 the suite ran once on
+each of four cloud models (November 15, 2026), one model at a time; every one finished all seven tasks, and no
+finished result filled a gap from the model's own knowledge, by the suite's measures:
 
-| Cloud model | Tasks finished | Model time | Uncited lines | Cost of the suite |
-|---|---|---|---|---|
-| `microsoft/phi-4` (the cloud default) | 7 of 7 | 5.1 min | 4 | $0.03 |
-| `openai/gpt-4o-mini` | 7 of 7 | 7.2 min | 12 | $0.06 |
-| `meta-llama/llama-3.1-8b-instruct` | 7 of 7 | 3.6 min | 21 | $0.12 |
-| `qwen/qwen-2.5-72b-instruct` | 7 of 7 | 13.4 min | 17 | $0.14 |
-| `google/gemma-3-4b-it` | 6 of 7 | 20.8 min | 9 | $0.03 |
+| Cloud model | Tasks finished | Model time | Uncited lines (1.65 → 1.66) | Expected words missing (1.65 → 1.66) | Cost of the suite |
+|---|---|---|---|---|---|
+| `microsoft/phi-4` (the cloud default) | 7 of 7 | 5.6 min | 4 → **1** | 1 → **0** | $0.04 |
+| `openai/gpt-4o-mini` | 7 of 7 | 7.4 min | 12 → **1** | 0 → 0 | $0.06 |
+| `meta-llama/llama-3.1-8b-instruct` | 7 of 7 | 4.0 min | 21 → **3** | 8 → **1** | $0.14 |
+| `google/gemma-3-4b-it` | 7 of 7 (6 on 1.65) | 23.6 min | 9 → **5** | 6 → **3** | $0.06 |
 
-One run each, scored by the suite's word checks, not read by hand. Phi-4 is the cloud default for its clean results;
-1.65 named `qwen/qwen-2.5-7b-instruct`, which no OpenRouter provider serves now.
+One run each, scored by the suite's word checks; read by hand, Gemma's factual answer gave a glacier's elevation
+(3,200 m) as Kilimanjaro's height, from the right page but the wrong sentence, which no check caught (see
+[Limitations](#limitations)). Measured earlier on 1.65.1 and not yet re-run on 1.66: Gemini 3.8 Flash 7 of 7 (6.1
+min, 0 uncited lines, $0.24), GPT-5.6 Terra 7 of 7 (4.9 min, 2 uncited, $0.47), Qwen 2.5 72B 7 of 7 (on 1.65, 13.4
+min, 17 uncited, $0.14), and GPT-4o, which lost three tasks to OpenRouter's new-account rate limit that 1.66 now
+waits out.
+
+**Fifty SimpleQA questions** (a public benchmark of short, hard facts) on Phi-4, the same 50 each time: alone, with
+no browsing, it answered 1 correctly; with LocalAgentBrowser 1.65.1, 38 and 39; with 1.66, **45 (90%)**, 4 wrong and
+1 not answered, in 28.6 minutes, for $0.13. Graded by hand against SimpleQA's answers, one grader.
+
+Phi-4 is the cloud default for its clean results; 1.65 named `qwen/qwen-2.5-7b-instruct`, which no OpenRouter
+provider serves now.
 
 **Which to pick:** the 7B for most PCs, Llama if you have the same 8 GB and want it to finish more often, the 3B for
 a PC with little memory. Any instruction-tuned model LM Studio serves should work.
@@ -159,9 +174,13 @@ your browser when the run ends.
    the [FAQ](#faq) for the other settings).
 2. Start LocalAgentBrowser: the Start-menu shortcut on Windows, or `localagentbrowser` in a terminal.
 3. Type your objective, for example *What is the tallest mountain in Africa, and how tall is it in meters and in
-   feet?* A Chromium window opens and the agent starts working. The first step takes a minute or two on a CPU.
-4. When it finishes, the report opens in your browser (Windows launcher), or read `research_report.md` in the folder
-   you ran it from. Runs from the shortcut each get their own folder under **Documents\LocalAgentBrowser runs**.
+   feet?* A Chromium window opens and the agent starts working. The first step takes a minute or two on a CPU. On
+   Windows (1.66), the console and the browser sit side by side, the console on the left and the browser on the
+   right, so you can watch both without switching windows (`LAB_SIDE_BY_SIDE=0` turns this off).
+4. When it finishes, the report opens in your browser (on the right, on Windows), or read `research_report.md` in the
+   folder you ran it from. Runs from the shortcut each get their own folder under **Documents\LocalAgentBrowser runs**.
+5. On Windows, the console then asks for another objective, so you can run one after another in the same window;
+   press Enter on an empty line to close it.
 
 A run takes about 10 to 60 minutes on a CPU, and a few minutes with a cloud model. Press Ctrl+C at any time to stop; the report is still written with
 everything found so far.
@@ -275,6 +294,7 @@ The full details, code layout, timings and known limits:
 | `LMSTUDIO_EXTRA_HEADERS` | none | Extra HTTP headers sent with every request, as JSON |
 | `OPENROUTER_API_KEY` | none | Your OpenRouter key for cloud models, read by the Windows launcher and the test suite's `--cloud` |
 | `LAB_RUNS_DIR` | `regression_runs/` | Where the test suite puts its run folders |
+| `LAB_SIDE_BY_SIDE` | on | On Windows, `0` keeps the console and the browser from being placed side by side |
 
 The Windows installer writes the model you chose, and the cloud setting if you turned it on, to small files in its
 `settings` folder. Behaviour limits are named constants in `localagentbrowser/config.py`, each with a comment.
@@ -333,8 +353,9 @@ in your browser by itself. The files are `research_report.md` (the answer and ev
 ## Limitations
 
 - **Whether a finding really answers a part is judged by the model, and it can be wrong.** The model can credit a finding about the
-  right topic to the wrong part (a "create" command for "activate"), or put the wrong number on a citation. Check
-  claims against the listed findings.
+  right topic to the wrong part (a "create" command for "activate"; on 1.66, Gemma 3 4B gave a glacier's elevation
+  on Kilimanjaro's page as the mountain's height), or put the wrong number on a citation. Check claims against the
+  listed findings.
 - **Reading only:** it doesn't click, fill in forms or sign in, and some sites refuse automated browsers.
 - **Web pages go into the prompt,** so a page could try to manipulate the model (prompt injection); treat findings as
   unverified. See [SECURITY.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/SECURITY.md).
@@ -348,8 +369,13 @@ More in [docs/how-it-works.md](https://github.com/SnowFXXX/LocalAgentBrowser/blo
 - [x] Exact-text command checks, and four models measured on identical code (1.63)
 - [x] Parts of the objective no longer dropped silently as often; the Windows launcher (1.64)
 - [x] A Windows installer with its own Python and a choice of tested models, and optional cloud models (1.65)
+- [x] Sturdier cloud runs, more of each answer checked in code, and the console and browser side by side (1.66)
+- [ ] **Clean Room (1.67):** a privacy edition with the cloud code removed entirely, released alongside every
+  standard version from then on
 - [ ] Count silent omissions in the regression suite, so [issue #11](https://github.com/SnowFXXX/LocalAgentBrowser/issues/11) can close on a number
 - [ ] Decide in code, not by asking the model, whether a finding answers the part it's credited to
+- [ ] Refuse a finding that changes one of the page's key words (1.66's SimpleQA run recorded "men's foil" from a
+  page that says "épée")
 - [ ] A tray app on Windows: new research, progress, a notification when done
 - [ ] Rewind dead ends: return to a saved point instead of carrying an unused page in every later prompt
 - [ ] Interacting with pages (clicking, forms) for tasks beyond reading

@@ -924,3 +924,63 @@ def test_a_concrete_missing_thing_no_discovery_names_sends_back():
 def test_the_prompt_s_own_section_names_are_not_unbacked_names():
     found = discoveries("The light reactions make ATP.")
     assert ab.unnamed_names("Following the OBJECTIVE CHECKLIST, the light reactions make ATP [1].", found, "Explain it") == []
+
+
+def test_a_view_at_the_end_of_a_repeated_result_is_kept():
+    # GPT-4o-mini sent the whole owl result back with its view at the end; the view was dropped with the repeat
+    result = "1. In Western cultures owls stood for wisdom and death [1].\n2. Mayan rulers wore owl emblems [1]."
+    view = "My view: Owls are seen at night and heard more than seen, so people read very different things into them."
+    client, model = fake_client([result, result + "\n\n" + view])
+    text = asyncio.run(ab.compose_final_result(client, "Find how cultures viewed owls, then give your own opinion.",
+                                               discoveries("Western cultures saw owls as wisdom and death; Mayan rulers wore owl emblems.")))
+    assert text.count("Western cultures") == 1 and view in text
+
+
+def test_a_reply_repeating_the_prompt_keeps_the_answer_after_it():
+    # Llama 3.1 8B's writing-step replies, three in one suite, refused whole: the answer came after the repeat
+    multi = ("### OBJECTIVE\nCompare SQLite and PostgreSQL.\n\n### CHECKLIST (the parts of the OBJECTIVE)\n1. Compare setup\n"
+             "2. Recommend one\n\n### DISCOVERIES\n[1] (from https://x.org)\nSQLite needs no server.\n\n### RESULTS\n"
+             "### 1. Compare setup\nSQLite needs no server [1].\n\n### MY VIEW")
+    out = ab.result_text(multi)
+    assert ab.usable_result(out) and out.startswith("### 1. Compare setup") and "### DISCOVERIES" not in out
+    assert not out.rstrip().endswith("### MY VIEW")
+    one_line = ("### OBJECTIVE: Find out how cultures viewed owls. ### CHECKLIST (the parts of the OBJECTIVE) 1. Find out "
+                "how cultures viewed owls ### DISCOVERIES [1] (from https://owls.example) Egyptians linked owls with death. "
+                "### 1. Find out how cultures viewed owls Egyptian records connect owls with death [1].")
+    out = ab.result_text(one_line)
+    assert ab.usable_result(out) and "Egyptian records connect owls with death [1]." in out and "[1] (from" not in out
+
+
+def test_a_kind_of_text_label_is_not_a_subject():
+    # Phi-4's photosynthesis result lost its "Process" and "Details" lines as "said of Light-dependent reactions"
+    found = discoveries("Light-dependent reactions split water molecules into hydrogen ions and oxygen atoms in the thylakoids.")
+    text = ("**Light-dependent reactions:** These occur in the thylakoids [1].\n"
+            "- **Details:** Water molecules are split into hydrogen ions and oxygen atoms in the thylakoids [1].")
+    assert ab.swapped_sentences(text, found) == []
+
+
+def test_the_codes_own_count_survives_the_number_check():
+    # GPT-4o-mini's owl result: "Only 2 of the 3 cultures or religions could be found", cut as no page's number
+    client, _ = fake_client(["1. Western cultures linked owls with wisdom [1].\n2. Mayans linked owls with rulers [1].\n"
+                             "Only 2 of the 3 cultures or religions could be found."])
+    items = [{"text": "Find out how at least three different cultures or religions have viewed owls", "discoveries": [1]}]
+    text = asyncio.run(ab.compose_final_result(client, "objective", discoveries("Western cultures and Mayans saw owls."),
+                                               items, short={1: (2, 3)}))
+    assert "Only two of the three cultures or religions could be found." in text and "Left out" not in text
+
+
+def test_a_repeated_block_of_sections_is_cut_and_look_alikes_stay():
+    # Llama 3.1 8B restated all four parts under "### SUMMARY", and the copies disagreed
+    repeated = ("### 1. Compare setup and administration of SQLite and PostgreSQL\nSQLite needs no server [1].\n"
+                "### 2. Compare handling of many simultaneous users in PostgreSQL\nMVCC handles many writers [2].\n"
+                "### SUMMARY\n### 1. Compare setup and administration of SQLite and PostgreSQL\nSQLite is easy [1].\n"
+                "### 2. Compare handling of many simultaneous users in SQLite and PostgreSQL\nIt was not found.\n"
+                "### My view:\nSQLite for a hobby project.")
+    out = ab.without_repeated_sections(repeated)
+    assert "MVCC handles many writers [2]." in out and "It was not found." not in out and "SUMMARY" not in out
+    assert out.count("Compare setup") == 1 and "### My view:" in out
+    # Parts that look alike are not repeats: meters beside feet, one tool's strengths beside another's
+    for text in ("### Tallest Mountain in Africa\nKilimanjaro [1].\n### Height of the Tallest Mountain in Africa in Meters\n"
+                 "5,895 m [1].\n### Height of the Tallest Mountain in Africa in Feet\n19,341 ft [1].",
+                 "## GIMP\n### Main Strengths\nLayers [1].\n## Krita\n### Main Strengths\nBrushes [2]."):
+        assert ab.without_repeated_sections(text) == text

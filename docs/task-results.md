@@ -38,3 +38,8 @@ has every step's results and what each one showed.
 | Explanation (photosynthesis) | Time limit | Finished, 13 min, but thin: no oxygen or water | Finished, 59 min: inputs, outputs and both stages, cited | Finished, 39 min | Finished, 73 min, oxygen included |
 | Opinion (owls) | Time limit | Finished, 38 min | Time limit: its first page covered two of the three cultures asked for | Finished, 42 min: four cultures, cited, with a view | Finished, 49 min |
 | Documentation (venv, official docs) | Finished, 15 min, from a tutorial site | Time limit (30 min) | Finished, 37 min, all from python.org; but the Windows line repeats the create command instead of the activate one | Time limit: all four items found from python.org, then it read on | Time limit: read the reference page part after part without recording (finished in 34 and 42 min in the two v11 runs) |
+
+On 1.66 the suite was run on four cloud models instead (Phi-4, GPT-4o-mini, Llama-3.1-8B, Gemma-3-4B): each finished
+all seven tasks, in 4 to 24 model minutes; the local models above have not been re-run on 1.66 yet. The
+[regression history](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md) has the
+numbers and what reading the results by hand found.

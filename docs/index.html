@@ -167,8 +167,10 @@
     <div class="flow" aria-label="The five actions: search, navigate, read more, discover, finish">
       <span>SEARCH</span><i>→</i><span>NAVIGATE</span><i>→</i><span>READ_MORE</span><i>→</i><span>DISCOVER</span><i>→</i><span class="end">FINISH</span>
     </div>
-    <p class="new"><strong>New in 1.65:</strong> a Windows installer with a choice of tested models, and optional cloud
-      models for fast answers.</p>
+    <p class="new"><strong>L.A.B. for short, in a LAB COAT: Citations Over Assumed Truth.</strong> Our principle is
+      Verification Over Trust.</p>
+    <p class="new"><strong>New in 1.66:</strong> sturdier cloud runs, more of every answer checked in code, the console and
+      browser side by side, and 45 of 50 SimpleQA questions right with Phi-4.</p>
     <div class="ctas">
       <a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest">Download for Windows</a>
       <a class="btn" href="#install">Other ways to install</a>
@@ -177,7 +179,7 @@
     </div>
     <div class="pills">
       <span class="pill">Local by default</span><span class="pill">Cloud optional</span>
-      <span class="pill">Four models tested on a CPU</span><span class="pill">Windows installer</span>
+      <span class="pill">Tested on local and cloud models</span><span class="pill">Windows installer</span>
       <span class="pill">Free and open source (MIT)</span><span class="pill">LM Studio + Playwright</span>
     </div>
   </div>
@@ -193,8 +195,8 @@
       <div class="card">
         <div class="num">CLAIM 1</div>
         <h3>No gaps filled from memory</h3>
-        <p>Four models on the same code. No finished answer filled a gap with the model's own knowledge, by the
-          suite's measures.</p>
+        <p>Four local models on 1.64 and four cloud models on 1.66, each set on the same code. No finished answer filled
+          a gap with the model's own knowledge, by the suite's measures.</p>
       </div>
       <div class="card">
         <div class="num">CLAIM 2</div>
@@ -203,14 +205,15 @@
           writes them.</p>
       </div>
       <div class="card warn">
-        <div class="num">OUR WORKING PROBLEM</div>
-        <h3>Silent omissions</h3>
-        <p>When something isn't found, the answer usually says so. But reading results by hand, we found answers
-          that left a part out without a word, and our tests don't count those yet. That's our next focus, and you can help.</p>
+        <div class="num">OUR WORKING PROBLEMS</div>
+        <h3>Omissions and near-copies</h3>
+        <p>Reading results by hand, we still find answers that leave a part out without a word, and findings that
+          change one key word of the page ("foil" where the page says "épée") yet pass the word check. Our tests don't
+          count either yet. That's our next focus, and you can help.</p>
       </div>
     </div>
     <figure>
-      <a href="assets/chart1.png"><img src="assets/chart1.png" alt="Four models on the same code (1.64): Qwen 2.5 7B finished 6 of 7 tasks, Llama 3.1 8B 7 of 7, Qwen 2.5 14B 5 of 7 and Qwen 2.5 3B 3 of 7, each with 0 gaps filled from its own knowledge." width="2400" height="1350"></a>
+      <a href="assets/chart1.png"><img src="assets/chart1.png" alt="Local and cloud models on the same seven tasks: on a PC with 1.64, Qwen 2.5 7B finished 6 of 7, Llama 3.1 8B 7, Qwen 2.5 14B 5 and Qwen 2.5 3B 3; in the cloud with 1.66, Phi-4, GPT-4o-mini, Llama 3.1 8B and Gemma 3 4B each finished 7 of 7. Every model: 0 gaps filled from its own knowledge." width="2400" height="1350"></a>
     </figure>
     <div class="two">
       <figure>
@@ -218,8 +221,8 @@
         <figcaption>Word matching rated an invented command above two real ones. Now commands must be on the page exactly.</figcaption>
       </figure>
       <figure>
-        <a href="assets/chart2.png"><img src="assets/chart2.png" alt="The testing behind the claims, on two PCs from October 16 to November 7: 67 test-suite runs, 361 tasks, 901 findings checked against their page, 215.7 hours of the AI working." width="2400" height="1350"></a>
-        <figcaption>Every run is saved: what the AI was shown, what it replied, what the code allowed.</figcaption>
+        <a href="assets/chart2.png"><img src="assets/chart2.png" alt="The testing behind the claims, on two PCs and cloud models from October 16 to November 15: 58 full test-suite runs, 406 tasks, 1,148 findings checked against their page, 184 hours of the AI working." width="2400" height="1350"></a>
+        <figcaption>Full runs only. Every run is saved: what the AI was shown, what it replied, what the code allowed.</figcaption>
       </figure>
     </div>
   </div>
@@ -227,11 +230,12 @@
 
 <section id="models" class="alt">
   <div class="wrap">
-    <div class="kicker">Tested on four models</div>
+    <div class="kicker">Tested on local and cloud models</div>
     <h2>Pick the model that fits <em>your PC.</em></h2>
-    <p class="lead">Measured on version 1.64: the same seven tasks, the same code, 90 minutes per task, on an ordinary
-      6-core office PC with no graphics card. None of them filled a gap in a finished answer from its own knowledge.
-      1.65 doesn't change how the agent works with a local model, so these results still apply.</p>
+    <p class="lead">On your own computer, measured on version 1.64: the same seven tasks, the same code, 90 minutes per
+      task, on an ordinary 6-core office PC with no graphics card. None of them filled a gap in a finished answer from
+      its own knowledge. 1.66 changes the agent for every model and was measured on cloud models (below); these local
+      results are 1.64's, not yet re-measured.</p>
     <div class="models">
       <div class="model best">
         <div class="tag">The default</div>
@@ -262,13 +266,49 @@
         <p>For PCs with little memory. One finished answer has a claim the checks missed.</p>
       </div>
     </div>
-    <p class="lead" style="font-size:17px;margin-top:22px"><strong>Or a cloud model, for fast answers.</strong> In 1.65
-      the same code can use a model in the cloud through your own OpenRouter account: a few minutes instead of an hour,
-      but it costs money, and your prompts and the pages read leave your computer. Off unless you turn it on. On five
-      cloud models (Phi-4, the default; GPT-4o-mini; Llama 3.1 8B; Qwen 2.5 72B; Gemma 3 4B) the suite finished 7 of 7 on
-      four and 6 of 7 on one, in 4 to 21 minutes for 3 to 14 cents, with no gaps filled from the model's own knowledge.
-      One run each.</p>
-    <p class="note">On version 1.63 the same models finished 6, 2, 2 and 0 of 7.
+    <p class="lead" style="font-size:17px;margin-top:22px"><strong>Or a cloud model, for fast answers.</strong> The same
+      code can use a model in the cloud through your own OpenRouter account: a few minutes instead of an hour, but it
+      costs money, and your prompts and the pages read leave your computer. Off unless you turn it on. Measured on 1.66,
+      one run each, one model at a time:</p>
+    <div class="models">
+      <div class="model best">
+        <div class="tag">The cloud default</div>
+        <h3>Phi-4</h3>
+        <div class="score">7<small> of 7 finished</small></div>
+        <dl><dt>All 7 tasks</dt><dd>5.6 min</dd><dt>Uncited lines</dt><dd>1 (4 on 1.65)</dd><dt>Cost</dt><dd>$0.04</dd></dl>
+        <p>The cleanest results for the price. 45 of 50 SimpleQA questions right.</p>
+      </div>
+      <div class="model">
+        <div class="tag">OpenAI's small model</div>
+        <h3>GPT-4o-mini</h3>
+        <div class="score">7<small> of 7 finished</small></div>
+        <dl><dt>All 7 tasks</dt><dd>7.4 min</dd><dt>Uncited lines</dt><dd>1 (12 on 1.65)</dd><dt>Cost</dt><dd>$0.06</dd></dl>
+        <p>Every expected detail in every answer, by the suite's word checks.</p>
+      </div>
+      <div class="model">
+        <div class="tag">Most improved</div>
+        <h3>Llama 3.1 8B</h3>
+        <div class="score">7<small> of 7 finished</small></div>
+        <dl><dt>All 7 tasks</dt><dd>4.0 min</dd><dt>Uncited lines</dt><dd>3 (21 on 1.65)</dd><dt>Cost</dt><dd>$0.14</dd></dl>
+        <p>The fastest. Its answers used to be lost when it repeated the prompt; 1.66 keeps them.</p>
+      </div>
+      <div class="model">
+        <div class="tag">The smallest</div>
+        <h3>Gemma 3 4B</h3>
+        <div class="score">7<small> of 7 finished</small></div>
+        <dl><dt>All 7 tasks</dt><dd>23.6 min</dd><dt>Uncited lines</dt><dd>5 (9 on 1.65)</dd><dt>Cost</dt><dd>$0.06</dd></dl>
+        <p>6 of 7 on 1.65. One answer gave a glacier's elevation as Kilimanjaro's height, which no check caught.</p>
+      </div>
+    </div>
+    <p class="lead" style="font-size:17px;margin-top:22px">No finished answer filled a gap from the model's own knowledge,
+      by the suite's measures. On 1.65.1, Gemini 3.8 Flash and GPT-5.6 Terra also finished 7 of 7 (for $0.24 and $0.47),
+      and GPT-4o lost three tasks to a rate limit that 1.66 now waits out. <strong>On 50 SimpleQA questions</strong>, a
+      public benchmark of short, hard facts, Phi-4 alone answered 1; with LocalAgentBrowser 1.66, 45, in 29 minutes for
+      13 cents.</p>
+    <figure>
+      <a href="assets/chart5.png"><img src="assets/chart5.png" alt="50 SimpleQA questions, Phi-4: alone, with no browsing, 1 correct; with LocalAgentBrowser 1.65.1, 38 and 39; with 1.66, 45 (4 wrong, 1 not answered, 29 minutes, 13 cents)." width="2400" height="1350"></a>
+    </figure>
+    <p class="note">On version 1.63 the four local models finished 6, 2, 2 and 0 of 7.
       <a href="https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md">Every run, measured.</a></p>
   </div>
 </section>

@@ -76,8 +76,41 @@ def is_search_page(url):
     """Whether the URL is the search engine's results page (where results are listed, not read)."""
     return urllib.parse.urlparse(url or "").netloc.endswith("duckduckgo.com")
 
+# Another site's own search page: a path segment "search" or a search parameter (?s=, ?q=, ?search=, ...)
+SITE_SEARCH_PATH = re.compile(r"(?:^|/)(?:search|searchresults|search-results|viewsearchresults)(?:/|\.php|\.aspx?|\.html?|$)",
+                              re.I)
+SITE_SEARCH_KEYS = {"s", "q", "query", "search", "search_query", "searchterm", "keyword", "keywords", "k", "term", "text"}
+
+def site_search_page(url):
+    """Whether the URL is another website's own search page: a list of that site's pages, not a source.
+
+    Such pages repeat the words searched for in their titles, and search engines list them: asked about "Rosa Whitaker
+    Day", Phi-4 was shown blog.wvlegislature.gov/search/..., kingsridgecofc.org/?s=... and others titled with the
+    question's words (some with the answer's date, typed by other searchers), opened them one after another and found
+    nothing; the source it needed was ranked below them. Replayed on 729 saved runs, 81 visits to such pages gave 6 of
+    1,540 discoveries, all copied from Wikipedia's search-result summaries rather than its articles."""
+    try:
+        parsed = urllib.parse.urlparse(str(url or ""))
+    except ValueError:
+        return False
+    if not parsed.netloc or is_search_page(url):
+        return False
+    keys = {k.lower() for k in urllib.parse.parse_qs(parsed.query, keep_blank_values=True)}
+    return bool(SITE_SEARCH_PATH.search(parsed.path) or keys & SITE_SEARCH_KEYS)
+
 def normalize_query(query):
     return " ".join(str(query).lower().split())
+
+def without_trailing_punctuation(url):
+    """An address taken from the model's text without the punctuation after it ("see https://x.org/page)." ends at
+    "page"). A closing bracket is the address's own when it closes one opened in it: cutting every trailing ")" sent
+    "https://en.wikipedia.org/wiki/Trevor_Evans_(journalist)" to "..._(journalist", which Wikipedia answered with an
+    empty search, about 40 times in the cloud SimpleQA runs."""
+    while url and url[-1] in ".,;)\"'":
+        if url[-1] == ")" and url.count("(") >= url.count(")"):
+            break
+        url = url[:-1]
+    return url
 
 def determine_url(action, parameter):
     if isinstance(parameter, list):
@@ -92,7 +125,7 @@ def determine_url(action, parameter):
         # as one address; five turns went by before it navigated to a page
         first_url = re.search(r"https?://\S+", clean_param)
         if first_url:
-            clean_param = first_url.group().rstrip(".,;)\"'")
+            clean_param = without_trailing_punctuation(first_url.group())
         if "#" in clean_param:
             clean_param = clean_param.split("#")[0]
 
@@ -111,6 +144,46 @@ def search_query(parameter):
         if 'q' in query_dict:
             clean_param = query_dict['q'][0]
     return " ".join(clean_param.replace('+', ' ').split()[:MAX_QUERY_WORDS])
+
+# Sites that turned the browser away during this run, by host, with the reason: visits to them are refused in code
+# and their results left out of search pages, so a model cannot keep going back (one went back six times)
+REFUSING_SITES = {}
+
+# What a page shown instead of the content says when a site checks for robots. Only short pages are judged: an
+# article may well mention a captcha
+BOT_CHECK = re.compile(r"verify (?:that )?you are (?:a )?human|are you a robot|checking (?:if the site connection is "
+                       r"secure|your browser)|just a moment\.\.\.|enable javascript and cookies to continue|unusual "
+                       r"traffic from your (?:computer|network)|press (?:and|&) hold|complete the security check|"
+                       r"\bcaptcha\b|access denied", re.I)
+BOT_CHECK_MAX_CHARS = 2000
+REFUSING_STATUSES = {401, 403, 429}
+
+def site_of(url):
+    try:
+        return (urllib.parse.urlparse(str(url)).hostname or "").lower().removeprefix("www.")
+    except ValueError:
+        return ""
+
+def mark_refusing(url, reason):
+    if site_of(url):
+        REFUSING_SITES.setdefault(site_of(url), reason)
+
+def refusing_site(url):
+    """Why the URL's site was marked as refusing this run (its HTTP status or bot check), or None."""
+    return REFUSING_SITES.get(site_of(url))
+
+async def site_refusal(page, status):
+    """Why a loaded page is the site turning the browser away rather than content, or None: an HTTP 401, 403 or 429,
+    or a short page asking to prove the visitor is human."""
+    if status in REFUSING_STATUSES:
+        return f"HTTP {status}"
+    try:
+        text = await page.evaluate("() => ((document.title || '') + '\\n' + (document.body ? document.body.innerText : ''))")
+    except Exception:
+        return None
+    if isinstance(text, str) and len(text) <= BOT_CHECK_MAX_CHARS and BOT_CHECK.search(text):
+        return "a bot check page"
+    return None
 
 def blocked_site(url):
     """Whether a URL is on a site the run excludes (BLOCKED_SITES: "huggingface.co/datasets", "github.com/openai/
@@ -141,7 +214,7 @@ async def count_search_results(page):
     except Exception:
         return 0
 
-async def extract_search_results(page, visited_urls):
+async def extract_search_results(page, visited_urls, listed=None):
     results = await page.evaluate("""() => Array.from(document.querySelectorAll('.result:not(.result--ad)')).map(r => {
         const a = r.querySelector('a.result__a');
         const s = r.querySelector('.result__snippet');
@@ -151,9 +224,12 @@ async def extract_search_results(page, visited_urls):
     lines = []
     # Sites a run excludes (LAB_BLOCKED_SITES) are left out of the results: a benchmark run must not read its answers
     # from pages that republish the benchmark
-    results = [r for r in results if not blocked_site(decode_ddg_link(r['href']))]
+    results = [r for r in results if not blocked_site(decode_ddg_link(r['href'])) and not refusing_site(decode_ddg_link(r['href']))
+               and not site_search_page(decode_ddg_link(r['href']))]
     for i, r in enumerate(results[:MAX_SEARCH_RESULTS], start=1):
         url = decode_ddg_link(r['href'])
+        if listed is not None:
+            listed.append((r['title'], url))
         visited = " (ALREADY VISITED)" if normalize_url(url) in visited_urls else ""
         snippet = r['snippet'][:MAX_SNIPPET_CHARS]
         lines.append(f"[{i}] {r['title']}{visited}\n    URL: {url}\n    {snippet}")
@@ -362,7 +438,9 @@ async def build_environment(page, current_url, page_state, visited_urls=frozense
         return "[Empty or No Target Page Loaded Yet]"
     try:
         if "duckduckgo.com" in current_url:
-            results = await extract_search_results(page, visited_urls)
+            listed = []
+            results = await extract_search_results(page, visited_urls, listed)
+            page_state["results"] = listed  # Titles and addresses, for the same-name check in checks.py
             if results:
                 page_state.setdefault("snippets", set()).update(snippet_lines(results))
                 return f"Search Results:\n{results}"
@@ -374,7 +452,7 @@ async def build_environment(page, current_url, page_state, visited_urls=frozense
             parts, outline, headings = await extract_page_parts(page)
             page_state.update(url=normalize_url(current_url), parts=parts, outline=outline, headings=headings, index=0,
                               seen_parts={0}, visit_discoveries=0, leave_confirmed=False, reread_confirmed=set(),
-                              read_on_confirmed=set(), grounding_asked=[],
+                              read_on_confirmed=set(), grounding_asked=[], matching_refusals=0,
                               # Kept per URL: on a return visit the read-on check asked about a part already recorded
                               recorded_parts=page_state.setdefault("recorded_by_url", {}).setdefault(
                                   normalize_url(current_url), set()))

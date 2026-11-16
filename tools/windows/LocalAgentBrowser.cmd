@@ -29,26 +29,42 @@ if defined LAB_CLOUD (
     exit /b 1
   )
 )
-for /f %%t in ('powershell -NoProfile -Command "Get-Date -Format yyyy-MM-dd_HHmmss"') do set "STAMP=%%t"
 rem Windows' own Documents folder (it may be in OneDrive), the same one the installer's "Past reports" shortcut opens
 for /f "delims=" %%d in ('powershell -NoProfile -Command "[Environment]::GetFolderPath('MyDocuments')"') do set "DOCS=%%d"
 if not defined DOCS set "DOCS=%USERPROFILE%\Documents"
-set "RUN=%DOCS%\LocalAgentBrowser runs\%STAMP%"
-mkdir "%RUN%"
-cd /d "%RUN%"
-echo Reports for this run go to: %RUN%
-echo.
 rem The installed app has its own Python; a clone uses its venv; otherwise the pip-installed command
 set "PY=python"
 if exist "%APP%\venv\Scripts\python.exe" set "PY=%APP%\venv\Scripts\python.exe"
 if exist "%APP%\python\python.exe" set "PY=%APP%\python\python.exe"
+rem One run after another in this window, each in its own folder, until an empty objective: the console stays open
+rem on the left with the last report on the right. LAB_RUN_COUNT tells the program which run it is (only the first
+rem starts with the console full size)
+set "LAB_RUN_COUNT=0"
+:next
+set /a LAB_RUN_COUNT+=1
+for /f %%t in ('powershell -NoProfile -Command "Get-Date -Format yyyy-MM-dd_HHmmss"') do set "STAMP=%%t"
+set "RUN=%DOCS%\LocalAgentBrowser runs\%STAMP%"
+rem Two runs started within the same second (one that ended at once) must not share a folder
+if exist "%RUN%" set "RUN=%RUN%_%LAB_RUN_COUNT%"
+mkdir "%RUN%"
+cd /d "%RUN%"
+echo.
+if %LAB_RUN_COUNT% GTR 1 echo Type another objective, or press Enter on an empty line to close LocalAgentBrowser.
+echo Reports for this run go to: %RUN%
+echo.
 if exist "%APP%\agent_browser.py" (
   "%PY%" "%APP%\agent_browser.py"
 ) else (
   localagentbrowser
 )
+rem No report means no objective was given: the empty run folder goes, and so does the window
+if not exist "%RUN%\research_report.md" (
+  cd /d "%DOCS%"
+  rmdir "%RUN%" 2>nul
+  exit /b 0
+)
 echo.
 echo Finished. The report is research_report.md in %RUN%
 rem The report opens as a page in the browser, in front; if that fails, the run folder opens instead
 "%PY%" "%APP%\tools\windows\show_report.py" "%RUN%" || start "" "%RUN%"
-pause
+goto next

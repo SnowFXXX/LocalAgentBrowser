@@ -1,10 +1,79 @@
 # Changelog
 
-Every version of LocalAgentBrowser, newest first. Each released version is also a tagged commit (`v1.11` … `v1.65.1`); 1.54 to 1.56 and 1.58 to 1.60 were internal steps
+Every version of LocalAgentBrowser, newest first. Each released version is also a tagged commit (`v1.11` … `v1.66`); 1.54 to 1.56 and 1.58 to 1.60 were internal steps
 measured on the regression suite and released as part of 1.57 and 1.61 (see
 [docs/regression-history.md](docs/regression-history.md)).
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
+
+## [1.66] - 2026-11-16
+L.A.B. (LocalAgentBrowser) gets sturdier in the cloud, checks more of its own answers in code, and is easier to
+watch: the console and the browser side by side, run after run. The agent's behaviour with a local model changes only
+where a fix below says so.
+### Added
+- **Side-by-side windows on Windows.** A run started from the launcher opens the console full size; when the browser
+  opens, the console takes the left half of the screen and the browser the right, and the report opens on the right
+  when the run ends. Pages are zoomed out to fit, so they are laid out as wide as in every test run. Only for a person
+  running it in a console window; `LAB_SIDE_BY_SIDE=0` turns it off. Test runs are unchanged.
+- **Run after run in one window.** After the report, the console stays open on the left and asks for another
+  objective; each run gets its own folder, and an empty objective closes the window. From the second run, the last
+  report is minimized when the new browser opens, so the browser is seen working.
+- **Checked date arithmetic.** For an age or a length of time, the code works the span out from the dates the
+  discoveries give, shows the result with its working, and the number check accepts those numbers and no others
+  ("80 years and 240 days", "1 year and 161 days"; "33 or 34 years" when only a year is given).
+- **A second source for comparisons and views.** A comparison, a recommendation or "several sources" resting on one
+  website is sent back once for a second; if none is found, the result says so.
+### Fixed
+- **Cloud errors.** A rate limit (429) is waited out instead of ending the task; a provider's "400 - Provider returned
+  error" is tried again; a `temperature` no provider of a model accepts is dropped for the run (Opus 5.5's providers
+  stopped taking one); an empty reply stopped by a content filter ends the run with that reason instead of three
+  billed retries; failures name the real cause instead of "check that LM Studio is running"; the regression suite
+  pauses after a task ended by a failed call. In one week of testing, three of eleven cloud models lost tasks to these.
+- **Addresses ending in ")"** lost the bracket ("…/wiki/Trevor_Evans_(journalist" opened an empty Wikipedia search),
+  about 40 times in the cloud SimpleQA runs.
+- **Other sites' own search pages** (`/search/…`, `?s=`, `?q=`) are left out of the search results and refused as a
+  NAVIGATE: they repeat the words searched for and are not sources. Replayed on 729 saved runs, 81 visits to such pages
+  gave 6 of 1,540 discoveries, all search-result summaries.
+- **A site that turns the browser away** (HTTP 401, 403, 429 or a "verify you are human" page) is not visited again
+  in the run, and its results leave the search pages (one model went back six times).
+- **Two pages with one name on the same site:** when a result's address names the question's word in brackets
+  ("Battle_of_the_Nations_(modern_tournament)"), another page of that site is refused until it has been opened.
+  Replayed on 176 choices of a result, it would have fired once, on the one wrong choice.
+- **Leaving a page while an unread part names the question's subject** ("Rosa Whitaker Day" further down the article)
+  is refused, at most twice per page.
+- **False "not found" lines:** one sentence giving a start and an end date, or one full date for a day, a month and a
+  year, answers all those items; an item about "each one" shares the discoveries of the item that found them.
+- **False "not shown to be free and open-source" cautions:** a discovery about the thing itself, or the address of an
+  open-source list (`…/open-source-…`, `?license=opensource`), now shows the condition; "open source" meets "free".
+- **Install commands:** an item asking how to install packages counts as answered only by an install command
+  (`pip install …`), decided in code both ways; when the model read past one, the code records the page's own line
+  (marked as recorded by the code) and adds it to the result if the result leaves it out.
+- **The writing step's replies:** a reply that repeated the prompt's sections before its answer is kept, without the
+  repeat (three of Llama 3.1 8B's results in one suite were lost to this); a block of sections written twice keeps the
+  first copy; a "My view:" paragraph at the end of a repeated reply is kept.
+- **Citations:** a line its section already cites, with 80% of its words in that discovery, is cited by the code
+  (Phi-4 cited by section, and 25 lines of one suite counted as uncited).
+- Smaller: a number in a name ("SHS-10") is no longer a count of things asked for; the code's own counts are written
+  in words ("two of the three") so the number check keeps them; labels such as "Process" or "Details" are not
+  subjects; two code blocks in a row are no longer merged; a lead-in whose command was cut says so; an unanswered item
+  stays open until something new is linked to it; a report of a run ended by a failed model call says why.
+### Measured
+- The suite on four cloud models, one run each, one model at a time, on this code (November 15): every one finished
+  7 of 7, with no gaps filled from the model's own knowledge, no invented commands and no forbidden answers, by the
+  suite's measures. Phi-4 5.6 model min, 1 uncited line (4 on 1.65), $0.04; GPT-4o-mini 7.4 min, 1 (12), $0.06;
+  Llama 3.1 8B 4.0 min, 3 (21), $0.14; Gemma 3 4B 23.6 min, 5 (9), $0.06, and 7 of 7 where 1.65 finished 6.
+- Read by hand, one finished answer is wrong in a way no check caught: Gemma 3 4B gave a glacier's elevation on
+  Kilimanjaro's page (3,200 m) as the mountain's height. Also left as found: Llama's cold brew steps without the
+  steeping time, Gemma's owl result without "wise" or a "My view:" paragraph, and Phi-4's recommendation under a
+  "Recommendation" heading rather than "My view:".
+- 50 SimpleQA questions on Phi-4 (the same 50 as before): 45 correct (90%), 4 wrong, 1 not answered, in 28.6 minutes
+  and 634 model calls, for $0.13; on 1.65.1 the same model answered 38 and 39, and alone, with no browsing, 1. Graded
+  by hand against SimpleQA's answers, one grader. Of the 4 wrong, 2 give what the page read says (a news page's
+  date, in every run, and a founding date that differs from SimpleQA's answer key); 1 is "33 or 34" for an age where
+  only the year of the second date is given, which SimpleQA counts as wrong; and 1 is a finding the checks should
+  have refused: Phi-4 recorded that Lucien Gaudin won the men's foil in 1921, from a page that lists him only for
+  épée, and the word-matching check let the changed word through. Checking that a finding keeps the page's own
+  key words is on the roadmap.
 
 ## [1.65.1] - 2026-11-10
 Cloud mode works again, and works with OpenAI models. The agent's behaviour with a local model is unchanged.
