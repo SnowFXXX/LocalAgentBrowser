@@ -382,7 +382,10 @@ class TestCloudFailures:
 
     def test_the_failure_advice_names_the_cloud_problem_not_lm_studio(self, monkeypatch):
         import openai
-        import httpx
+        try:  # openai 3 is built on httpx2, openai 2 on httpx
+            import httpx2 as httpx
+        except ImportError:
+            import httpx
 
         monkeypatch.setattr(agent, "BASE_URL", "https://openrouter.ai/api/v1")
         response = httpx.Response(429, request=httpx.Request("POST", "https://openrouter.ai/api/v1"))
