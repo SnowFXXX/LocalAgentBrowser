@@ -23,9 +23,10 @@ questions and correct over those attempted).
 | [1.64, local](results/1.64_qwen2.5-7b-instruct_local/answers.md) | Qwen2.5-7B, CPU only | 50 | 35 | 6 | 9 | 0.769 |
 | [Qwen2.5-7B alone, no browsing](results/closed-book_qwen2.5-7b-instruct_local/answers.md) | Qwen2.5-7B, CPU only | 50 | 0 | 13 | 37 | 0 |
 
-**Grading.** Each answer was graded by Claude against SimpleQA's reference answer, one question at a time, with a
-note for every wrong answer and every judgement call (an answer that isn't a clean match or a clean miss). The author
-is reviewing the judgement calls; grades that change will be updated here. Every grade, note and answer is in the
+**Grading: graded by Claude, judgement calls reviewed by the author.** Each answer was graded by Claude against
+SimpleQA's reference answer, one question at a time, with a note for every wrong answer and every judgement call (an
+answer that isn't a clean match or a clean miss). The author reviewed all 18 judgement calls and borderline grades
+in these runs and agreed with every one. Every grade, note and answer is in the
 run's folder, so any of them can be checked.
 
 **Sample size.** 50 questions can't separate close scores: the likely range for 45 of 50 is about 79% to 96%. A

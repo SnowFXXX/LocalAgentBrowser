@@ -1,6 +1,6 @@
 # SimpleQA answers: 1.66_microsoft_phi-4_20261115
 
-Questions: sample.json. Grader: Claude (Master session), 2026-11-16, by hand against the reference answers with SimpleQA's three grades. One grader; judgement calls are noted. Not yet reviewed by the user.
+Questions: sample.json. Grader: Graded by Claude against SimpleQA's reference answers, one question at a time, with a note for every wrong answer and judgement call. Judgement calls reviewed by the author on 2026-11-16: 18 across the published runs (11 marked judgement calls and 7 borderline CORRECT grades); the author agreed with every one.
 
 Correct 45, incorrect 4, not attempted 1 of 50 graded; accuracy 90.0%, correct given attempted 91.8%, F-score 0.909.
 
