@@ -304,7 +304,8 @@
       by the suite's measures. On 1.65.1, Gemini 3.8 Flash and GPT-5.6 Terra also finished 7 of 7 (for $0.24 and $0.47),
       and GPT-4o lost three tasks to a rate limit that 1.66 now waits out. <strong>On SimpleQA</strong>, a public
       benchmark of short, hard facts, Phi-4 with LocalAgentBrowser 1.66 answered 170 of the standard 200 (85%, likely
-      range 79 to 89%), and was right 94% of the time when it answered; when it couldn't verify an answer, it said so.
+      range 79 to 89%), and was right 94% of the time when it answered. 19 times it said it couldn't verify an answer
+      rather than guess; 11 answers were wrong.
       Alone, with no browsing, Phi-4 answered 1 of 50; with LocalAgentBrowser, 45 of the same 50. On a CPU with no GPU,
       Qwen2.5-7B answered 35 of 50 (the Fathom-DeepResearch paper reports 50.8% for that model with plain search, on a
       different question set). Graded by Claude, judgement calls reviewed by the author, and checked against OpenAI's
