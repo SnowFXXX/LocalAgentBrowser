@@ -30,6 +30,9 @@ COVERAGE_ITEM_CHECK = (
     "conditions, or that name it if there are no conditions ('' if the DISCOVERIES do not say it); [] if the item asks "
     "for neither.")
 
+COVERAGE_SHORTER = ("Your reply was not complete JSON (it may have been cut off at the length limit). Reply again with the same "
+                    "JSON, with evidence holding only the shortest words from the DISCOVERIES that answer the item, "
+                    "copied exactly (at most 40 words), and each proof just as short.")
 COVERAGE_QUOTE = ("Your evidence gives only discovery numbers. Reply again with the same JSON, with evidence holding the "
                   "words from those DISCOVERIES that answer ITEM {n} itself, copied exactly; '' if none of them answers it.")
 # "Or part of it": asked whether a discovery "says what the ITEM asks for", the 7B answered no 6 times out of 6 for

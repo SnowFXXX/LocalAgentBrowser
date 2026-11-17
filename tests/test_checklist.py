@@ -188,8 +188,9 @@ class TestCoverageGaps:
         assert gaps(["What each one is best at"], [reply])[0] == []
 
     def test_opinion_items_are_not_checked_and_failed_calls_report_nothing(self):
-        result, model = gaps(["Give your own opinion on why", "What comes out"], ["not json"])
-        assert result == [] and len(model.calls) == 1
+        # A reply that isn't JSON is asked for once more; failing again, the item is not checked and reports no gap
+        result, model = gaps(["Give your own opinion on why", "What comes out"], ["not json", "not json"])
+        assert result == [] and len(model.calls) == 2
 
 
 class TestCoverageRefusal:
@@ -984,3 +985,38 @@ def test_a_repeated_block_of_sections_is_cut_and_look_alikes_stay():
                  "5,895 m [1].\n### Height of the Tallest Mountain in Africa in Feet\n19,341 ft [1].",
                  "## GIMP\n### Main Strengths\nLayers [1].\n## Krita\n### Main Strengths\nBrushes [2]."):
         assert ab.without_repeated_sections(text) == text
+
+
+class TestCutOffCoverageReplies:
+    """A coverage reply cut off at the length limit (Opus 5.5 copied long passages as evidence and broke mid-JSON) is
+    asked for once more with a higher limit; failing again, the item is not checked, never counted as covered."""
+
+    CUT = '{"evidence": "[1] LibreOffice is free and open source and has a long list of features that goes on'
+
+    def test_a_cut_off_reply_is_asked_again_with_a_higher_limit_and_shorter_evidence(self):
+        client, model = fake_client([(self.CUT, "length"), verdict(evidence="[1] LibreOffice is free and open source")])
+        unchecked = set()
+        result, unanswered, _ = asyncio.run(ab.coverage_gaps(client, "o", checklist("Name one office suite"),
+                                                          discoveries("LibreOffice is free and open source."),
+                                                          unchecked=unchecked))
+        assert len(model.calls) == 2 and unanswered == [] and result == [] and unchecked == set()
+        assert model.calls[1][-1]["content"] == ab.COVERAGE_SHORTER
+        assert model.calls[1][-2] == {"role": "assistant", "content": self.CUT}
+
+    def test_failing_twice_is_not_checked_not_covered_and_not_unanswered(self, capsys):
+        client, model = fake_client([(self.CUT, "length"), (self.CUT, "length")])
+        unchecked, items = set(), checklist("Name one office suite")
+        result, unanswered, _ = asyncio.run(ab.coverage_gaps(client, "o", items, discoveries("LibreOffice is free."),
+                                                          unchecked=unchecked))
+        assert unchecked == {1} and unanswered == [] and result == [] and items[0]["unchecked"]
+        assert "not checked (not counted as covered)" in capsys.readouterr().out
+        assert "coverage check failed, not checked" in ab.checklist_lines(items, report=True)
+        assert "not checked" not in ab.checklist_lines(items)  # the prompts the model reads are unchanged
+
+    def test_a_later_check_that_works_clears_the_mark(self):
+        client, _ = fake_client([(self.CUT, "length"), (self.CUT, "length"), verdict(evidence="[1] LibreOffice is free")])
+        items, found = checklist("Name one office suite"), discoveries("LibreOffice is free.")
+        asyncio.run(ab.coverage_gaps(client, "o", items, found))
+        assert items[0]["unchecked"]
+        asyncio.run(ab.coverage_gaps(client, "o", items, found))
+        assert "unchecked" not in items[0]

@@ -242,6 +242,9 @@ def score_run(task, journal, console="", checklist=None):
         "model_minutes": round(sum(calls) / 60, 1),
         "model_calls": len(calls),
         "time_limit_reached": "TEST TIME LIMIT REACHED" in console,
+        # Checklist items whose coverage check failed (a reply cut off even after the retry): never verified
+        "coverage_unchecked": len(set(re.findall(r"Coverage check of item (\d+) failed", console))),
+        "coverage_retries": console.count(ab.COVERAGE_RETRY_LINE),
         "discoveries": len(found),
         "sources": sorted({host(e.get("source")) for e in found if e.get("source")}),
         "checks": dict(sorted(checks.items())),
@@ -290,6 +293,8 @@ def score_run(task, journal, console="", checklist=None):
             problems.append(f"{len(score['uncited_lines'])} uncited paragraph(s)")
         if score["outside_knowledge"]:
             problems.append(f"{len(score['outside_knowledge'])} gap(s) filled from the model's own knowledge")
+    if score.get("coverage_unchecked"):
+        problems.append(f"{score['coverage_unchecked']} checklist item(s) not checked (coverage reply failed)")
     if score.get("off_source_discoveries"):
         problems.append(f"{score['off_source_discoveries']} of {len(found)} discoveries outside the named source")
     score["problems"] = problems
