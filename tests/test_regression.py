@@ -634,3 +634,14 @@ def test_test_runs_never_move_windows(monkeypatch):
     assert not windows.enabled() and windows.browser_args() == []
     monkeypatch.setenv("LAB_SIDE_BY_SIDE", "0")
     assert not windows.enabled()
+
+
+class TestCoverageNotChecked:
+    def test_items_whose_coverage_check_failed_are_counted_and_listed_as_a_problem(self):
+        console = ("⚠️ Coverage check of item 1 failed (Unterminated string); not checked (not counted as covered).\n"
+                   f"{ab.COVERAGE_RETRY_LINE}\n"
+                   "⚠️ Coverage check of item 3 failed (Unterminated string); not checked (not counted as covered).\n"
+                   "⚠️ Coverage check of item 3 failed (Unterminated string); not checked (not counted as covered).\n")
+        score = rg.score_run(TASK, journal("LibreOffice [1].", "LibreOffice ..."), console)
+        assert score["coverage_unchecked"] == 2 and score["coverage_retries"] == 1
+        assert "2 checklist item(s) not checked (coverage reply failed)" in score["problems"]

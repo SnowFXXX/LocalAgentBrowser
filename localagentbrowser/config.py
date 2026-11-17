@@ -114,6 +114,11 @@ MAX_CHECKLIST_ITEM_CHARS = 200
 SPLIT_MAX_TOKENS = 300
 
 COVERAGE_MAX_TOKENS = 400  # Length limit for the check of one checklist item before finishing
+COVERAGE_RETRY_MAX_TOKENS = 2000  # The one retry of a check whose reply was cut off at that limit (Opus 5.5 copied
+                                  # long passages as evidence and 9 checks in four tasks broke mid-JSON). At 1000,
+                                  # Phi-4 still re-copied ~950 tokens of evidence and proofs, and a model that
+                                  # reasons before answering (Gemini 3.8 Flash) spent ~390 tokens before its first
+                                  # character: both broke again in replays of 60 saved failures
 
 MAX_CONDITION_WORDS = 2    # Longer "conditions" are descriptions of the item, not properties a thing must have
 

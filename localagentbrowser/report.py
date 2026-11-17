@@ -547,7 +547,7 @@ def write_report(objective, journal, checklist=None, stop_reason=None):
                   "_(The agent did not finish; see the discoveries below.)_"]
     if checklist and len(checklist) > 1:
         lines += ["", "## Checklist", "", "The parts of the objective, with the discoveries recorded for each:", "",
-                  checklist_lines(checklist)]
+                  checklist_lines(checklist, report=True)]
     lines += ["", f"## Discoveries ({len(found)})"]
     for i, e in enumerate(found, start=1):
         by_code = " (recorded by the code: the install command this page gives)" if e.get("by_code") else ""

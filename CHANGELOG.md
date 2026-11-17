@@ -6,6 +6,17 @@ measured on the regression suite and released as part of 1.57 and 1.61 (see
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [Unreleased]
+### Fixed
+- **Coverage checks cut off mid-reply counted as covered.** Each checklist item's coverage check had a 400-token
+  reply limit; a model copying long evidence (Opus 5.5 most of all) was cut off mid-JSON, and the code counted the
+  item as covered without checking it: 9 items in four tasks of an Opus suite, and 60 across every model family
+  in all saved runs since 1.61 (in the published 1.66 suites: Phi-4 3, Gemma 2, Llama 1; none in the SimpleQA
+  runs). Now a reply that isn't complete JSON is asked for once more, with a 2,000-token limit and shorter
+  evidence; failing again, the item is "not checked": it sends nothing back and adds no "not found" line, the
+  report's checklist says so, and the test suite counts it. Replayed on the saved failures, every Opus one and 63
+  of 64 others recovered; the one left, a malformed reply, was reported as not checked.
+
 ## [1.66.1] - 2026-11-17
 Documentation only; the code is unchanged from 1.66, as measured. Released so PyPI's page matches the README.
 - **SimpleQA, published question by question:** benchmarks/simpleqa has the questions, the scripts and every

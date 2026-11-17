@@ -3,13 +3,17 @@ items, counts, proof of conditions), and what is reported as not found or not pr
 import json
 import re
 from urllib.parse import urlparse
-from .config import COVERAGE_MAX_TOKENS, MAX_CONDITION_WORDS, MAX_MISSING_CLAIM_WORDS, MAX_THING_NAME_WORDS, MODEL
-from .prompts import CITED_FORMAT, CITED_QUESTION, COVERAGE_FORMAT, COVERAGE_ITEM_CHECK, COVERAGE_QUOTE, SYSTEM_PROMPT
+from .config import (COVERAGE_MAX_TOKENS, COVERAGE_RETRY_MAX_TOKENS, MAX_CONDITION_WORDS, MAX_MISSING_CLAIM_WORDS,
+                     MAX_THING_NAME_WORDS, MODEL)
+from .prompts import (CITED_FORMAT, CITED_QUESTION, COVERAGE_FORMAT, COVERAGE_ITEM_CHECK, COVERAGE_QUOTE, COVERAGE_SHORTER,
+                      SYSTEM_PROMPT)
 from .text import MISSING_STOPWORDS, OPINION_REQUEST, asked_count, extract_message_content, plain_words, word_pairs
 from .pages import ITEM_VERBS
 from .dates import SPAN_QUESTION, dates_in
 
 UNANSWERED_GAP = "nothing in DISCOVERIES SO FAR answers it"
+UNCHECKED_NOTE = "not checked (not counted as covered)"
+COVERAGE_RETRY_LINE = "↻ A coverage reply was not complete JSON (cut off or malformed); asking once more, with a higher limit."
 # Items asking for amounts, and what an amount looks like: a cold brew result listed "coffee beans, water, a strainer"
 # for "what I need with the quantities" without saying no quantities were found, and the check's own "missing
 # quantities" verdicts were too often wrong to report (they named things the discoveries had)
@@ -159,7 +163,26 @@ def one_site(objective, journal):
     sites = {site(e.get("source")) for e in journal if e.get("action") == "DISCOVER"}
     return sites.pop() or None if len(sites) == 1 else None
 
-async def coverage_gaps(client, objective, checklist, journal, only=None, evidence=None):
+async def coverage_reply(client, messages):
+    """The model's coverage verdict for one item, read as JSON, and the reply it came from.
+
+    A reply cut off at the length limit is asked for again once, with a higher limit and shorter evidence: Opus 5.5
+    copied long passages as evidence, its replies stopped mid-JSON at COVERAGE_MAX_TOKENS ("Unterminated string"), and
+    9 checklist items in four tasks went unchecked. A second failure raises, and the item is reported as not checked."""
+    response = await client.chat.completions.create(
+        model=MODEL, temperature=0.2, max_tokens=COVERAGE_MAX_TOKENS, response_format=COVERAGE_FORMAT, messages=messages)
+    text = extract_message_content(response)
+    try:
+        return response, json.loads(text)
+    except ValueError:
+        print(COVERAGE_RETRY_LINE)
+    retry = messages + [{"role": "assistant", "content": text}, {"role": "user", "content": COVERAGE_SHORTER}]
+    response = await client.chat.completions.create(
+        model=MODEL, temperature=0.2, max_tokens=COVERAGE_RETRY_MAX_TOKENS, response_format=COVERAGE_FORMAT,
+        messages=retry)
+    return response, json.loads(extract_message_content(response))
+
+async def coverage_gaps(client, objective, checklist, journal, only=None, evidence=None, unchecked=None):
     """What the discoveries still lack for each checklist item, judged item by item just before finishing.
 
     The finish check takes the model's word that an item is covered: on an explanation task it finished from one
@@ -168,7 +191,8 @@ async def coverage_gaps(client, objective, checklist, journal, only=None, eviden
     wrong; asked about one item at a time it named such gaps. Conditions are not taken on its word: for each
     thing it names, it must copy words from the discoveries, and the code checks they are there and state the
     condition. A condition counts only if the item itself states it (the model copied one item's conditions to
-    the next). Items asking for an opinion or recommendation are not checked; a failed call reports no gaps.
+    the next). Items asking for an opinion or recommendation are not checked. A check whose reply fails twice
+    (see coverage_reply) reports no gap for its item and adds it to `unchecked`: not checked, never covered.
 
     Each item is asked in a prompt of its own, with the item last so the long instructions before it are read once.
     Asked as a continuation of the browsing conversation instead (which kept that conversation in LM Studio's
@@ -187,10 +211,7 @@ async def coverage_gaps(client, objective, checklist, journal, only=None, eviden
                    f"{COVERAGE_ITEM_CHECK}\n\nThe item to check: ITEM {n}. {item['text']}")
         messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": request}]
         try:
-            response = await client.chat.completions.create(
-                model=MODEL, temperature=0.2, max_tokens=COVERAGE_MAX_TOKENS, response_format=COVERAGE_FORMAT,
-                messages=messages)
-            verdict = json.loads(extract_message_content(response))
+            response, verdict = await coverage_reply(client, messages)
             # Only discovery numbers ("[1]") as evidence is not taken on its word either: a 7B model gave "[1]" for
             # "handling of many simultaneous users", [1] being a page's opening paragraph that never mentions it, and
             # the final result filled the item from the model's own knowledge, cited to [1]. Asked to copy the words,
@@ -199,12 +220,9 @@ async def coverage_gaps(client, objective, checklist, journal, only=None, eviden
                 bare = str(verdict["evidence"])
                 messages += [{"role": "assistant", "content": extract_message_content(response)},
                              {"role": "user", "content": COVERAGE_QUOTE.format(n=n)}]
-                response = await client.chat.completions.create(
-                    model=MODEL, temperature=0.2, max_tokens=COVERAGE_MAX_TOKENS, response_format=COVERAGE_FORMAT,
-                    messages=messages)
+                response, verdict = await coverage_reply(client, messages)
                 cited = [found[int(c) - 1]["extracted_data"] for c in re.findall(r"\[(\d+)\]", bare)
                          if 0 < int(c) <= len(found)]
-                verdict = json.loads(extract_message_content(response))
                 # Each cited part is checked on its own: quoting three discoveries at once, an owl task's evidence
                 # matched no single one of them and the item was wrongly sent back as unanswered
                 quotes = [q for q in re.split(r"\[\d+\]", str(verdict.get("evidence", ""))) if re.search(r"\w", q)]
@@ -237,8 +255,14 @@ async def coverage_gaps(client, objective, checklist, journal, only=None, eviden
             things = [t for t in verdict.get("things") or [] if isinstance(t, dict) and str(t.get("name", "")).strip()
                       and "\n" not in str(t["name"]).strip() and len(str(t["name"]).split()) <= MAX_THING_NAME_WORDS]
         except Exception as err:
-            print(f"⚠️ Coverage check of item {n} failed ({err}); treating it as covered.")
+            # Not checked is not covered: it sends no one back and adds no "not found" line (nothing says the item is
+            # unanswered), but the report shows it, so a reader knows this part was never verified
+            print(f"⚠️ Coverage check of item {n} failed ({err}); {UNCHECKED_NOTE}.")
+            item["unchecked"] = True
+            if unchecked is not None:
+                unchecked.add(n)
             continue
+        item.pop("unchecked", None)
         # Nothing copied for the item, not even a discovery number, means nothing recorded answers it: on a how-to
         # the check gave empty evidence and nothing missing for "care in the first two weeks", the agent had linked
         # that item to "the best time to repot is spring and summer", and the final result invented a care routine
@@ -405,7 +429,8 @@ async def coverage_refusal(client, objective, tried, journal):
     if any(e.get("action") == "DISCOVER" for e in journal):
         print("🔎 Checking each checklist item against the discoveries before finishing...")
         gaps, tried["unanswered"], unproven = await coverage_gaps(client, objective, checklist, journal,
-                                                                    evidence=tried.setdefault("evidence", {}))
+                                                                    evidence=tried.setdefault("evidence", {}),
+                                                                    unchecked=tried.setdefault("unchecked", set()))
         tried["short_counts"] = short_counts(gaps)
         # Open again until something new is linked to it: after "nothing answers item 4", the read-on check told Phi-4
         # "every item of the OBJECTIVE CHECKLIST already has the discoveries it asks for. Choose FINISH now", because
@@ -554,6 +579,7 @@ async def not_found_items(client, objective, tried, journal):
         return candidates, []
     print(f"🔎 Checking checklist item(s) {', '.join(map(str, rechecked))} once more before writing the final result...")
     gaps, unanswered, unproven = await coverage_gaps(client, objective, checklist, journal, only=set(rechecked),
-                                                     evidence=tried.setdefault("evidence", {}))
+                                                     evidence=tried.setdefault("evidence", {}),
+                                                     unchecked=tried.setdefault("unchecked", set()))
     tried["short_counts"] = {n: count for n, count in short_counts(gaps).items() if n not in unanswered}
     return [n for n in unanswered if n in candidates or n in rechecked], unproven

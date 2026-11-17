@@ -28,7 +28,9 @@ async def split_objective(client, objective):
         items = []
     return [{"text": text, "discoveries": []} for text in items[:MAX_CHECKLIST_ITEMS]] or [{"text": objective, "discoveries": []}]
 
-def checklist_lines(checklist):
+def checklist_lines(checklist, report=False):
+    """The checklist with the discoveries linked to each item. In the report (not in prompts), an item whose coverage
+    check failed says so: it was never verified, and is not to be read as covered."""
     lines = []
     for number, item in enumerate(checklist or [], 1):
         # An opinion is written at FINISH, not found on a page: shown as "discoveries for it: none yet", it kept an
@@ -37,7 +39,8 @@ def checklist_lines(checklist):
             lines.append(f"{number}. {item['text']} (written by you at FINISH, not found on a page)")
             continue
         found = ", ".join(f"[{n}]" for n in item["discoveries"])
-        lines.append(f"{number}. {item['text']} (discoveries for it: {found or 'none yet'})")
+        note = "; coverage check failed, not checked" if report and item.get("unchecked") else ""
+        lines.append(f"{number}. {item['text']} (discoveries for it: {found or 'none yet'}{note})")
     return "\n".join(lines)
 
 def every_item_has_discoveries(checklist):
