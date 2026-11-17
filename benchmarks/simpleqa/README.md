@@ -32,8 +32,23 @@ likely range for 85% is about 79% to 89% (Wilson, 95%); for 45 of 50 it is about
 **Grading: graded by Claude, judgement calls reviewed by the author.** Each answer was graded by Claude against
 SimpleQA's reference answer, one question at a time, with a note for every wrong answer, judgement call and
 borderline grade (an answer that isn't a clean match or a clean miss). The author reviewed every one of them: 18
-across the 50-question runs (all agreed) and 30 in the 200 (2 changed). Every grade, note and answer is in the run's
-folder, so any of them can be checked.
+across the 50-question runs (all agreed) and 30 in the 200, covering 45 rows. The author changed 2, both in the 200:
+q2 (NOT_ATTEMPTED to INCORRECT) and q157 (INCORRECT to NOT_ATTEMPTED); their notes say so. Every grade, note and
+answer is in the run's folder, so any of them can be checked.
+
+**Grading rules.**
+- SimpleQA's three grades: CORRECT contains the reference and contradicts nothing; INCORRECT is a different answer,
+  a contradiction, or a hedge between candidates ("22 or 23"); NOT_ATTEMPTED says it couldn't find out, with no
+  wrong answer.
+- A partial answer that gives part of the reference and nothing wrong ("May 2019" for May 28, 2019; "May 2000" for
+  2 May 2000) is NOT_ATTEMPTED, as SimpleQA defines it. OpenAI's grader counts those as INCORRECT; both are kept.
+- Some answers end with notes from LocalAgentBrowser's own checks, not the model: "Left out, because no discovery
+  gives these numbers: ...", a "Not found in the pages read" list, and a numbers warning. Answers are graded as
+  written, notes included. Whether a number inside a "Left out" note counts as the answer is the author's call row
+  by row: in q2 of the 200 it was counted ("33 years" for 32), in q88 it wasn't ("2020" for April 2019).
+- Some "Not found" lists after a right answer are garbled ("ten more (only none of the ten were found)"): the
+  count check read a number in the question ("track 10") as a count of things asked for. A known bug; it changed no
+  grade.
 
 **On Hugging Face:** every run here is also the dataset [SnowFX/localagentbrowser-simpleqa](https://huggingface.co/datasets/SnowFX/localagentbrowser-simpleqa),
 one row per question with the answer, its findings and sources, and both grades (`simpleqa_200` and `simpleqa_50`).
@@ -49,8 +64,8 @@ $1.34.
 
 - **[sample.json](sample.json):** the first 50, drawn with `random.Random(20261106)` from the dataset and sorted.
 - **[sample-200.json](sample-200.json):** the 200 questions OpenAI's [simple-evals](https://github.com/openai/simple-evals)
-  runs with `--examples 200` (`random.Random(0).sample` over the dataset rows), so a run on them can be compared
-  with anyone else's on the same subset. One question is in both samples.
+  runs with `--examples 200`: simple-evals' own draw, `random.Random(0).sample` over the dataset rows (seed 0), in
+  the order drawn. Anyone running simple-evals with `--examples 200` gets the same questions. One question is in both samples.
 
 `run.py sample` draws either one again from the dataset file and checks its SHA-256 first.
 

@@ -1108,7 +1108,7 @@ Not found in the pages read:
 
 > ⚠️ Numbers not found in the recorded discoveries: 2020. Check them before relying on this result.
 
-**Grade:** NOT_ATTEMPTED (No answer; the code cut the model's "2020" (the reference is April 2019).)
+**Grade:** NOT_ATTEMPTED (No answer: the text before the code's note gives none. The note names the cut "2020" (the reference is April 2019); the author judged that it doesn't count as an answer here. Whether a number in the code's "Left out" note counts is the author's call row by row: in q2 it was counted.)
 
 ## q89 (Science and technology)
 
