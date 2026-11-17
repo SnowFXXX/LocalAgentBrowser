@@ -35,6 +35,9 @@ borderline grade (an answer that isn't a clean match or a clean miss). The autho
 across the 50-question runs (all agreed) and 30 in the 200 (2 changed). Every grade, note and answer is in the run's
 folder, so any of them can be checked.
 
+**On Hugging Face:** every run here is also the dataset [SnowFX/localagentbrowser-simpleqa](https://huggingface.co/datasets/SnowFX/localagentbrowser-simpleqa),
+one row per question with the answer, its findings and sources, and both grades (`simpleqa_200` and `simpleqa_50`).
+
 **OpenAI's grader**, as a second, automatic grade: simple-evals' own grader prompt and model (GPT-4.1,
 `grade_openai.py`), run after Claude's grades were done, on the same final answers. It agrees on 194 of the 200 and
 on 47 to 50 of each 50. Where they differ, it is more lenient on near misses ("1 year and 162 days" for 161 days, a

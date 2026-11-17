@@ -102,7 +102,8 @@ reviewed by the author. Every question, answer, source and grade is in
 Phi-4 (November 16, 2026): **170 correct (85%)**, 11 wrong, 19 not attempted, F-score 0.892, in 142 minutes for
 $0.58. When it answered, it was right 94% of the time; when it couldn't verify an answer, it said so instead of
 guessing. OpenAI's own grader (GPT-4.1, simple-evals' prompt) counts 171 correct and gives the same grade on 194 of
-the 200.
+the 200. Every answer, its sources and both grades are also a Hugging Face dataset:
+[SnowFX/localagentbrowser-simpleqa](https://huggingface.co/datasets/SnowFX/localagentbrowser-simpleqa).
 
 Phi-4 is the cloud default for its clean results; 1.65 named `qwen/qwen-2.5-7b-instruct`, which no OpenRouter
 provider serves now.
