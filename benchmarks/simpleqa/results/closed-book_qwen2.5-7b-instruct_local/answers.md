@@ -1,6 +1,6 @@
 # SimpleQA answers: closed-book_qwen2.5-7b-instruct_local
 
-Questions: sample.json. Grader: Claude (Master session), 2026-11-10, by hand against the references with SimpleQA's three grades. No answer was correct; every "I don't know" is NOT_ATTEMPTED; every other answer is INCORRECT. Not yet reviewed by the user.
+Questions: sample.json. Grader: Graded by Claude against SimpleQA's reference answers, one question at a time, with a note for every wrong answer and judgement call. Judgement calls reviewed by the author on 2026-11-16: 18 across the published runs (11 marked judgement calls and 7 borderline CORRECT grades); the author agreed with every one.
 
 Correct 0, incorrect 13, not attempted 37 of 50 graded; accuracy 0.0%, correct given attempted 0.0%, F-score 0.000.
 

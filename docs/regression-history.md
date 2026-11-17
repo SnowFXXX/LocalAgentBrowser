@@ -336,7 +336,7 @@ have not been re-run on 1.66 yet.
   Kilimanjaro's page (3,200 m) as the mountain's height. Left as found: Llama's cold brew steps without the steeping
   time, Gemma's owl result without "wise" or a "My view:" paragraph, and Phi-4's recommendation under a heading
   rather than "My view:". Phi-4's one "number not in discoveries" is "1,5" in a chemical name, a checker quirk.
-- **50 SimpleQA questions on Phi-4** (the same 50 each time, graded by Claude against the reference answers, judgement calls under review by the author;
+- **50 SimpleQA questions on Phi-4** (the same 50 each time, graded by Claude, judgement calls reviewed by the author;
   every answer is in [benchmarks/simpleqa](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/benchmarks/simpleqa/README.md)): alone, 1 correct; 1.65.1,
   38 and 39; 1.66, 45 correct, 4 wrong, 1 not answered, in 28.6 minutes and 634 model calls, for $0.13. One of the
   four wrong answers credits a fencer with foil where the page lists him only for épée: the right page, the wrong
