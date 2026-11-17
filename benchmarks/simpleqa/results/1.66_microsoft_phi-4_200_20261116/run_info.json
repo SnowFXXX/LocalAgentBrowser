@@ -1,0 +1,22 @@
+{
+ "model": "microsoft/phi-4",
+ "sample": "sample-200.json",
+ "questions": 200,
+ "commit": "a53f059b58cffdc315b75d9a9d0f64b6ad2146b1",
+ "uncommitted_changes": false,
+ "minutes_per_question": 60,
+ "blocked_sites": [
+  "huggingface.co/datasets",
+  "github.com/openai/simple-evals",
+  "openaipublic.blob.core.windows.net",
+  "kaggle.com/datasets",
+  "paperswithcode.com",
+  "openai.com/index/introducing-simpleqa",
+  "cdn.openai.com/papers/simpleqa",
+  "arxiv.org/abs/2411.04368",
+  "arxiv.org/pdf/2411.04368"
+ ],
+ "started": "2026-11-16T17:54:08",
+ "finished": "2026-11-16T20:16:15",
+ "minutes": 142.1
+}

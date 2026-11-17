@@ -341,6 +341,11 @@ have not been re-run on 1.66 yet.
   38 and 39; 1.66, 45 correct, 4 wrong, 1 not answered, in 28.6 minutes and 634 model calls, for $0.13. One of the
   four wrong answers credits a fencer with foil where the page lists him only for épée: the right page, the wrong
   word.
+- **200 SimpleQA questions on Phi-4** (November 16; the standard subset simple-evals runs with `--examples 200`):
+  170 correct (85%), 11 wrong, 19 not attempted, F-score 0.892, 142 minutes, $0.58. Right 94% of the time when it
+  answered. OpenAI's grader (GPT-4.1) counts 171 and agrees on 194 of 200. Two output problems showed up on right
+  answers: a garbled count note ("ten more") after single-answer questions, and a cut number repeated in the "Left
+  out" note, which OpenAI's grader read as the answer.
 
 ## What the steps showed overall
 

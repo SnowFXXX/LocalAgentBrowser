@@ -21,7 +21,8 @@ Key facts:
   the four tested models during setup, and Start-menu shortcuts; the report opens by itself when a run ends.
 - Cloud models (optional, since 1.65): through OpenRouter with the user's own key; much faster, but prompts and pages
   read leave the computer. On 1.66 Phi-4, GPT-4o-mini, Llama-3.1-8B and Gemma-3-4B each finished 7 of 7 tasks in 4 to
-  24 minutes for $0.04 to $0.14 a suite. On 50 SimpleQA questions Phi-4 alone answered 1; with LocalAgentBrowser 1.66, 45.
+  24 minutes for $0.04 to $0.14 a suite. On SimpleQA, Phi-4 alone answered 1 of 50; with LocalAgentBrowser 1.66,
+  45 of the same 50 and 170 of the standard 200 (85%).
   The Windows installer sets them up; otherwise set LMSTUDIO_BASE_URL to https://openrouter.ai/api/v1, LMSTUDIO_MODEL
   to an OpenRouter model (microsoft/phi-4) and LMSTUDIO_API_KEY to the key (the README's FAQ has the full settings).
 - Honesty by design: rules in code check the model's claims. Findings must be on the page shown. Before finishing,

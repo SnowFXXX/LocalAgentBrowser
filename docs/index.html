@@ -170,7 +170,7 @@
     <p class="new"><strong>L.A.B. for short, in a LAB COAT: Citations Over Assumed Truth.</strong> Our principle is
       Verification Over Trust.</p>
     <p class="new"><strong>New in 1.66:</strong> sturdier cloud runs, more of every answer checked in code, the console and
-      browser side by side, and 45 of 50 SimpleQA questions right with Phi-4.</p>
+      browser side by side, and 85% on the standard 200 SimpleQA questions with Phi-4.</p>
     <div class="ctas">
       <a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest">Download for Windows</a>
       <a class="btn" href="#install">Other ways to install</a>
@@ -276,7 +276,7 @@
         <h3>Phi-4</h3>
         <div class="score">7<small> of 7 finished</small></div>
         <dl><dt>All 7 tasks</dt><dd>5.6 min</dd><dt>Uncited lines</dt><dd>1 (4 on 1.65)</dd><dt>Cost</dt><dd>$0.04</dd></dl>
-        <p>The cleanest results for the price. 45 of 50 SimpleQA questions right.</p>
+        <p>The cleanest results for the price. 85% on 200 SimpleQA questions.</p>
       </div>
       <div class="model">
         <div class="tag">OpenAI's small model</div>
@@ -302,11 +302,12 @@
     </div>
     <p class="lead" style="font-size:17px;margin-top:22px">No finished answer filled a gap from the model's own knowledge,
       by the suite's measures. On 1.65.1, Gemini 3.8 Flash and GPT-5.6 Terra also finished 7 of 7 (for $0.24 and $0.47),
-      and GPT-4o lost three tasks to a rate limit that 1.66 now waits out. <strong>On 50 SimpleQA questions</strong>, a
-      public benchmark of short, hard facts, Phi-4 alone answered 1; with LocalAgentBrowser 1.66, 45, in 29 minutes for
-      13 cents.</p>
+      and GPT-4o lost three tasks to a rate limit that 1.66 now waits out. <strong>On SimpleQA</strong>, a public
+      benchmark of short, hard facts, Phi-4 alone answered 1 of 50; with LocalAgentBrowser 1.66, 45 of the same 50, and
+      170 of the standard 200 (85%, F-score 0.892) in 142 minutes for 58 cents. <a href="https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/benchmarks/simpleqa/README.md">Every
+      answer is published</a>, graded by Claude, judgement calls reviewed by the author.</p>
     <figure>
-      <a href="assets/chart5.png"><img src="assets/chart5.png" alt="50 SimpleQA questions, Phi-4: alone, with no browsing, 1 correct; with LocalAgentBrowser 1.65.1, 38 and 39; with 1.66, 45 (4 wrong, 1 not answered, 29 minutes, 13 cents)." width="2400" height="1350"></a>
+      <a href="assets/chart5.png"><img src="assets/chart5.png" alt="SimpleQA, Phi-4, share answered correctly: alone, with no browsing, 2% of 50; with LocalAgentBrowser 1.65.1, 76% and 78% of the same 50; with 1.66, 90% of the same 50, and 85% of the standard 200 (170 correct, 11 wrong, 19 not attempted, 142 minutes, 58 cents)." width="2400" height="1350"></a>
     </figure>
     <p class="note">On version 1.63 the four local models finished 6, 2, 2 and 0 of 7.
       <a href="https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md">Every run, measured.</a></p>
