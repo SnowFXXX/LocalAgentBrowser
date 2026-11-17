@@ -243,6 +243,19 @@ class TestCountedItems:
         assert ab.asked_count("Say how to care for the plant during the first two weeks") is None
         assert ab.asked_count("Name two drinks made with 2 cups of water") == 2
 
+    def test_numbers_that_name_or_date_something_are_not_counts(self):
+        # From the 200-question SimpleQA run, where each of these ended a right answer with "ten more (only none of
+        # the ten were found)" or the like
+        for item in ["What is the name of track 10 on disc 2 of the soundtrack?", "The title of Episode 12, Season 3",
+                     "For what career did Eddie Marsan leave school at 16?", "The final score on February 6, 2022",
+                     "Who influenced 'Rhythm 2' by Marina Abramovic?", "The maximum angle of the Rattler at Six Flags",
+                     "When was Sony's PlayStation 5 announced?", "The museum in Two Rivers, Wisconsin"]:
+            assert ab.asked_count(item) is None, item
+        assert ab.asked_count("What two football teams were mentioned in the case?") == 2
+        assert ab.asked_count("The names of the two streets at the intersection") == 2
+        assert ab.asked_count("Three free, open-source alternatives to Adobe Photoshop") == 3
+        assert ab.asked_count("Find out how at least three different cultures have viewed owls") == 3
+
     def test_fewer_different_things_than_asked_is_a_gap(self):
         reply = verdict(conditions=["open-source"], things=[("LibreOffice", "LibreOffice is free and open source"),
                                                             ("LibreOffice", "LibreOffice is free and open source")])
@@ -474,6 +487,29 @@ def test_the_report_of_a_run_stopped_while_writing_shows_an_unchecked_draft(tmp_
     assert "finished by the agent" not in report and "unchecked draft" in report
 
 
+def test_what_the_checks_cut_is_reported_after_the_result_not_inside_it(tmp_path, monkeypatch):
+    # OpenAI's SimpleQA grader read the cut "33 years" in "Left out ...: 33 years." as the answer
+    monkeypatch.chdir(tmp_path)
+    final = ("His age when he first kayaked it was not found [1].\n\n"
+             "Left out, because no discovery gives these numbers (the pages read may still have them): 33 years.")
+    journal = [{"action": "DISCOVER", "turn": 1, "extracted_data": "He kayaked the waterfall in 2017."},
+               {"action": "FINISH", "turn": 2, "finding": final}]
+    ab.write_report("How old was he?", journal)
+    report = (tmp_path / ab.REPORT_FILE).read_text(encoding="utf-8")
+    result = report.split("## Final result", 1)[1].split("\n## ", 1)[0]
+    assert "33" not in result and ab.CHECKED_POINTER in result
+    assert "## Checked by the code" in report and "gives these numbers (the pages read may still have them): 33 years." in report
+
+
+def test_a_result_the_checks_left_alone_has_no_extra_section(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    journal = [{"action": "DISCOVER", "turn": 1, "extracted_data": "Kilimanjaro is 5,895 m tall."},
+               {"action": "FINISH", "turn": 2, "finding": "Kilimanjaro is 5,895 m tall [1]."}]
+    ab.write_report("How tall is Kilimanjaro?", journal)
+    report = (tmp_path / ab.REPORT_FILE).read_text(encoding="utf-8")
+    assert "Checked by the code" not in report and ab.CHECKED_POINTER not in report
+
+
 def test_items_asking_for_amounts_with_none_recorded_are_reported_by_the_code():
     items = checklist("List what I need with the quantities", "Say how long it keeps in the fridge")
     journal = discoveries("You need coffee beans, water, and a strainer.", "It keeps in the fridge for two weeks.")
@@ -572,6 +608,13 @@ class TestFewerFoundThanAsked:
         assert text.endswith("Not found in the pages read:\n- Name three free suites: one more (only two of the three "
                              "were found)")
         assert ab.unverified_numbers(text, discoveries("x")) == []
+
+    def test_with_none_found_the_note_says_so_plainly(self):
+        items = checklist("Name three free suites", "Say what each is best at")
+        client, _ = fake_client(["The page lists no suites [1]."])
+        text = asyncio.run(ab.compose_final_result(client, "objective", discoveries("x"), items, short={1: (0, 3)}))
+        assert text.endswith("- Name three free suites: none of the three were found")
+        assert "only none" not in text
 
     def test_short_items_are_counted_again_before_the_final_result(self):
         items = checklist("Name three free suites", "Say what each is best at")
@@ -1044,3 +1087,13 @@ class TestResultsCutOffAtTheLimit:
         client, model = fake_client(["SQLite is one file.", "SQLite is one file [1]."])
         asyncio.run(ab.compose_final_result(client, "objective", discoveries("SQLite is one file.")))
         assert model.limits == [ab.COMPOSE_MAX_TOKENS, ab.COMPOSE_RETRY_MAX_TOKENS]
+
+
+def test_a_number_inside_a_chemical_name_is_part_of_the_name():
+    # Phi-4's correct "Ribulose-1,5-bisphosphate (RuBP) is regenerated using ATP [2]" was cut as an invented "1,5"
+    found = discoveries("RuBP is regenerated using ATP.")
+    assert ab.unverified_numbers("Ribulose-1,5-bisphosphate (RuBP) is regenerated using ATP [1].", found) == []
+    assert ab.unverified_numbers("It forms glyceraldehyde-3-phosphate.", found) == []
+    # A quantity written with a hyphen is still a quantity
+    assert ab.unverified_numbers("Steep it for a 16-hour period.", found) == ["16"]
+    assert ab.unverified_numbers("Use a 4-cup jar.", found) == ["4"]

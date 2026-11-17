@@ -16,12 +16,24 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
   evidence; failing again, the item is "not checked": it sends nothing back and adds no "not found" line, the
   report's checklist says so, and the test suite counts it. Replayed on the saved failures, every Opus one and 63
   of 64 others recovered; the one left, a malformed reply, was reported as not checked.
-
 - **Final results cut off at the writing step's limit.** A result that ran past its 900-token limit was asked for
   again at the same limit, so a long-writing model was cut off twice and the code kept only its finished sentences
   ("stopped partway"): Opus 5.5 lost the end of 2 of 4 results, and its cold brew lost the whole part on how long it
   keeps. Now a result cut off at the limit is asked for more briefly, with a 2,500-token limit (also used to rewrite
   a result that cites nothing). Replayed on those two Opus results, both finished, with the lost parts back.
+- **Garbled count notes after right answers.** A number in a question was read as a count of things asked for
+  ("track 10", "left school at 16", "Episode 12, Season 3", "February 6, 2022", "Six Flags"), and 10 right answers
+  in the 200-question SimpleQA run ended with notes like "ten more (only none of the ten were found)". A count now
+  has to follow a word that leads to one ("name three", "at least three", "what two", "the two") or open the item;
+  replayed on all 767 saved checklist items, this drops exactly the 21 false counts and keeps every real one. With
+  none found, the note says "none of the three were found".
+- **The checks' own notes are reported after the result, not inside it.** "Left out, because no discovery gives
+  these numbers: 33 years" put the cut number back into the answer, and OpenAI's SimpleQA grader read it as the
+  answer. The report now lists those notes and the numbers warnings in a section of their own, "Checked by the
+  code", and the result says only that the checks left something out.
+- **Numbers inside chemical names** ("ribulose-1,5-bisphosphate", "glyceraldehyde-3-phosphate") are part of the
+  name, not numbers to check: Phi-4's correct third Calvin-cycle stage was cut as an invented "1,5". Replayed on
+  1,535 saved results, only such names are affected; a hyphenated quantity ("a 16-hour period") is still checked.
 
 ## [1.66.1] - 2026-11-17
 Documentation only; the code is unchanged from 1.66, as measured. Released so PyPI's page matches the README.

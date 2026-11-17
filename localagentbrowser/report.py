@@ -73,6 +73,8 @@ def read_research_log(path="research_log.txt"):
 # Not a digit in a name ("sqlite3", "H2O", "CO2", "IPv6"): cutting invented numbers, a comparison result lost its
 # sentence naming the `sqlite3` tool, reported as the number "3"
 NUMBER_PATTERN = re.compile(r"(?<![A-Za-z_])\d+(?:[.,/]\d+)*")
+NAME_PART_BEFORE = re.compile(r"[A-Za-z]{2,}-$")
+NAME_PART_AFTER = re.compile(r"-[A-Za-z]{2,}")
 
 def unverified_numbers(text, discoveries, objective=""):
     """Numbers in the final result that appear in none of the discoveries.
@@ -94,7 +96,13 @@ def unverified_numbers(text, discoveries, objective=""):
     spans = span_numbers(discoveries, objective)
     known |= {n for n, _ in spans}
     unverified = []
-    for number in NUMBER_PATTERN.findall(text):
+    for match in NUMBER_PATTERN.finditer(text):
+        number = match.group()
+        # A number inside a chemical or similar name, with a word part on both sides ("ribulose-1,5-bisphosphate",
+        # "glyceraldehyde-3-phosphate"), is part of the name: Phi-4's correct "Ribulose-1,5-bisphosphate (RuBP) is
+        # regenerated using ATP [2]" was cut as an invented "1,5", and the result listed two of three stages
+        if NAME_PART_BEFORE.search(text, 0, match.start()) and NAME_PART_AFTER.match(text, match.end()):
+            continue
         if number.replace(",", "") not in known and number not in unverified:
             unverified.append(number)
     # An amount in words is a number too: a cold brew result said it keeps "for up to two weeks [not found]", from
@@ -415,6 +423,7 @@ def without_unnamed_names(text, discoveries, objective=""):
     return f"{body}\n\n{note}" if body else note
 
 LEFT_OUT_NOTE = re.compile(r"(?m)^Left out, because .*$")
+CHECKED_POINTER = "_(The checks left out or flagged part of this result; see \"Checked by the code\" below.)_"
 
 def unverified_code(text, discoveries):
     """Backticked commands or code in the final result that none of the discoveries contain. The checks' own "Left
@@ -532,15 +541,26 @@ def write_report(objective, journal, checklist=None, stop_reason=None):
                   "final result did not finish with:)_", "", str(finish.get("finding") or "")]
     elif finish:
         final = finish.get("finding") or "_(The agent finished without writing a final result.)_"
-        lines += [f"**Status:** finished by the agent on turn {finish.get('turn')}", "", "## Final result", "", final]
+        # The checks' own notes, which name what they cut ("Left out ...: 33 years"), go in a section of their own
+        # after the result: inside it, OpenAI's SimpleQA grader read a cut "33 years" as the answer (and a cut "80"
+        # as a right one). The result itself only says that the checks left something out
+        notes = LEFT_OUT_NOTE.findall(final)
+        answer = re.sub(r"\n{3,}", "\n\n", LEFT_OUT_NOTE.sub("", final)).strip() if notes else final
+        warnings = []
         unchecked = unverified_numbers(final, found, objective)
         if unchecked:
-            lines += ["", f"> ⚠️ Numbers not found in the recorded discoveries: {', '.join(unchecked)}. "
-                          "Check them before relying on this result."]
+            warnings.append(f"> ⚠️ Numbers not found in the recorded discoveries: {', '.join(unchecked)}. "
+                            "Check them before relying on this result.")
         code = unverified_code(final, found)
         if code:
-            lines += ["", f"> ⚠️ Commands not found in the recorded discoveries: {', '.join(f'`{c}`' for c in code)}. "
-                          "Check them before running them."]
+            warnings.append(f"> ⚠️ Commands not found in the recorded discoveries: {', '.join(f'`{c}`' for c in code)}. "
+                            "Check them before running them.")
+        if notes or warnings:
+            answer += "\n\n" + CHECKED_POINTER
+        lines += [f"**Status:** finished by the agent on turn {finish.get('turn')}", "", "## Final result", "", answer]
+        if notes or warnings:
+            lines += ["", "## Checked by the code", "", "What the checks cut from the result above, or flagged in it:"]
+            lines += [x for note in notes for x in ("", note)] + [x for w in warnings for x in ("", w)]
     else:
         # A run ended by a failed model call says why: its report read the same as a timed-out run's
         reason = f": {stop_reason}" if stop_reason else ""
@@ -727,7 +747,8 @@ async def compose_final_result(client, objective, journal, checklist=None, not_f
             text += "\n\n" + working
     # Reported by the code as well, whatever the result says
     unfound_lines = ([f"- {t}" for t in unfound] + [f"- {t}: the amounts it asks for" for t in amountless]
-                     + [f"- {t}: {in_words(wanted - k)} more (only {in_words(k)} of the {in_words(wanted)} were found)"
+                     + [f"- {t}: none of the {in_words(wanted)} were found" if not k else
+                        f"- {t}: {in_words(wanted - k)} more (only {in_words(k)} of the {in_words(wanted)} were found)"
                         for t, k, wanted in fewer])
     if unfound_lines:
         text += "\n\nNot found in the pages read:\n" + "\n".join(unfound_lines)
