@@ -117,7 +117,7 @@ a PC with little memory. Any instruction-tuned model LM Studio serves should wor
 
 1. Install [LM Studio](https://lmstudio.ai) (free). You don't need to download a model in it yet. (Not needed if
    you'll only use cloud models.)
-2. Download **`LocalAgentBrowser-1.65.1-setup.exe`** from the
+2. Download **`LocalAgentBrowser-1.66-setup.exe`** from the
    [latest release](https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest) and run it.
    - Windows may say **"Windows protected your PC"**, because the installer isn't code-signed yet. Click
      **More info → Run anyway**.
@@ -190,6 +190,12 @@ your browser when the run ends.
    folder you ran it from. Runs from the shortcut each get their own folder under **Documents\LocalAgentBrowser runs**.
 5. On Windows, the console then asks for another objective, so you can run one after another in the same window;
    press Enter on an empty line to close it.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/side-by-side-run.png" alt="A run on Windows: the console on the left shows each turn (a search, then the Mount Kilimanjaro page and the finding recorded from it), and the browser on the right shows the Wikipedia page the agent is reading" width="400">
+  <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/side-by-side-report.png" alt="The same run finished: the report on the right with the cited answer, 5,895 meters (19,341 feet), and the console on the left asking for another objective" width="400">
+</p>
+<p align="center"><sub>1.66 with Qwen2.5-7B on a CPU: the run, then its report. The file paths in the second shot are blurred.</sub></p>
 
 A run takes about 10 to 60 minutes on a CPU, and a few minutes with a cloud model. Press Ctrl+C at any time to stop; the report is still written with
 everything found so far.
