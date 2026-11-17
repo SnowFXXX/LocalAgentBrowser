@@ -96,7 +96,7 @@ waits out.
 no browsing, it answered 1 correctly; with LocalAgentBrowser 1.65.1, 38 and 39; with 1.66, **45 (90%)**, 4 wrong and
 1 not answered, in 28.6 minutes, for $0.13. Graded by Claude against SimpleQA's reference answers, judgement calls
 reviewed by the author. Every question, answer, source and grade is in
-[benchmarks/simpleqa](benchmarks/simpleqa/README.md), along with a local run on a CPU (Qwen2.5-7B on 1.64: 35 of 50).
+[benchmarks/simpleqa](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/benchmarks/simpleqa/README.md), along with a local run on a CPU (Qwen2.5-7B on 1.64: 35 of 50).
 
 **200 SimpleQA questions,** the standard subset OpenAI's simple-evals runs with `--examples 200`, on 1.66 with
 Phi-4 (November 16, 2026): **170 correct (85%; likely range 79 to 89%)**, 11 wrong, 19 not attempted, F-score 0.892, in 142 minutes for

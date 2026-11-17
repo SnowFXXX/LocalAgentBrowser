@@ -1,10 +1,22 @@
 # Changelog
 
-Every version of LocalAgentBrowser, newest first. Each released version is also a tagged commit (`v1.11` … `v1.66`); 1.54 to 1.56 and 1.58 to 1.60 were internal steps
+Every version of LocalAgentBrowser, newest first. Each released version is also a tagged commit (`v1.11` … `v1.66.1`); 1.54 to 1.56 and 1.58 to 1.60 were internal steps
 measured on the regression suite and released as part of 1.57 and 1.61 (see
 [docs/regression-history.md](docs/regression-history.md)).
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
+
+## [1.66.1] - 2026-11-17
+Documentation only; the code is unchanged from 1.66, as measured. Released so PyPI's page matches the README.
+- **SimpleQA, published question by question:** benchmarks/simpleqa has the questions, the scripts and every
+  answer, source and grade, and the standard 200 (simple-evals' `--examples 200`) on 1.66 with Phi-4: 170 correct
+  (85%), 11 wrong, 19 not attempted, F-score 0.892. Graded by Claude, judgement calls reviewed by the author; OpenAI's
+  simple-evals grader gives the same grade on 194 of the 200. Also on Hugging Face as
+  SnowFX/localagentbrowser-simpleqa.
+- **Wording:** the README no longer says the 50-question SimpleQA run was "graded by hand, one grader"; it gives the
+  grading as it was done, and the not-attempted and wrong counts.
+- **README:** the 1.66 installer, new installer and side-by-side screenshots, 1.66 example reports, and an
+  absolute link to the benchmark (relative links break on PyPI).
 
 ## [1.66] - 2026-11-16
 L.A.B. (LocalAgentBrowser) gets sturdier in the cloud, checks more of its own answers in code, and is easier to
