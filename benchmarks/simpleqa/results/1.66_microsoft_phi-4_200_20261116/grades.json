@@ -1,0 +1,653 @@
+{
+ "_grader": {
+  "note": "Graded by Claude against SimpleQA's reference answers, one question at a time, before seeing the automatic grader's grades, with a note for every wrong answer, judgement call and borderline grade. Judgement calls reviewed by the author on 2026-11-16: 30 items (13 judgement calls, 11 borderline CORRECT grades, 6 disagreements with OpenAI's grader); the author changed 2 (q2 to INCORRECT, q157 to NOT_ATTEMPTED) and agreed with the rest."
+ },
+ "1": {
+  "grade": "CORRECT"
+ },
+ "2": {
+  "grade": "INCORRECT",
+  "note": "Says the age was not found, but the answer's own text then gives \"33 years\" (the reference is 32): a wrong number in the answer. Changed from NOT_ATTEMPTED in the author's review."
+ },
+ "3": {
+  "grade": "CORRECT"
+ },
+ "4": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Judgement call: gives both vote counts (4,969 and 3,876, whose difference is the reference 1,093) but not the difference, and says it was not found."
+ },
+ "5": {
+  "grade": "CORRECT"
+ },
+ "6": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says the year she sold the shop was not found."
+ },
+ "7": {
+  "grade": "CORRECT"
+ },
+ "8": {
+  "grade": "CORRECT"
+ },
+ "9": {
+  "grade": "CORRECT",
+  "note": "\"Frank Antonio Manera\" (reference Frank Manera)."
+ },
+ "10": {
+  "grade": "CORRECT"
+ },
+ "11": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Judgement call: \"May 2019\" without the day (reference May 28, 2019); incomplete, nothing contradicts it."
+ },
+ "12": {
+  "grade": "CORRECT",
+  "note": "Borderline: right (\"Break In\"), followed by a garbled count note (\"ten more\")."
+ },
+ "13": {
+  "grade": "CORRECT"
+ },
+ "14": {
+  "grade": "CORRECT"
+ },
+ "15": {
+  "grade": "INCORRECT",
+  "note": "Says founded 14 March 1936; reference 1912."
+ },
+ "16": {
+  "grade": "CORRECT"
+ },
+ "17": {
+  "grade": "CORRECT"
+ },
+ "18": {
+  "grade": "CORRECT"
+ },
+ "19": {
+  "grade": "CORRECT"
+ },
+ "20": {
+  "grade": "INCORRECT",
+  "note": "Says October 2026 (the Apple TV 4K); reference September 2014."
+ },
+ "21": {
+  "grade": "CORRECT",
+  "note": "Borderline: right (\"apprenticeship as a printer\"), followed by a garbled count note (\"14 more\")."
+ },
+ "22": {
+  "grade": "CORRECT"
+ },
+ "23": {
+  "grade": "CORRECT"
+ },
+ "24": {
+  "grade": "CORRECT"
+ },
+ "25": {
+  "grade": "CORRECT"
+ },
+ "26": {
+  "grade": "CORRECT"
+ },
+ "27": {
+  "grade": "CORRECT"
+ },
+ "28": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Judgement call: \"She shoots him\" without naming her (reference Alison Garrs)."
+ },
+ "29": {
+  "grade": "INCORRECT",
+  "note": "Says 1985 (when the footage was shot); reference 2003."
+ },
+ "30": {
+  "grade": "CORRECT"
+ },
+ "31": {
+  "grade": "CORRECT"
+ },
+ "32": {
+  "grade": "CORRECT"
+ },
+ "33": {
+  "grade": "CORRECT"
+ },
+ "34": {
+  "grade": "CORRECT"
+ },
+ "35": {
+  "grade": "CORRECT"
+ },
+ "36": {
+  "grade": "CORRECT"
+ },
+ "37": {
+  "grade": "CORRECT"
+ },
+ "38": {
+  "grade": "CORRECT"
+ },
+ "39": {
+  "grade": "CORRECT"
+ },
+ "40": {
+  "grade": "CORRECT"
+ },
+ "41": {
+  "grade": "CORRECT"
+ },
+ "42": {
+  "grade": "CORRECT"
+ },
+ "43": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Judgement call: says not found, though it mentions that Badoureau (1881) discovered 37 (reference Albert Badoureau)."
+ },
+ "44": {
+  "grade": "CORRECT"
+ },
+ "45": {
+  "grade": "CORRECT",
+  "note": "Judgement call: quotes \"died at the age of 50\", then the code's note says \"50 years\" was left out."
+ },
+ "46": {
+  "grade": "CORRECT"
+ },
+ "47": {
+  "grade": "CORRECT"
+ },
+ "48": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Judgement call: \"May 2000\" without the day (reference 2 May 2000)."
+ },
+ "49": {
+  "grade": "CORRECT"
+ },
+ "50": {
+  "grade": "CORRECT"
+ },
+ "51": {
+  "grade": "CORRECT"
+ },
+ "52": {
+  "grade": "CORRECT"
+ },
+ "53": {
+  "grade": "CORRECT"
+ },
+ "54": {
+  "grade": "CORRECT"
+ },
+ "55": {
+  "grade": "CORRECT"
+ },
+ "56": {
+  "grade": "CORRECT"
+ },
+ "57": {
+  "grade": "CORRECT"
+ },
+ "58": {
+  "grade": "CORRECT"
+ },
+ "59": {
+  "grade": "CORRECT"
+ },
+ "60": {
+  "grade": "CORRECT",
+  "note": "Borderline: right (\"Rhythm 5\"), followed by a garbled count note (\"one more\")."
+ },
+ "61": {
+  "grade": "CORRECT"
+ },
+ "62": {
+  "grade": "CORRECT"
+ },
+ "63": {
+  "grade": "CORRECT"
+ },
+ "64": {
+  "grade": "CORRECT"
+ },
+ "65": {
+  "grade": "CORRECT"
+ },
+ "66": {
+  "grade": "CORRECT"
+ },
+ "67": {
+  "grade": "CORRECT"
+ },
+ "68": {
+  "grade": "CORRECT"
+ },
+ "69": {
+  "grade": "CORRECT",
+  "note": "Borderline: right (\"Warrior\"), followed by a garbled count note (\"two more\")."
+ },
+ "70": {
+  "grade": "CORRECT"
+ },
+ "71": {
+  "grade": "CORRECT"
+ },
+ "72": {
+  "grade": "CORRECT"
+ },
+ "73": {
+  "grade": "INCORRECT",
+  "note": "Says the Holiday 2015 update; reference 1.2.3."
+ },
+ "74": {
+  "grade": "CORRECT"
+ },
+ "75": {
+  "grade": "CORRECT",
+  "note": "\"Giovani Antonio Scopoli\" (spelling variant)."
+ },
+ "76": {
+  "grade": "CORRECT"
+ },
+ "77": {
+  "grade": "CORRECT"
+ },
+ "78": {
+  "grade": "CORRECT"
+ },
+ "79": {
+  "grade": "CORRECT"
+ },
+ "80": {
+  "grade": "CORRECT"
+ },
+ "81": {
+  "grade": "INCORRECT",
+  "note": "Says mammoths; reference reindeer."
+ },
+ "82": {
+  "grade": "CORRECT",
+  "note": "Borderline: \"91 Aegina\" (right), followed by false \"not found\" lines for the number and name."
+ },
+ "83": {
+  "grade": "CORRECT"
+ },
+ "84": {
+  "grade": "CORRECT"
+ },
+ "85": {
+  "grade": "CORRECT"
+ },
+ "86": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says the month and year were not found."
+ },
+ "87": {
+  "grade": "CORRECT"
+ },
+ "88": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "No answer; the code cut the model's \"2020\" (the reference is April 2019)."
+ },
+ "89": {
+  "grade": "CORRECT"
+ },
+ "90": {
+  "grade": "CORRECT"
+ },
+ "91": {
+  "grade": "CORRECT"
+ },
+ "92": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says the choreographer was not found."
+ },
+ "93": {
+  "grade": "CORRECT",
+  "note": "Borderline: right (December 11, 1905), followed by a garbled count note (\"six more\")."
+ },
+ "94": {
+  "grade": "CORRECT"
+ },
+ "95": {
+  "grade": "CORRECT"
+ },
+ "96": {
+  "grade": "CORRECT"
+ },
+ "97": {
+  "grade": "CORRECT"
+ },
+ "98": {
+  "grade": "CORRECT"
+ },
+ "99": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says the first person was not found."
+ },
+ "100": {
+  "grade": "CORRECT"
+ },
+ "101": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Judgement call: says the number of sons was not found, though it names two (Eric and Alan) from the obituary (reference two)."
+ },
+ "102": {
+  "grade": "CORRECT",
+  "note": "Borderline: right (August 17, 2022), followed by a false \"only one of the two were found\" note."
+ },
+ "103": {
+  "grade": "CORRECT"
+ },
+ "104": {
+  "grade": "CORRECT"
+ },
+ "105": {
+  "grade": "CORRECT"
+ },
+ "106": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says who catches Dexter was not found (it mentions Doakes only as Lila's victim)."
+ },
+ "107": {
+  "grade": "CORRECT"
+ },
+ "108": {
+  "grade": "CORRECT"
+ },
+ "109": {
+  "grade": "CORRECT"
+ },
+ "110": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says the successor was not found (names only the current presiding bishop)."
+ },
+ "111": {
+  "grade": "CORRECT",
+  "note": "\"Johns Hopkins University\" (reference \"John Hopkins\")."
+ },
+ "112": {
+  "grade": "CORRECT"
+ },
+ "113": {
+  "grade": "CORRECT"
+ },
+ "114": {
+  "grade": "CORRECT"
+ },
+ "115": {
+  "grade": "CORRECT"
+ },
+ "116": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Judgement call: says the number of academic staff wasn't stated, and gives only the total staff (13,113) as such."
+ },
+ "117": {
+  "grade": "CORRECT"
+ },
+ "118": {
+  "grade": "CORRECT",
+  "note": "Judgement call: says each of the three was elected by the public (reference \"The public\"), though it opens with \"elected by different bodies\" and adds a later change."
+ },
+ "119": {
+  "grade": "CORRECT"
+ },
+ "120": {
+  "grade": "CORRECT"
+ },
+ "121": {
+  "grade": "CORRECT"
+ },
+ "122": {
+  "grade": "CORRECT"
+ },
+ "123": {
+  "grade": "INCORRECT",
+  "note": "Judgement call: \"22 or 23 years\" (reference 22); a hedge between candidates is INCORRECT in SimpleQA."
+ },
+ "124": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says the song was not found."
+ },
+ "125": {
+  "grade": "CORRECT"
+ },
+ "126": {
+  "grade": "CORRECT"
+ },
+ "127": {
+  "grade": "INCORRECT",
+  "note": "Says 1,040,507; reference 1,916,432."
+ },
+ "128": {
+  "grade": "CORRECT"
+ },
+ "129": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "No answer; the code cut \"August\" because no finding names it."
+ },
+ "130": {
+  "grade": "CORRECT"
+ },
+ "131": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Judgement call: names Islamia College of Science and Commerce (right) but says its April 2010 accreditation wasn't confirmed, so not found."
+ },
+ "132": {
+  "grade": "CORRECT"
+ },
+ "133": {
+  "grade": "CORRECT"
+ },
+ "134": {
+  "grade": "CORRECT"
+ },
+ "135": {
+  "grade": "CORRECT"
+ },
+ "136": {
+  "grade": "CORRECT"
+ },
+ "137": {
+  "grade": "CORRECT"
+ },
+ "138": {
+  "grade": "CORRECT"
+ },
+ "139": {
+  "grade": "INCORRECT",
+  "note": "Says Chief Justice of the Andhra Pradesh High Court (an earlier post); reference Chief Justice of the Sikkim High Court."
+ },
+ "140": {
+  "grade": "CORRECT"
+ },
+ "141": {
+  "grade": "CORRECT"
+ },
+ "142": {
+  "grade": "CORRECT"
+ },
+ "143": {
+  "grade": "CORRECT"
+ },
+ "144": {
+  "grade": "CORRECT"
+ },
+ "145": {
+  "grade": "CORRECT"
+ },
+ "146": {
+  "grade": "CORRECT"
+ },
+ "147": {
+  "grade": "CORRECT"
+ },
+ "148": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says the subject was not found."
+ },
+ "149": {
+  "grade": "CORRECT"
+ },
+ "150": {
+  "grade": "CORRECT",
+  "note": "Borderline: right (1977), followed by a garbled count note (\"five more\")."
+ },
+ "151": {
+  "grade": "CORRECT"
+ },
+ "152": {
+  "grade": "CORRECT"
+ },
+ "153": {
+  "grade": "CORRECT"
+ },
+ "154": {
+  "grade": "CORRECT",
+  "note": "Judgement call: \"the 2014 Intersections Honoree award from Intersections International\" (reference The Intersections International Award)."
+ },
+ "155": {
+  "grade": "CORRECT"
+ },
+ "156": {
+  "grade": "CORRECT"
+ },
+ "157": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Suggests Erika Slezak's Viki \"may have narrated\" it (reference Allison Perkins): too tentative to count as an answer. Changed from INCORRECT in the author's review."
+ },
+ "158": {
+  "grade": "CORRECT"
+ },
+ "159": {
+  "grade": "CORRECT"
+ },
+ "160": {
+  "grade": "CORRECT"
+ },
+ "161": {
+  "grade": "CORRECT"
+ },
+ "162": {
+  "grade": "CORRECT"
+ },
+ "163": {
+  "grade": "CORRECT"
+ },
+ "164": {
+  "grade": "CORRECT"
+ },
+ "165": {
+  "grade": "CORRECT"
+ },
+ "166": {
+  "grade": "CORRECT"
+ },
+ "167": {
+  "grade": "CORRECT"
+ },
+ "168": {
+  "grade": "CORRECT"
+ },
+ "169": {
+  "grade": "INCORRECT",
+  "note": "Says 81 degrees; reference 61.4."
+ },
+ "170": {
+  "grade": "CORRECT",
+  "note": "Borderline: right (\"CouchPotato\"), followed by a garbled count note (\"nine more\")."
+ },
+ "171": {
+  "grade": "CORRECT"
+ },
+ "172": {
+  "grade": "CORRECT"
+ },
+ "173": {
+  "grade": "CORRECT"
+ },
+ "174": {
+  "grade": "CORRECT"
+ },
+ "175": {
+  "grade": "CORRECT"
+ },
+ "176": {
+  "grade": "CORRECT"
+ },
+ "177": {
+  "grade": "CORRECT"
+ },
+ "178": {
+  "grade": "CORRECT"
+ },
+ "179": {
+  "grade": "CORRECT"
+ },
+ "180": {
+  "grade": "CORRECT"
+ },
+ "181": {
+  "grade": "CORRECT",
+  "note": "Borderline: the 51st minute, within the plus or minus one minute the question allows (reference 52nd), followed by a garbled count note."
+ },
+ "182": {
+  "grade": "CORRECT"
+ },
+ "183": {
+  "grade": "CORRECT"
+ },
+ "184": {
+  "grade": "INCORRECT",
+  "note": "Says October 15, 2019 (WoW Classic's date); reference 7 March 2005."
+ },
+ "185": {
+  "grade": "CORRECT"
+ },
+ "186": {
+  "grade": "CORRECT"
+ },
+ "187": {
+  "grade": "CORRECT"
+ },
+ "188": {
+  "grade": "CORRECT"
+ },
+ "189": {
+  "grade": "CORRECT",
+  "note": "Borderline: right (1999), followed by garbled notes (\"only one of two found\"; \"Than, Asked\" left out)."
+ },
+ "190": {
+  "grade": "CORRECT"
+ },
+ "191": {
+  "grade": "CORRECT"
+ },
+ "192": {
+  "grade": "CORRECT"
+ },
+ "193": {
+  "grade": "CORRECT"
+ },
+ "194": {
+  "grade": "CORRECT"
+ },
+ "195": {
+  "grade": "CORRECT"
+ },
+ "196": {
+  "grade": "CORRECT",
+  "note": "\"Polymixia hollisterae\" (the published name; the reference spells it \"hollisterea\")."
+ },
+ "197": {
+  "grade": "CORRECT"
+ },
+ "198": {
+  "grade": "CORRECT"
+ },
+ "199": {
+  "grade": "CORRECT"
+ },
+ "200": {
+  "grade": "CORRECT"
+ }
+}

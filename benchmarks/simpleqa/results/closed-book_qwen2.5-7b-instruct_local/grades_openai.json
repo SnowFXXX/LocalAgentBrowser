@@ -1,0 +1,205 @@
+{
+ "_grader": {
+  "note": "OpenAI's simple-evals grader: its GRADER_TEMPLATE, openai/gpt-4.1-2025-04-14 via OpenRouter, temperature 0.5. Automatic; not reviewed."
+ },
+ "1": {
+  "grade": "INCORRECT",
+  "reply": "B"
+ },
+ "2": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "3": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "4": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "5": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "6": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "7": {
+  "grade": "INCORRECT",
+  "reply": "B"
+ },
+ "8": {
+  "grade": "INCORRECT",
+  "reply": "B"
+ },
+ "9": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "10": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "11": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "12": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "13": {
+  "grade": "INCORRECT",
+  "reply": "B"
+ },
+ "14": {
+  "grade": "INCORRECT",
+  "reply": "B"
+ },
+ "15": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "16": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "17": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "18": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "19": {
+  "grade": "INCORRECT",
+  "reply": "B"
+ },
+ "20": {
+  "grade": "INCORRECT",
+  "reply": "B"
+ },
+ "21": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "22": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "23": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "24": {
+  "grade": "INCORRECT",
+  "reply": "B"
+ },
+ "25": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "26": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "27": {
+  "grade": "INCORRECT",
+  "reply": "B"
+ },
+ "28": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "29": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "30": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "31": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "32": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "33": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "34": {
+  "grade": "INCORRECT",
+  "reply": "B"
+ },
+ "35": {
+  "grade": "INCORRECT",
+  "reply": "B"
+ },
+ "36": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "37": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "38": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "39": {
+  "grade": "INCORRECT",
+  "reply": "B"
+ },
+ "40": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "41": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "42": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "43": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "44": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "45": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "46": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "47": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "48": {
+  "grade": "INCORRECT",
+  "reply": "B"
+ },
+ "49": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ },
+ "50": {
+  "grade": "NOT_ATTEMPTED",
+  "reply": "C"
+ }
+}

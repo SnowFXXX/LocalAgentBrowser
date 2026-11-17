@@ -74,6 +74,10 @@ where a fix below says so.
   have refused: Phi-4 recorded that Lucien Gaudin won the men's foil in 1921, from a page that lists him only for
   épée, and the word-matching check let the changed word through. Checking that a finding keeps the page's own
   key words is on the roadmap.
+- After the release, on this code (November 16): the 200 SimpleQA questions simple-evals runs with `--examples 200`,
+  on Phi-4: 170 correct (85%), 11 wrong, 19 not attempted, F-score 0.892, in 142 minutes and 2,762 model calls, for
+  $0.58. Graded by Claude, judgement calls reviewed by the author; OpenAI's simple-evals grader (GPT-4.1) counts 171
+  correct and agrees on 194 of the 200. Every answer is in benchmarks/simpleqa.
 
 ## [1.65.1] - 2026-11-10
 Cloud mode works again, and works with OpenAI models. The agent's behaviour with a local model is unchanged.
