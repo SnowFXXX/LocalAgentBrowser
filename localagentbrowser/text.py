@@ -21,20 +21,37 @@ def with_digits(text):
 MEASURE_WORDS = {"second", "seconds", "minute", "minutes", "hour", "hours", "day", "days", "week", "weeks", "month",
                  "months", "year", "years", "cup", "cups", "times", "percent"}
 
+# The words a count of things to find follows ("Name three ...", "at least three ...", "What two football teams ...",
+# "the two streets"), or the item's first word. A number after anything else is not a count: it names or dates
+# something ("track 10", "Episode 12, Season 3", "Rhythm 2", "February 6, 2022", "at 16", "Six Flags", "1905-06")
+COUNT_LEADS = {"name", "list", "find", "give", "least", "most", "the", "top", "these", "those", "exactly", "about",
+               "suggest", "recommend", "identify", "provide", "show", "describe", "explain", "compare", "pick", "choose",
+               "what", "which", "all", "only", "me", "us", "summarize", "summarise", "outline", "mention", "gather",
+               "collect", "rank", "select", "offer", "propose", "are", "were", "her", "his", "their", "its", "first",
+               "main", "key", "other", "any", "some", "and", "or", "with", "contain", "include", "including"}
+
 def asked_count(text):
     """The number of things an item asks for ("three ...", "5 ..."), or None. "At least three" counts as three.
 
     A number of time units or amounts ("the first two weeks", "2 cups") is not a number of things to find. Nor is a
     number in a name: "the Yamaha SHS-10" was read as ten things asked for, and a right answer ended "nine more (only
-    one of the ten were found)". A word joined to others by a hyphen, a dot or a slash stays one word here."""
-    words = re.findall(r"[a-z0-9]+(?:[-./][a-z0-9]+)*", str(text).lower())
-    for word, after in zip(words, words[1:] + [""], strict=True):
+    one of the ten were found)". A word joined to others by a hyphen, a dot or a slash stays one word here. And a
+    count comes after a word that leads to one (COUNT_LEADS) or opens the item: in the 200-question SimpleQA run,
+    "track 10 on disc 2", "left school at 16" and "Episode 12, Season 3" were read as counts, and 10 right answers
+    ended with a garbled note such as "ten more (only none of the ten were found)"."""
+    tokens = re.findall(r"[A-Za-z0-9]+(?:[-./][A-Za-z0-9]+)*", str(text))
+    words = [t.lower() for t in tokens]
+    for i, (word, after) in enumerate(zip(words, words[1:] + [""], strict=True)):
         if after in MEASURE_WORDS:
             continue
-        if word in NUMBER_WORDS:
-            return NUMBER_WORDS[word]
-        if word.isdigit() and 2 <= int(word) <= 20:
-            return int(word)
+        value = NUMBER_WORDS.get(word) or (int(word) if word.isdigit() and 2 <= int(word) <= 20 else None)
+        if value is None:
+            continue
+        # A number word written with a capital inside the item is part of a name ("Six Flags", "Two Rivers")
+        if i > 0 and word in NUMBER_WORDS and tokens[i][0].isupper():
+            continue
+        if i == 0 or words[i - 1] in COUNT_LEADS:
+            return value
     return None
 
 def plain_words(text):
