@@ -3,8 +3,9 @@ caveats), and the report file."""
 import json
 import os
 import re
-from .config import COMPOSE_MAX_TOKENS, JOURNAL_BATCH, MAX_EVIDENCE_CHARS, MAX_JOURNAL_DETAIL_CHARS, MAX_JOURNAL_REASON_CHARS, MAX_THOUGHT_CHARS, MODEL, REPORT_FILE, VIEW_MAX_TOKENS
-from .prompts import COMPOSE_SYSTEM, NO_RESULT, RESULT_FORMAT, RESULT_REPLY, RESULT_RETRY, RESULT_UNCITED, RESULT_UNFINISHED, UNFINISHED_NOTE
+from .config import COMPOSE_MAX_TOKENS, COMPOSE_RETRY_MAX_TOKENS, JOURNAL_BATCH, MAX_EVIDENCE_CHARS, MAX_JOURNAL_DETAIL_CHARS, MAX_JOURNAL_REASON_CHARS, MAX_THOUGHT_CHARS, MODEL, REPORT_FILE, VIEW_MAX_TOKENS
+from .prompts import (COMPOSE_SYSTEM, NO_RESULT, RESULT_FORMAT, RESULT_REPLY, RESULT_RETRY, RESULT_TOO_LONG, RESULT_UNCITED,
+                      RESULT_UNFINISHED, UNFINISHED_NOTE)
 from .text import MISSING_STOPWORDS, NUMBER_WORDS, OPINION_REQUEST, SPELLED_NUMBERS, extract_message_content, plain_words, shorten, was_cut_off, with_digits, word_pairs
 from .pages import normalize_url
 from .grounding import code_text, invented_code
@@ -646,13 +647,16 @@ async def compose_final_result(client, objective, journal, checklist=None, not_f
             text = NO_RESULT
     text = without_echoed_objective(text, objective)
     # Asked once more when the result stops partway through a sentence (or at the length limit); if the second one
-    # does too, the first is cut back to its last finished sentence and the code says it stopped there
+    # does too, the first is cut back to its last finished sentence and the code says it stopped there. A result cut
+    # off at the limit is asked for more briefly, with room to spare: asked again at the same limit, Opus 5.5 was cut
+    # off again on 2 of 4 tasks, and its cold brew result lost the part on how long it keeps
     if text != NO_RESULT and (was_cut_off(response) or ends_mid_sentence(text)):
         ending = shorten(" ".join(text.split()[-8:]), 80)
+        ask = RESULT_TOO_LONG if was_cut_off(response) else RESULT_UNFINISHED
         retry = messages + [{"role": "assistant", "content": extract_message_content(response)},
-                            {"role": "user", "content": RESULT_UNFINISHED.replace("{ending}", ending)}]
+                            {"role": "user", "content": ask.replace("{ending}", ending)}]
         response = await client.chat.completions.create(model=MODEL, messages=retry, temperature=0.3,
-                                                        max_tokens=COMPOSE_MAX_TOKENS, response_format=RESULT_FORMAT)
+                                                        max_tokens=COMPOSE_RETRY_MAX_TOKENS, response_format=RESULT_FORMAT)
         again = without_echoed_objective(result_text(extract_message_content(response)), objective)
         if usable_result(again) and not was_cut_off(response) and not ends_mid_sentence(again):
             text = again
@@ -667,7 +671,7 @@ async def compose_final_result(client, objective, journal, checklist=None, not_f
         retry = messages + [{"role": "assistant", "content": json.dumps({"result": text}, ensure_ascii=False)},
                             {"role": "user", "content": RESULT_UNCITED}]
         response = await client.chat.completions.create(model=MODEL, messages=retry, temperature=0.3,
-                                                        max_tokens=COMPOSE_MAX_TOKENS, response_format=RESULT_FORMAT)
+                                                        max_tokens=COMPOSE_RETRY_MAX_TOKENS, response_format=RESULT_FORMAT)
         again = without_echoed_objective(result_text(extract_message_content(response)), objective)
         if (usable_result(again) and CITATION.search(again) and not was_cut_off(response)
                 and not ends_mid_sentence(again)):
