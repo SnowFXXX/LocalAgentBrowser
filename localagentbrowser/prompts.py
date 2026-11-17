@@ -137,6 +137,9 @@ CUT_OFF = ("Your reply was cut off at {limit} tokens because it was too long. Re
 # The 7B's photosynthesis result ended "...from the light-dependent reactions to", by itself, with two parts unwritten
 RESULT_UNFINISHED = ("That result stops partway through a sentence (\"{ending}\"). Write the complete final result "
                      "again, following the rules above: finish every sentence and cover every part. " + RESULT_REPLY)
+RESULT_TOO_LONG = ("That result was cut off at the length limit; it stops at \"{ending}\". Write the complete final "
+                   "result again, following the rules above, more briefly: cover every part in fewer words, and "
+                   "finish every sentence. " + RESULT_REPLY)
 # 15 of 135 finished results with discoveries cited none of them
 RESULT_UNCITED = ("That result cites no discovery. Write it again, following the rules above, with the number of the "
                   "discovery that supports each point after it, like [2]. " + RESULT_REPLY)

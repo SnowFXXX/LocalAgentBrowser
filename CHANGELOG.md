@@ -17,6 +17,12 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
   report's checklist says so, and the test suite counts it. Replayed on the saved failures, every Opus one and 63
   of 64 others recovered; the one left, a malformed reply, was reported as not checked.
 
+- **Final results cut off at the writing step's limit.** A result that ran past its 900-token limit was asked for
+  again at the same limit, so a long-writing model was cut off twice and the code kept only its finished sentences
+  ("stopped partway"): Opus 5.5 lost the end of 2 of 4 results, and its cold brew lost the whole part on how long it
+  keeps. Now a result cut off at the limit is asked for more briefly, with a 2,500-token limit (also used to rewrite
+  a result that cites nothing). Replayed on those two Opus results, both finished, with the lost parts back.
+
 ## [1.66.1] - 2026-11-17
 Documentation only; the code is unchanged from 1.66, as measured. Released so PyPI's page matches the README.
 - **SimpleQA, published question by question:** benchmarks/simpleqa has the questions, the scripts and every

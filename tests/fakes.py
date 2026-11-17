@@ -21,9 +21,11 @@ class FakeCompletions:
 
     def __init__(self, replies, prompt_tokens=1500):
         self.replies, self.calls, self.prompt_tokens = list(replies), [], prompt_tokens
+        self.limits = []  # max_tokens of every call
 
     async def create(self, **kwargs):
         self.calls.append([dict(m) for m in kwargs["messages"]])
+        self.limits.append(kwargs.get("max_tokens"))
         if self.prompt_tokens is None:  # Estimate from the prompt size, like a real server would report
             prompt_tokens = sum(len(m["content"]) for m in kwargs["messages"]) // 4
         else:

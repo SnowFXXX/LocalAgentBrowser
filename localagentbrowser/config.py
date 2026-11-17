@@ -102,6 +102,9 @@ RATE_LIMIT_WAITS = (20, 30, 60, 60, 90, 120)
 STALL_TURNS = 4          # Turns without a new discovery before the model is asked to check its progress
 
 COMPOSE_MAX_TOKENS = 900  # Length limit for the separately written final result
+COMPOSE_RETRY_MAX_TOKENS = 2500  # A rewrite of a result cut off at that limit (or rewritten to add citations): Opus
+                                 # 5.5's results ran past 900 tokens, the rewrite at the same limit was cut off
+                                 # again, and 2 of 4 results ended "stopped partway" (cold brew lost a whole part)
 
 VIEW_MAX_TOKENS = 250     # Length limit for a 'My view:' paragraph added when the result left it out
 

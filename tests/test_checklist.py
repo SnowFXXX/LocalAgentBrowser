@@ -1020,3 +1020,27 @@ class TestCutOffCoverageReplies:
         assert items[0]["unchecked"]
         asyncio.run(ab.coverage_gaps(client, "o", items, found))
         assert "unchecked" not in items[0]
+
+
+class TestResultsCutOffAtTheLimit:
+    """K3: Opus 5.5's results ran past COMPOSE_MAX_TOKENS; written again at the same limit they were cut off again, and
+    2 of 4 ended "stopped partway". A result cut off at the limit is asked for more briefly, with a higher limit."""
+
+    def test_a_result_cut_off_at_the_limit_is_asked_for_more_briefly_with_a_higher_limit(self):
+        client, model = fake_client([("1. Setup: SQLite is one file [1].\n\n2. Many users: PostgreSQL uses", "length"),
+                                     "1. Setup: SQLite is one file [1].\n\n2. Many users: PostgreSQL uses MVCC [2]."])
+        found = discoveries("SQLite is one file.", "PostgreSQL uses MVCC for many users.")
+        text = asyncio.run(ab.compose_final_result(client, "objective", found))
+        assert text.endswith("PostgreSQL uses MVCC [2].")
+        assert model.limits == [ab.COMPOSE_MAX_TOKENS, ab.COMPOSE_RETRY_MAX_TOKENS]
+        assert "cut off at the length limit" in model.calls[1][-1]["content"] and "more briefly" in model.calls[1][-1]["content"]
+
+    def test_a_sentence_left_unfinished_without_hitting_the_limit_keeps_the_old_request(self):
+        client, model = fake_client([TestUnfinishedResults.CUT, "It takes in water and gives out glucose [1]."])
+        asyncio.run(ab.compose_final_result(client, "objective", discoveries("x")))
+        assert 'stops partway through a sentence ("' in model.calls[1][-1]["content"]
+
+    def test_the_rewrite_to_add_citations_also_gets_the_higher_limit(self):
+        client, model = fake_client(["SQLite is one file.", "SQLite is one file [1]."])
+        asyncio.run(ab.compose_final_result(client, "objective", discoveries("SQLite is one file.")))
+        assert model.limits == [ab.COMPOSE_MAX_TOKENS, ab.COMPOSE_RETRY_MAX_TOKENS]
