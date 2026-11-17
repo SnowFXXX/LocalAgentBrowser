@@ -286,7 +286,7 @@
  },
  "88": {
   "grade": "NOT_ATTEMPTED",
-  "note": "No answer; the code cut the model's \"2020\" (the reference is April 2019)."
+  "note": "No answer: the text before the code's note gives none. The note names the cut \"2020\" (the reference is April 2019); the author judged that it doesn't count as an answer here. Whether a number in the code's \"Left out\" note counts is the author's call row by row: in q2 it was counted."
  },
  "89": {
   "grade": "CORRECT"

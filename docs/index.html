@@ -303,9 +303,13 @@
     <p class="lead" style="font-size:17px;margin-top:22px">No finished answer filled a gap from the model's own knowledge,
       by the suite's measures. On 1.65.1, Gemini 3.8 Flash and GPT-5.6 Terra also finished 7 of 7 (for $0.24 and $0.47),
       and GPT-4o lost three tasks to a rate limit that 1.66 now waits out. <strong>On SimpleQA</strong>, a public
-      benchmark of short, hard facts, Phi-4 alone answered 1 of 50; with LocalAgentBrowser 1.66, 45 of the same 50, and
-      170 of the standard 200 (85%, F-score 0.892) in 142 minutes for 58 cents. <a href="https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/benchmarks/simpleqa/README.md">Every
-      answer is published</a>, graded by Claude, judgement calls reviewed by the author.</p>
+      benchmark of short, hard facts, Phi-4 with LocalAgentBrowser 1.66 answered 170 of the standard 200 (85%, likely
+      range 79 to 89%), and was right 94% of the time when it answered; when it couldn't verify an answer, it said so.
+      Alone, with no browsing, Phi-4 answered 1 of 50; with LocalAgentBrowser, 45 of the same 50. On a CPU with no GPU,
+      Qwen2.5-7B answered 35 of 50 (the Fathom-DeepResearch paper reports 50.8% for that model with plain search, on a
+      different question set). Graded by Claude, judgement calls reviewed by the author, and checked against OpenAI's
+      own simple-evals grader, which gives the same grade on 194 of the 200. <a href="https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/benchmarks/simpleqa/README.md">Every answer is
+      published</a>, also as a <a href="https://huggingface.co/datasets/SnowFX/localagentbrowser-simpleqa">Hugging Face dataset</a>.</p>
     <figure>
       <a href="assets/chart5.png"><img src="assets/chart5.png" alt="SimpleQA, Phi-4, share answered correctly: alone, with no browsing, 2% of 50; with LocalAgentBrowser 1.65.1, 76% and 78% of the same 50; with 1.66, 90% of the same 50, and 85% of the standard 200 (170 correct, 11 wrong, 19 not attempted, 142 minutes, 58 cents)." width="2400" height="1350"></a>
     </figure>
@@ -449,7 +453,9 @@ python tools/regression.py --model qwen2.5-7b-instruct --minutes 90</code></pre>
     <p>Built by SnowFX with <a href="https://www.anthropic.com/claude">Claude</a> in Claude Code, on
       <a href="https://lmstudio.ai">LM Studio</a> and <a href="https://playwright.dev/python/">Playwright</a>, with
       optional cloud models through <a href="https://openrouter.ai">OpenRouter</a>.
-      The agent's checks trust no model's word, including the one that helped build it.</p>
+      The agent's checks trust no model's word, including the one that helped build it. Claude also graded the
+      SimpleQA answers, so each one carries a second grade from OpenAI's own simple-evals grader, which agrees on 194
+      of the 200.</p>
   </div>
 </footer>
 
