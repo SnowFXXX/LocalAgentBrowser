@@ -1,0 +1,176 @@
+{
+ "_grader": {
+  "note": "Claude (Master session), 2026-11-15, by hand against the reference answers with SimpleQA's three grades. One grader; judgement calls are noted. Not yet reviewed by the user."
+ },
+ "1": {
+  "grade": "CORRECT"
+ },
+ "2": {
+  "grade": "CORRECT"
+ },
+ "3": {
+  "grade": "CORRECT"
+ },
+ "4": {
+  "grade": "CORRECT"
+ },
+ "5": {
+  "grade": "CORRECT"
+ },
+ "6": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says the winner was not found."
+ },
+ "7": {
+  "grade": "CORRECT"
+ },
+ "8": {
+  "grade": "CORRECT"
+ },
+ "9": {
+  "grade": "CORRECT"
+ },
+ "10": {
+  "grade": "CORRECT"
+ },
+ "11": {
+  "grade": "CORRECT"
+ },
+ "12": {
+  "grade": "CORRECT"
+ },
+ "13": {
+  "grade": "CORRECT"
+ },
+ "14": {
+  "grade": "CORRECT"
+ },
+ "15": {
+  "grade": "CORRECT",
+  "note": "'The key of A' (reference A major)."
+ },
+ "16": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Writer right (Umera Ahmad); says year and month were not found."
+ },
+ "17": {
+  "grade": "CORRECT"
+ },
+ "18": {
+  "grade": "INCORRECT",
+  "note": "Says October 2016 (Oct 31, 2016 durbar); reference December 2018. Same answer as run 1."
+ },
+ "19": {
+  "grade": "CORRECT"
+ },
+ "20": {
+  "grade": "CORRECT"
+ },
+ "21": {
+  "grade": "CORRECT"
+ },
+ "22": {
+  "grade": "CORRECT"
+ },
+ "23": {
+  "grade": "CORRECT"
+ },
+ "24": {
+  "grade": "INCORRECT",
+  "note": "Says the village of Baba Reshi; reference Rambodh. Same as run 1."
+ },
+ "25": {
+  "grade": "CORRECT"
+ },
+ "26": {
+  "grade": "CORRECT"
+ },
+ "27": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Gives the dates; the number check cut the age."
+ },
+ "28": {
+  "grade": "CORRECT",
+  "note": "Season 5, Episode 3 'Strategy' (right)."
+ },
+ "29": {
+  "grade": "CORRECT"
+ },
+ "30": {
+  "grade": "INCORRECT",
+  "note": "Says patch 1.05, and adds that the Hornet Ring 'is known to reduce equipment load': the ring boosts critical hits, and this is the model's own (wrong) knowledge that no check caught."
+ },
+ "31": {
+  "grade": "CORRECT"
+ },
+ "32": {
+  "grade": "INCORRECT",
+  "note": "Says 'Fool's Idol'; reference 'Maneater'. Same as run 1."
+ },
+ "33": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Gives the dates; the number check cut the length."
+ },
+ "34": {
+  "grade": "CORRECT"
+ },
+ "35": {
+  "grade": "CORRECT"
+ },
+ "36": {
+  "grade": "CORRECT"
+ },
+ "37": {
+  "grade": "CORRECT"
+ },
+ "38": {
+  "grade": "CORRECT"
+ },
+ "39": {
+  "grade": "INCORRECT",
+  "note": "Says 'Rosalía - EP' by Guillermo De Caminos, a different artist's release; reference 'Fucking Money Man'."
+ },
+ "40": {
+  "grade": "CORRECT"
+ },
+ "41": {
+  "grade": "CORRECT"
+ },
+ "42": {
+  "grade": "CORRECT"
+ },
+ "43": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Gives birth date and 1873; the number check cut the age."
+ },
+ "44": {
+  "grade": "CORRECT"
+ },
+ "45": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says the number was not found (mentions the daughter's three children)."
+ },
+ "46": {
+  "grade": "CORRECT"
+ },
+ "47": {
+  "grade": "CORRECT"
+ },
+ "48": {
+  "grade": "CORRECT"
+ },
+ "49": {
+  "grade": "CORRECT"
+ },
+ "50": {
+  "grade": "CORRECT"
+ },
+ "_summary": {
+  "correct": 39,
+  "incorrect": 5,
+  "not_attempted": 6,
+  "minutes": 40.4,
+  "cost_usd": 0.1526,
+  "model": "microsoft/phi-4 via OpenRouter (DeepInfra), LocalAgentBrowser 1.65.1"
+ }
+}

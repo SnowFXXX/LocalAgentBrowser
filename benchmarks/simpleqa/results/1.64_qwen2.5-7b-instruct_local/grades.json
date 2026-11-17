@@ -1,0 +1,176 @@
+{
+ "_grader": {
+  "note": "Claude (Master session), 2026-11-10, by hand against the reference answers with SimpleQA's three grades. One grader; judgement calls are noted. Not yet reviewed by the user."
+ },
+ "1": {
+  "grade": "CORRECT"
+ },
+ "2": {
+  "grade": "CORRECT"
+ },
+ "3": {
+  "grade": "CORRECT"
+ },
+ "4": {
+  "grade": "CORRECT"
+ },
+ "5": {
+  "grade": "INCORRECT",
+  "note": "Says Black Condor (1992-93) #7; reference Infinite Crisis #1. Copied faithfully from comicbookrealm.com, a page that disagrees with the reference."
+ },
+ "6": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "The result is only \"[1]\"; the name check cut \"Italy\" (no finding names it). No answer given."
+ },
+ "7": {
+  "grade": "INCORRECT",
+  "note": "Judgement call: \"Bear Bryant and Georgia Bulldogs\" names one team and Alabama's coach, not the University of Alabama. Copied from the Wikipedia case page."
+ },
+ "8": {
+  "grade": "CORRECT"
+ },
+ "9": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it was not found."
+ },
+ "10": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Did not finish within 60 minutes."
+ },
+ "11": {
+  "grade": "CORRECT"
+ },
+ "12": {
+  "grade": "INCORRECT",
+  "note": "Finding was \"Fred Forbes\" (right); the written answer gave \"Fred\" as the surname. A writing slip, not a wrong source."
+ },
+ "13": {
+  "grade": "CORRECT"
+ },
+ "14": {
+  "grade": "CORRECT"
+ },
+ "15": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Says it was not found."
+ },
+ "16": {
+  "grade": "CORRECT",
+  "note": "Umera Ahmed (spelling variant of the reference); premiered 1 August 2021."
+ },
+ "17": {
+  "grade": "CORRECT"
+ },
+ "18": {
+  "grade": "CORRECT"
+ },
+ "19": {
+  "grade": "CORRECT"
+ },
+ "20": {
+  "grade": "CORRECT"
+ },
+ "21": {
+  "grade": "CORRECT"
+ },
+ "22": {
+  "grade": "CORRECT"
+ },
+ "23": {
+  "grade": "CORRECT",
+  "note": "19 July 2023; the sentence giving the year is uncited."
+ },
+ "24": {
+  "grade": "INCORRECT",
+  "note": "Judgement call: \"a village named after the saint in Baramulla district\" instead of Rambodh. Copied from Wikipedia's Baba Reshi page."
+ },
+ "25": {
+  "grade": "CORRECT"
+ },
+ "26": {
+  "grade": "INCORRECT",
+  "note": "\"around the early 2000s\" vs 1993, copied from an SFGate article."
+ },
+ "27": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Judgement call: gives birth and death dates but no age; the number check cut the model's \"80\" (which was right) because no finding gives it."
+ },
+ "28": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Did not finish within 60 minutes."
+ },
+ "29": {
+  "grade": "CORRECT"
+ },
+ "30": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Judgement call: \"Aye, reduced this latest patch [1]\" gives no patch number."
+ },
+ "31": {
+  "grade": "CORRECT"
+ },
+ "32": {
+  "grade": "CORRECT"
+ },
+ "33": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "Judgement call: gives the dates (12 July 1985 to 20 December 1986) but no length; the number check cut the model's \"1 year 259 days\" (wrong; the reference is 1 year, 161 days)."
+ },
+ "34": {
+  "grade": "CORRECT"
+ },
+ "35": {
+  "grade": "CORRECT",
+  "note": "Judgement call: gives December 2, 2023, then wrongly adds that no year was found (a false \"not found\")."
+ },
+ "36": {
+  "grade": "CORRECT"
+ },
+ "37": {
+  "grade": "CORRECT"
+ },
+ "38": {
+  "grade": "INCORRECT",
+  "note": "Mikko Ilonen; reference Jesper Parnevik. Took the wrong row of the winners table on the Wikipedia page."
+ },
+ "39": {
+  "grade": "NOT_ATTEMPTED",
+  "note": "The result only repeats the question."
+ },
+ "40": {
+  "grade": "CORRECT"
+ },
+ "41": {
+  "grade": "CORRECT",
+  "note": "June 25, 2008, but followed by false \"not found\" lines for month, date and year."
+ },
+ "42": {
+  "grade": "CORRECT"
+ },
+ "43": {
+  "grade": "CORRECT"
+ },
+ "44": {
+  "grade": "CORRECT"
+ },
+ "45": {
+  "grade": "CORRECT"
+ },
+ "46": {
+  "grade": "CORRECT",
+  "note": "2 operators, followed by a garbled count note (\"ten more\")."
+ },
+ "47": {
+  "grade": "CORRECT"
+ },
+ "48": {
+  "grade": "CORRECT",
+  "note": "25-25, followed by a garbled count note (\"four more\")."
+ },
+ "49": {
+  "grade": "CORRECT"
+ },
+ "50": {
+  "grade": "CORRECT"
+ }
+}

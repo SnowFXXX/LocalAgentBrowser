@@ -1,0 +1,1409 @@
+{
+ "seed": 0,
+ "size": 200,
+ "method": "simple-evals: random.Random(0).sample(rows, size)",
+ "dataset_sha256": "feee3f7e7db3617e94e8fcf1977b756ec420ef8568f4e0fcbbe0e92e9d5fc032",
+ "drawn": "2026-11-16",
+ "questions": [
+  {
+   "n": 1,
+   "index": 3155,
+   "problem": "In which city of Pakistan was Muhammad Rafiq Tarar, a Pakistani politician, born?",
+   "answer": "Mandi Bahauddin, Punjab",
+   "topic": "Politics"
+  },
+  {
+   "n": 2,
+   "index": 3445,
+   "problem": "How old was Aniol Serrasolses when he kayaked for the first time down the largest glacial waterfall ever recorded in Norway?",
+   "answer": "32",
+   "topic": "Sports"
+  },
+  {
+   "n": 3,
+   "index": 331,
+   "problem": "Who was Japan's Prime Minister after Ichirō Hatoyama left office on December 23, 1956?",
+   "answer": "Tanzan Ishibashi",
+   "topic": "Politics"
+  },
+  {
+   "n": 4,
+   "index": 2121,
+   "problem": "How many more votes did Freeman Freeman-Thomas win than George Sandys in the 1906 Bodmin by-election?",
+   "answer": "1,093",
+   "topic": "Politics"
+  },
+  {
+   "n": 5,
+   "index": 4188,
+   "problem": "While Henri d'Angoulême served as the governor of Provence, who was his secretary?",
+   "answer": "François de Malherbe.",
+   "topic": "History"
+  },
+  {
+   "n": 6,
+   "index": 3980,
+   "problem": "What year did Yohji Yamamoto's mother sell her dressmaking shop?",
+   "answer": "1972.",
+   "topic": "Art"
+  },
+  {
+   "n": 7,
+   "index": 3317,
+   "problem": "In which country was the 4th edition of the ASEAN-India Grassroots Innovation Forum (AIGIF) launched?",
+   "answer": "Malaysia",
+   "topic": "Politics"
+  },
+  {
+   "n": 8,
+   "index": 2484,
+   "problem": "Three years after joining Comme des Garçons, Junya Watanabe started designing which CdG line?",
+   "answer": "Tricot line",
+   "topic": "Art"
+  },
+  {
+   "n": 9,
+   "index": 3904,
+   "problem": "What was the name of the cannibal in the Whistleblower DLC of the 2013 video game \"Outlast\"?",
+   "answer": "Frank Manera",
+   "topic": "Video games"
+  },
+  {
+   "n": 10,
+   "index": 2933,
+   "problem": "What was the Sky EPG number of Game Network when it launched in the United Kingdom in May 2001?",
+   "answer": "223.",
+   "topic": "TV shows"
+  },
+  {
+   "n": 11,
+   "index": 1789,
+   "problem": "What is the month, day, and year that the United States removed Eritrea from the \"Counterterror Non-Cooperation List\"?",
+   "answer": "May, 28, and 2019",
+   "topic": "Politics"
+  },
+  {
+   "n": 12,
+   "index": 4134,
+   "problem": "What is the name of track 10 on disc 2 of the Sen no Kiseki IV - The End of Saga - original soundtrack?",
+   "answer": "Break In",
+   "topic": "Video games"
+  },
+  {
+   "n": 13,
+   "index": 1140,
+   "problem": "In what year did Jon Kleinberg become a fellow of the Association for Computing Machinery?",
+   "answer": "2013",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 14,
+   "index": 2308,
+   "problem": "In what month and year did Bakshi Ghulam Mohammad announce his retirement from politics?",
+   "answer": "June 1965",
+   "topic": "Politics"
+  },
+  {
+   "n": 15,
+   "index": 1144,
+   "problem": "What year was the municipality of Tarso, Antioquia, Colombia, founded?",
+   "answer": "1912",
+   "topic": "Geography"
+  },
+  {
+   "n": 16,
+   "index": 776,
+   "problem": "For the original Groove Coaster game for iOS, all the original songs were by Hirokazu Koshio (COSIO) and whom?",
+   "answer": "Shohei Tsuchiya",
+   "topic": "Video games"
+  },
+  {
+   "n": 17,
+   "index": 2052,
+   "problem": "What's the full name of the first female Finance Minister in Zambia?",
+   "answer": "Edith Zewelani Nawakwi",
+   "topic": "Politics"
+  },
+  {
+   "n": 18,
+   "index": 1203,
+   "problem": "How many times did Bil Keane win Best Syndicated Panel by the National Cartoonists Society's Award?",
+   "answer": "four times",
+   "topic": "Art"
+  },
+  {
+   "n": 19,
+   "index": 2540,
+   "problem": "On June 24, 2021, which political party did Hong Joon-pyo rejoin?",
+   "answer": "People Power Party.",
+   "topic": "Politics"
+  },
+  {
+   "n": 20,
+   "index": 809,
+   "problem": "In which month and year did Apple add the ability for users to speak \"Hey Siri\" to enable the assistant without the requirement of physically handling the device?",
+   "answer": "September 2014.",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 21,
+   "index": 604,
+   "problem": "For what career did Eddie Marsan leave school at 16?",
+   "answer": " apprentice printer",
+   "topic": "Other"
+  },
+  {
+   "n": 22,
+   "index": 2704,
+   "problem": "What was the original name of the town of Dolores, Abra, Philippines?",
+   "answer": "Bucao",
+   "topic": "Geography"
+  },
+  {
+   "n": 23,
+   "index": 3867,
+   "problem": "How many people were involved in making the largest human DNA helix, achieved by the Medical University of Varna (Bulgaria) in Varna, Bulgaria, on April 23, 2016?",
+   "answer": "4,000",
+   "topic": "Other"
+  },
+  {
+   "n": 24,
+   "index": 824,
+   "problem": "What was the name of Project Zero Dawn's Extinction Failsafe Protocol in the video game Horizon Zero Dawn (2017)?",
+   "answer": "HADES",
+   "topic": "Video games"
+  },
+  {
+   "n": 25,
+   "index": 2898,
+   "problem": "In what year was the Penny Crane Award for Distinguished Service established?",
+   "answer": "2000",
+   "topic": "Other"
+  },
+  {
+   "n": 26,
+   "index": 3556,
+   "problem": "On what date, month, and year did Mussolini declare before 60,000 people at the Fascist Congress in Naples, \"Our program is simple: we want to rule Italy\"?",
+   "answer": "October 24, 1922",
+   "topic": "Politics"
+  },
+  {
+   "n": 27,
+   "index": 2590,
+   "problem": "In what year did the Computer History Museum have its first exhibit?",
+   "answer": "1975",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 28,
+   "index": 1675,
+   "problem": "Who kills Daryl Garrs in Happy Valley?",
+   "answer": "Alison Garrs",
+   "topic": "TV shows"
+  },
+  {
+   "n": 29,
+   "index": 3907,
+   "problem": "Sir Isaac Julien's installation piece 'Lost Boundaries' is from which year?",
+   "answer": "2003",
+   "topic": "Art"
+  },
+  {
+   "n": 30,
+   "index": 3626,
+   "problem": "What year was the Süleymaniye damaged in the great fire?",
+   "answer": "1660",
+   "topic": "History"
+  },
+  {
+   "n": 31,
+   "index": 4270,
+   "problem": "How much money did Benny Hinn Ministries donate to the tsunami relief effort in 2007?",
+   "answer": "$250,000",
+   "topic": "Other"
+  },
+  {
+   "n": 32,
+   "index": 2133,
+   "problem": "Comedian Phyllis Diller was crowned with what title by \"Field and Stream\" magazine in 1973?",
+   "answer": "Miss Fun Fishing",
+   "topic": "Other"
+  },
+  {
+   "n": 33,
+   "index": 510,
+   "problem": "What was Yoido Full Gospel Church's membership in 1968?",
+   "answer": "8000",
+   "topic": "Other"
+  },
+  {
+   "n": 34,
+   "index": 115,
+   "problem": "The Jensen Interceptor (1950), produced from 1950 to 1957, had a wheelbase measurement of what in millimeters?",
+   "answer": "2,845 mm",
+   "topic": "Other"
+  },
+  {
+   "n": 35,
+   "index": 764,
+   "problem": "Who was the recipient of the Leslie Fox Prize for Numerical Analysis in 2017?",
+   "answer": "Nicole Spillane",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 36,
+   "index": 3267,
+   "problem": "In which year did the top religious body in Saudi Arabia give the green light for codification of Sharia law?",
+   "answer": "2010",
+   "topic": "Politics"
+  },
+  {
+   "n": 37,
+   "index": 9,
+   "problem": "To whom did Mehbooba Mufti Sayed contest the 2019 Lok Sabha elections and lose?",
+   "answer": "Hasnain Masoodi",
+   "topic": "Politics"
+  },
+  {
+   "n": 38,
+   "index": 4043,
+   "problem": "Who directed the play \"Agamemnon\" at the 2022 Athens Epidaurus Festival?",
+   "answer": "Ulrich Rasche",
+   "topic": "Art"
+  },
+  {
+   "n": 39,
+   "index": 2729,
+   "problem": "Who was the first fashion designer to stream a runway show online?",
+   "answer": "Helmut Lang",
+   "topic": "Art"
+  },
+  {
+   "n": 40,
+   "index": 1998,
+   "problem": "What is the surname of the individual who won the Gibson-Fawcett Award in 2012?",
+   "answer": "Fogg",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 41,
+   "index": 2664,
+   "problem": "What was the title of the episode of *River Monsters* in which Jeremy Wade caught a Japanese giant salamander by hand?",
+   "answer": "\"Cold Blooded Horror\"",
+   "topic": "TV shows"
+  },
+  {
+   "n": 42,
+   "index": 515,
+   "problem": "Who was the inaugural winner of the Riemann Prize in 2019?",
+   "answer": "Terence Tao",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 43,
+   "index": 1565,
+   "problem": "What is the name of the man who discovered 37 of the 75 non-prismatic uniform polyhedra in 1878?",
+   "answer": "Albert Badoureau",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 44,
+   "index": 1816,
+   "problem": "What is the month, day, and year Kaitlin Armstrong pleaded not guilty to the murder charge of Moriah Wilson and was arraigned?",
+   "answer": "July 21, 2022",
+   "topic": "Other"
+  },
+  {
+   "n": 45,
+   "index": 1954,
+   "problem": "How old was Fatima Sydow, the famous Cape Malay chef, when she passed away?",
+   "answer": "50.",
+   "topic": "Other"
+  },
+  {
+   "n": 46,
+   "index": 1167,
+   "problem": "What type of display does the Toshiba BC-1411 use?",
+   "answer": "Nixie tube display",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 47,
+   "index": 3669,
+   "problem": "In which city in India is the flyover bridge named after Sam Manekshaw?",
+   "answer": "Ahmedabad",
+   "topic": "Geography"
+  },
+  {
+   "n": 48,
+   "index": 747,
+   "problem": "What was the date, month, and year when \"Selective Availability\" was discontinued as a result of the 1996 executive order, allowing civilian users to receive a non-degraded signal globally?",
+   "answer": "2 May 2000",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 49,
+   "index": 659,
+   "problem": "Other than being a choreographer for the TV series In Living Color, what other job did Rosie Perez do on the show?",
+   "answer": "segment producer",
+   "topic": "TV shows"
+  },
+  {
+   "n": 50,
+   "index": 2621,
+   "problem": "On what day, month, and year did Ignaz Alberti, an Austrian illustrator, engraver, and book printer, die?",
+   "answer": "31 August 1794",
+   "topic": "Art"
+  },
+  {
+   "n": 51,
+   "index": 4161,
+   "problem": "On what day, month, and year was Syed Bashir Ahmad (a Kashmiri politician) born?",
+   "answer": "2 January 1952",
+   "topic": "Politics"
+  },
+  {
+   "n": 52,
+   "index": 4008,
+   "problem": "Who is the municipality of Gómez Plata, Antioquia, Colombia, named after?",
+   "answer": "Juan de la Cruz Gómez Plata",
+   "topic": "Geography"
+  },
+  {
+   "n": 53,
+   "index": 893,
+   "problem": "What is the surname of the individual who won the Robert Boyle Prize for Analytical Science, formerly called the Boyle Medal, in 2012?",
+   "answer": "Dovichi",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 54,
+   "index": 2469,
+   "problem": "In which year was the International Centre for Genetic Engineering and Biotechnology (ICGEB) established?",
+   "answer": "1983",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 55,
+   "index": 2384,
+   "problem": "On which date, month, and year was the \"King Shaka International Airport\" name approved by the South African Geographical Names Council?",
+   "answer": "14 January 2010",
+   "topic": "Geography"
+  },
+  {
+   "n": 56,
+   "index": 1022,
+   "problem": "Who designed the San Martín Palace?",
+   "answer": "The San Martín Palace was designed by the architect Alejandro Christophersen.",
+   "topic": "Art"
+  },
+  {
+   "n": 57,
+   "index": 2725,
+   "problem": "What venue did Ciara perform at on May 27, 2015, for her Jackie tour?",
+   "answer": "House of Blues",
+   "topic": "Music"
+  },
+  {
+   "n": 58,
+   "index": 1664,
+   "problem": "In what year was the praying mantis species Eremiaphila braueri described by Krauss?",
+   "answer": "1902",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 59,
+   "index": 2356,
+   "problem": "Tell me the specific day, month, and year when the Samajwadi Janata Party was formed.",
+   "answer": "5 November 1990",
+   "topic": "Politics"
+  },
+  {
+   "n": 60,
+   "index": 3645,
+   "problem": "What is the name of the performance that influenced \"Rhythm 2\" by Marina Abramović to include an unconscious aspect?",
+   "answer": "Rhythm 5",
+   "topic": "Art"
+  },
+  {
+   "n": 61,
+   "index": 750,
+   "problem": "What is the name of the man who purchased Belmont on St. Saviour's Hill, Jersey, UK, in 1822?",
+   "answer": "Sir Colin Halkett",
+   "topic": "History"
+  },
+  {
+   "n": 62,
+   "index": 3153,
+   "problem": "How many livres did artist Jean-Antoine Watteau sell his painting \"Camp-fire\" to Sirois for?",
+   "answer": "200",
+   "topic": "Art"
+  },
+  {
+   "n": 63,
+   "index": 2597,
+   "problem": "What was the maximum takeoff weight of the Brewster F2A-3 Buffalo (1937) in kilograms?",
+   "answer": "3,247",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 64,
+   "index": 1983,
+   "problem": "Which patch for the original Dark Souls reduced the effectiveness of the Hornet Ring?",
+   "answer": "1.06",
+   "topic": "Video games"
+  },
+  {
+   "n": 65,
+   "index": 2378,
+   "problem": "How many operator cells are within the Yamaha YM2203 from the 1980s?",
+   "answer": "12 operator cells.",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 66,
+   "index": 1506,
+   "problem": "What was the title of Episode 12, Season 3 of Airwolf?",
+   "answer": "Half-Pint",
+   "topic": "TV shows"
+  },
+  {
+   "n": 67,
+   "index": 1551,
+   "problem": "In which village was the victim of the 2019 Hyderabad gang rape and murder case working as a veterinary assistant surgeon at the state-run hospital?",
+   "answer": "Kollur",
+   "topic": "Other"
+  },
+  {
+   "n": 68,
+   "index": 1529,
+   "problem": "Which company launched India’s first commercial MCU chip?",
+   "answer": "Mindgrove",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 69,
+   "index": 270,
+   "problem": "In the video game Dark Souls 1 for the PlayStation 3, which starting class has 11 vitality, 13 strength, and starts at soul level 4?",
+   "answer": "Warrior",
+   "topic": "Video games"
+  },
+  {
+   "n": 70,
+   "index": 2130,
+   "problem": "During which year did Gerhard Richter have a solo exhibition named \"Gerhard Richter 4900 Colours: Version II\"?",
+   "answer": "2008",
+   "topic": "Art"
+  },
+  {
+   "n": 71,
+   "index": 3903,
+   "problem": "What are the name of the town and province in the Netherlands where Frans Gunningh Sloet died?",
+   "answer": " Edam, North Holland",
+   "topic": "Geography"
+  },
+  {
+   "n": 72,
+   "index": 565,
+   "problem": "On which day, month, and year did Egypt play against Angola in Group A of the 1996 African Cup of Nations?",
+   "answer": "15 January 1996",
+   "topic": "Sports"
+  },
+  {
+   "n": 73,
+   "index": 735,
+   "problem": "What Terraria patch added biome-specific stalactites to the underground areas?",
+   "answer": "1.2.3",
+   "topic": "Video games"
+  },
+  {
+   "n": 74,
+   "index": 1066,
+   "problem": "What is the surname of the individual who won the Chemical Industry Medal, an annual American award given to an industrial chemist by the Society of Chemical Industry, America, in 1960?",
+   "answer": "Stauffer",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 75,
+   "index": 1225,
+   "problem": "Who originally recorded the scientific name of the white-headed duck as *Anas leucocephala* in 1769?",
+   "answer": "Giovanni Antonio Scopoli",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 76,
+   "index": 316,
+   "problem": "The Dante-Alighieri monument, located on Allée des Poètes along Rue D'Auteuil, was created by L'atelier Attitude and inspired by the work of what Italian-born sculptor?",
+   "answer": "Carlo Balboni",
+   "topic": "Art"
+  },
+  {
+   "n": 77,
+   "index": 657,
+   "problem": "In what year did Francesco \"Franco\" Giordano become a member of the Italian Communist Party?",
+   "answer": "1974",
+   "topic": "Politics"
+  },
+  {
+   "n": 78,
+   "index": 3205,
+   "problem": "Richard Serra created his work 'Thirty-Five Feet of Lead Rolled Up' while living in which city?",
+   "answer": "New York City",
+   "topic": "Art"
+  },
+  {
+   "n": 79,
+   "index": 4297,
+   "problem": "What year was the municipality of Susacón, Boyacá, Colombia, founded?",
+   "answer": "1809",
+   "topic": "Geography"
+  },
+  {
+   "n": 80,
+   "index": 2257,
+   "problem": "Which Denver team did Brodie Smith play for in 2014?",
+   "answer": "Johnny Bravo",
+   "topic": "Sports"
+  },
+  {
+   "n": 81,
+   "index": 4274,
+   "problem": "Ivan Lyakhov located the Lyakhovsky Islands by following the tracks of which animal?",
+   "answer": "Reindeer",
+   "topic": "Geography"
+  },
+  {
+   "n": 82,
+   "index": 1929,
+   "problem": "What is the number and name of the second asteroid discovered by astronomer Édouard Jean-Marie Stephan?",
+   "answer": "91 Aegina",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 83,
+   "index": 1762,
+   "problem": "Who was Savannah Churchill's second husband?",
+   "answer": "Jesse Johnson",
+   "topic": "Music"
+  },
+  {
+   "n": 84,
+   "index": 3435,
+   "problem": "In what year did the Ethiopian politician Billene Seyoum Woldeyes co-form a spoken-word poetry collective called Zemneged-Andinet?",
+   "answer": "2011",
+   "topic": "Politics"
+  },
+  {
+   "n": 85,
+   "index": 2254,
+   "problem": "What was the first name of the man who, in 1925, married Mavis Tate, a former British Conservative politician?",
+   "answer": "Henry",
+   "topic": "Politics"
+  },
+  {
+   "n": 86,
+   "index": 3691,
+   "problem": "In which month and year did Arch Linux installation images start including installation scripts by default?",
+   "answer": "April 2021",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 87,
+   "index": 4035,
+   "problem": "Which school did Lucas Valeriu Ntuba Radebe, the former South African professional footballer, attend until he was 15 years old?",
+   "answer": "Bopasenatla Secondary School",
+   "topic": "Sports"
+  },
+  {
+   "n": 88,
+   "index": 2927,
+   "problem": "On which month and year did Sony announce the PlayStation 5?",
+   "answer": "April 2019",
+   "topic": "Video games"
+  },
+  {
+   "n": 89,
+   "index": 674,
+   "problem": "Which female chemist was awarded the Garvan–Olin Medal in 1952?",
+   "answer": "Gladys A. Emerson",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 90,
+   "index": 2656,
+   "problem": "In which month of 1993 was the Jianbing-93 spacecraft launched?",
+   "answer": "October",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 91,
+   "index": 944,
+   "problem": "Who played Creon in Antigone at the Epidaurus Festival 2022?",
+   "answer": "Vasilis Bisbikis played Creon in Antigone at the Epidaurus Festival in 2022.",
+   "topic": "Art"
+  },
+  {
+   "n": 92,
+   "index": 3984,
+   "problem": "Who did the choreography for the play \"Helen\" at the 2022 Athens Epidaurus Festival?",
+   "answer": "Dimitris Sotiriou",
+   "topic": "Art"
+  },
+  {
+   "n": 93,
+   "index": 2746,
+   "problem": "On what day, month, and year was William Hodgson \"Hod\" Stuart suspended from the league before the start of the 1905–06 season?",
+   "answer": "11 December 1905",
+   "topic": "Sports"
+  },
+  {
+   "n": 94,
+   "index": 1559,
+   "problem": "What is the first and last name of the professor who received the Royal Society of Chemistry Bader Award in 2021?",
+   "answer": "Alison Hulme",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 95,
+   "index": 1990,
+   "problem": "Under what section of CRPC was Omar Abdullah placed under preventive detention by the Indian government on the 4th and 5th of August 2019?",
+   "answer": "107",
+   "topic": "Politics"
+  },
+  {
+   "n": 96,
+   "index": 132,
+   "problem": "In what month and year did Jacques Frédéric Français publish a work in which he gave a geometric representation of complex numbers with interesting applications?",
+   "answer": "September 1813",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 97,
+   "index": 2220,
+   "problem": "What role did Darsheel Safary play in the series Yeh Hai Aashiqui in 2016?",
+   "answer": "Abhay",
+   "topic": "TV shows"
+  },
+  {
+   "n": 98,
+   "index": 959,
+   "problem": "What month, day, and year did the second session of the 4th Parliament of Singapore commence?",
+   "answer": "December 26, 1978",
+   "topic": "Politics"
+  },
+  {
+   "n": 99,
+   "index": 1806,
+   "problem": "Who was the first transgender person in Argentina to get her name and gender on her government-issued ID legally changed?",
+   "answer": "Florencia de la V",
+   "topic": "Politics"
+  },
+  {
+   "n": 100,
+   "index": 3047,
+   "problem": "What patch number was the Space Creature set added to in Terraria?",
+   "answer": "1.2.1",
+   "topic": "Video games"
+  },
+  {
+   "n": 101,
+   "index": 1396,
+   "problem": "How many sons did Nathan Mendelsohn and his wife, Helen, have?",
+   "answer": "Two",
+   "topic": "Other"
+  },
+  {
+   "n": 102,
+   "index": 2724,
+   "problem": "In what month, date, and year did Jarrette Jones from the American version of \"Love Is Blind\" Season 2 announce his separation?",
+   "answer": "August 17th, 2022",
+   "topic": "TV shows"
+  },
+  {
+   "n": 103,
+   "index": 3490,
+   "problem": "What is the title in French of Dame Margot's debate song (jeu parti) in which she debates Dame Maroie?",
+   "answer": "\"Je vous pri, dame Maroie\"",
+   "topic": "Music"
+  },
+  {
+   "n": 104,
+   "index": 509,
+   "problem": "Who did Rose Matafeo join in July 2020 on the comedy show Tiny Tour of Aotearoa, traveling across New Zealand?",
+   "answer": "Guy Montgomery",
+   "topic": "TV shows"
+  },
+  {
+   "n": 105,
+   "index": 1198,
+   "problem": "What is the name of Communist politician Georgi Dimitrov's second wife?",
+   "answer": "Roza Yulievna Fleishmann ",
+   "topic": "Politics"
+  },
+  {
+   "n": 106,
+   "index": 1792,
+   "problem": "In Season 2 of Dexter, who catches Dexter while trying to dispose of his mother's killer's remains?",
+   "answer": "Doakes",
+   "topic": "TV shows"
+  },
+  {
+   "n": 107,
+   "index": 370,
+   "problem": "What day, month, and year was James Young (Missouri politician) born?",
+   "answer": " 11 May, 1800",
+   "topic": "Politics"
+  },
+  {
+   "n": 108,
+   "index": 606,
+   "problem": "Who was the guest star who played Carter on S5 E9 of \"The Dukes of Hazzard\"?",
+   "answer": "Brett Halsey",
+   "topic": "TV shows"
+  },
+  {
+   "n": 109,
+   "index": 218,
+   "problem": "In June 1637, Thomas Ballard of Wandsworth accused Richard Kestian of publicly calling him a liar at which man's house in Putney in front of justices of the peace?",
+   "answer": "Sir Abraham Dawes",
+   "topic": "History"
+  },
+  {
+   "n": 110,
+   "index": 1019,
+   "problem": "Who succeeded Stefano Moshi as presiding bishop of the Evangelical Lutheran Church in Tanzania?",
+   "answer": "Sebastian Kolowa",
+   "topic": "Other"
+  },
+  {
+   "n": 111,
+   "index": 1544,
+   "problem": "From which university did W. Gary Ernst receive his Ph.D.?",
+   "answer": "John Hopkins University",
+   "topic": "Other"
+  },
+  {
+   "n": 112,
+   "index": 980,
+   "problem": "Who was Raúl Alfonsín's first Minister of Defense?",
+   "answer": "Raúl Borrás",
+   "topic": "Politics"
+  },
+  {
+   "n": 113,
+   "index": 3204,
+   "problem": "Who was the recipient of the ISCB Accomplishment by a Senior Scientist Award in 2012?",
+   "answer": "Gunnar von Heijne",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 114,
+   "index": 749,
+   "problem": "In what episode and season of Scandal did Olivia find out that her mother is a terrorist?",
+   "answer": "Season 3 Episode 9",
+   "topic": "TV shows"
+  },
+  {
+   "n": 115,
+   "index": 3032,
+   "problem": "\"The Little Village that Grew,\" a local history published in 1987 and contributed to by the Northside Community Association, is about which Alberta village?",
+   "answer": "North Red Deer.",
+   "topic": "Geography"
+  },
+  {
+   "n": 116,
+   "index": 950,
+   "problem": "As of 2020, what is the number of academic staff in the University of Cambridge?",
+   "answer": "6170",
+   "topic": "Other"
+  },
+  {
+   "n": 117,
+   "index": 298,
+   "problem": "What is the title of Series 1, Episode 17 of *Space: 1999*?",
+   "answer": "\"The Last Sunset\"",
+   "topic": "TV shows"
+  },
+  {
+   "n": 118,
+   "index": 177,
+   "problem": "Toronto mayors Sir Adam Wilson (Mayor from 1859-1861), John George Bowes (Mayor from 1861-1864), and Francis Henry Medcalf (Mayor from 1864-1867) were elected to office by which body?",
+   "answer": "The public",
+   "topic": "Politics"
+  },
+  {
+   "n": 119,
+   "index": 1594,
+   "problem": "What year was Fiordland College in New Zealand established?",
+   "answer": "1976",
+   "topic": "Geography"
+  },
+  {
+   "n": 120,
+   "index": 1515,
+   "problem": "At which University of Puerto Rico campus did New York State Representative Nydia Velázquez work as a professor from 1976 to 1981?",
+   "answer": "Humacao ",
+   "topic": "Politics"
+  },
+  {
+   "n": 121,
+   "index": 1014,
+   "problem": "Who was the inaugural holder of the position of Attorney General of Argentina?",
+   "answer": "Francisco Pico",
+   "topic": "Politics"
+  },
+  {
+   "n": 122,
+   "index": 3925,
+   "problem": "Where was singer Ivan Rebroff's father born?",
+   "answer": "Liebenwerda.",
+   "topic": "Music"
+  },
+  {
+   "n": 123,
+   "index": 1725,
+   "problem": "How old was Montreal native Charles Whitlaw in 1846 when he bought a grist mill on Grand River Street from Robert Kirkwood in Paris, Ontario?",
+   "answer": "Twenty two",
+   "topic": "History"
+  },
+  {
+   "n": 124,
+   "index": 500,
+   "problem": "What song (title and artist) inspired Tuesday from the anime \"Carole & Tuesday\" (2019) to run away from home to pursue music?",
+   "answer": "Cyndi Lauper - True Colors",
+   "topic": "Music"
+  },
+  {
+   "n": 125,
+   "index": 186,
+   "problem": "On what day, month, and year was Vladas Mironas, the 14th Prime Minister of Lithuania, born?",
+   "answer": "22 June 1880.",
+   "topic": "Politics"
+  },
+  {
+   "n": 126,
+   "index": 3486,
+   "problem": "In what year did the Society of Illustrators sell the rights to their Illustrator Show skits?",
+   "answer": "1925",
+   "topic": "Art"
+  },
+  {
+   "n": 127,
+   "index": 831,
+   "problem": "As of 2022, what is the population of Mersin Province?",
+   "answer": "1,916,432",
+   "topic": "Geography"
+  },
+  {
+   "n": 128,
+   "index": 2129,
+   "problem": "What is the name of the sole survivor of the 2008 Yeti Airlines Flight 103 crash?",
+   "answer": "Surendra Kunwar",
+   "topic": "Other"
+  },
+  {
+   "n": 129,
+   "index": 573,
+   "problem": "What was the date (day/month/year) of the professional rower Albert Hamm's (1860-1891) first professional race?",
+   "answer": "August 1st, 1880",
+   "topic": "Sports"
+  },
+  {
+   "n": 130,
+   "index": 1809,
+   "problem": "Who is credited with the binomial name of the yellowfin sole?",
+   "answer": "Pallas",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 131,
+   "index": 589,
+   "problem": "Which college in Srinagar was accredited as the College for Potential Excellence by the University Grants Commission (India) in April 2010?",
+   "answer": "Islamia College of Science and Commerce",
+   "topic": "Other"
+  },
+  {
+   "n": 132,
+   "index": 2466,
+   "problem": "On what day, month, and year did King Louis II's, also known as King Louis XIII of France, reign as King of Navarre end?",
+   "answer": "20 October 1620",
+   "topic": "History"
+  },
+  {
+   "n": 133,
+   "index": 2869,
+   "problem": "What Toronto Library collection was established in 1977, named after the children's librarian and head of the TPL?",
+   "answer": "The Jean Thomson Collection of Original Art",
+   "topic": "Art"
+  },
+  {
+   "n": 134,
+   "index": 3572,
+   "problem": "In what year did S. Osman Ali, the 7th Governor of the State Bank of Pakistan, enter the Indian Civil Service?",
+   "answer": "1934",
+   "topic": "Politics"
+  },
+  {
+   "n": 135,
+   "index": 1477,
+   "problem": "Which year was Bob Marley's home converted into a museum?",
+   "answer": "1986",
+   "topic": "Music"
+  },
+  {
+   "n": 136,
+   "index": 4125,
+   "problem": "In which episode and season of Regular Show did Mordecai and Rigby find RadiCola?",
+   "answer": "Season 2, Episode 9: Party Pete",
+   "topic": "TV shows"
+  },
+  {
+   "n": 137,
+   "index": 3826,
+   "problem": "Who was the first woman to be elected as the Speaker of the House of Representatives in Nepal?",
+   "answer": "Onsari Gharti Magar",
+   "topic": "Politics"
+  },
+  {
+   "n": 138,
+   "index": 322,
+   "problem": "Who won the Godman-Salvin Medal in 2010?",
+   "answer": "Ian Newton",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 139,
+   "index": 826,
+   "problem": "What was Jitendra Kumar Maheshwari's position just before being appointed as a judge of the Supreme Court of India?",
+   "answer": "Chief Justice of the Sikkim High Court",
+   "topic": "Politics"
+  },
+  {
+   "n": 140,
+   "index": 1633,
+   "problem": "Odisha’s longest road bridge, “Netaji Subhas Chandra Bose Setu,” has been built over which tributary of the Mahanadi River?",
+   "answer": "Kathajodi ",
+   "topic": "Geography"
+  },
+  {
+   "n": 141,
+   "index": 2131,
+   "problem": "Who created Ida Mntwana's bronze statue?",
+   "answer": "Sarah Lovejoy",
+   "topic": "Art"
+  },
+  {
+   "n": 142,
+   "index": 2937,
+   "problem": "During which tour was Ghost's Papa Nihil resurrected?",
+   "answer": "Imperatour.",
+   "topic": "Music"
+  },
+  {
+   "n": 143,
+   "index": 3852,
+   "problem": "In which year, on repeated requests from the student community of Ladakh, did Sonam Wangchuk (an Indian engineer, innovator, and education reformist) help launch the New Ladakh Movement (NLM), a social campaign and Ladakh's version of the Green Party, to work for sustainable education, environment, and economy?",
+   "answer": "2013",
+   "topic": "Politics"
+  },
+  {
+   "n": 144,
+   "index": 1387,
+   "problem": "What month and year did a team of scientists publish a study of a skeleton found in Bragança, northeastern Portugal, of a man who died around 1000 AD and was discovered to have a 47,XXY karyotype?",
+   "answer": "August 2022",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 145,
+   "index": 1666,
+   "problem": "On what day, month, and year did the physicist and chemist Katharine Burr Blodgett issue the U.S. patent for \"Step Gauge for Measuring Thickness of Thin Films\"?",
+   "answer": "26 February 1952",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 146,
+   "index": 475,
+   "problem": "In which street did Martin Gardner live with his family in Hastings-on-Hudson, New York, before moving to Hendersonville in 1979?",
+   "answer": "Euclid Avenue",
+   "topic": "Other"
+  },
+  {
+   "n": 147,
+   "index": 1296,
+   "problem": "Which Indian agriculture is known as Golden Zest?",
+   "answer": "Saffron Cultivation",
+   "topic": "Geography"
+  },
+  {
+   "n": 148,
+   "index": 1326,
+   "problem": "Mathematician Alexander Aitken graduated in 1920 with First Class Honors in what subject?",
+   "answer": "French and Latin",
+   "topic": "Other"
+  },
+  {
+   "n": 149,
+   "index": 2804,
+   "problem": "What total number of newly discovered pieces of music by Maddalena Casulana were played for the first time in 400 years on March 8, 2022, as part of BBC Radio 3's programming for International Women's Day?",
+   "answer": "12",
+   "topic": "Music"
+  },
+  {
+   "n": 150,
+   "index": 2053,
+   "problem": "What was the year when NASA Administrator James C. Fletcher proposed a token of $5 million for Hubble in NASA's budget?",
+   "answer": "1977",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 151,
+   "index": 960,
+   "problem": "What was the model number of the first Betamax VCR in the US?",
+   "answer": "LV-1901",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 152,
+   "index": 3623,
+   "problem": "On what day, month, and year did Ghulam Nabi Wani Sogami (an Indian politician from Jammu and Kashmir) die?",
+   "answer": " 23 July 1981",
+   "topic": "Politics"
+  },
+  {
+   "n": 153,
+   "index": 1432,
+   "problem": "On what day, month, and year did the United Nations Security Council pass its first resolution on Kashmir?",
+   "answer": "21 April 1948",
+   "topic": "Politics"
+  },
+  {
+   "n": 154,
+   "index": 108,
+   "problem": "Which award did Reza Aslan receive in 2014?",
+   "answer": "The Intersections International Award",
+   "topic": "Other"
+  },
+  {
+   "n": 155,
+   "index": 3863,
+   "problem": "On what day, month, and year was Ila Pant (an Indian politician) born?",
+   "answer": "10 March 1938",
+   "topic": "Politics"
+  },
+  {
+   "n": 156,
+   "index": 3357,
+   "problem": "What was the population of Goldsboro, NC, in the 2020 census?",
+   "answer": "33,657",
+   "topic": "Geography"
+  },
+  {
+   "n": 157,
+   "index": 4166,
+   "problem": "Which character narrated the last episode of the \"One Life to Live\" series that aired on January 13, 2012?",
+   "answer": "Allison Perkins",
+   "topic": "TV shows"
+  },
+  {
+   "n": 158,
+   "index": 2551,
+   "problem": "According to the last population update in 2010, the rural locality of Taz Russky in the Klyapovskoye Rural Settlement of Russia has a population of what?",
+   "answer": "175",
+   "topic": "Geography"
+  },
+  {
+   "n": 159,
+   "index": 2925,
+   "problem": "What year was the third edition of the Yale Bright Star Catalogue published?",
+   "answer": "1964",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 160,
+   "index": 3183,
+   "problem": "What Mozilla Firefox release version included the patch note: \"Improved the performance of the instance when Microsoft's IME and Defender retrieve the URL of a focused document in Windows 11 version 22H2\"?",
+   "answer": "107.0",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 161,
+   "index": 2055,
+   "problem": "Give the name of Basanti Dulal Nag Chaudhuri's (an Indian nuclear scientist) wife.",
+   "answer": " Dipali Nag née Talukdar",
+   "topic": "Other"
+  },
+  {
+   "n": 162,
+   "index": 1256,
+   "problem": "In which year was the municipality of San Eduardo, Boyacá, Colombia, founded?",
+   "answer": "1914",
+   "topic": "Geography"
+  },
+  {
+   "n": 163,
+   "index": 101,
+   "problem": "What drag family was Monét X Change originally a member of before starting her own?",
+   "answer": "Davenport.",
+   "topic": "Other"
+  },
+  {
+   "n": 164,
+   "index": 3751,
+   "problem": "The Partisan weapon in the original version of Bloodstained: Ritual of the Night for the PC is dropped by which enemy with the word \"armor\" in its name?",
+   "answer": "Lance Armor ",
+   "topic": "Video games"
+  },
+  {
+   "n": 165,
+   "index": 647,
+   "problem": "What were the names of the two streets at the intersection where the Sydenham Hospital in New York was originally located?",
+   "answer": "124th Street and Manhattan Avenue",
+   "topic": "Geography"
+  },
+  {
+   "n": 166,
+   "index": 2751,
+   "problem": "What cabinet position did Sir Hector-Louis Langevin hold in 1870?",
+   "answer": "Minister of Public Works",
+   "topic": "Politics"
+  },
+  {
+   "n": 167,
+   "index": 374,
+   "problem": "Who is known to be the longest-serving premier in the history of the USSR?",
+   "answer": "Alexei Kosygin",
+   "topic": "Politics"
+  },
+  {
+   "n": 168,
+   "index": 2300,
+   "problem": "As of 2022, what year did the Centro Botín Centre in Spain have the exhibition named 'Amigos'?",
+   "answer": "2019",
+   "topic": "Art"
+  },
+  {
+   "n": 169,
+   "index": 1104,
+   "problem": "How many degrees was the Rattler's maximum vertical angle at Six Flags Fiesta Texas?",
+   "answer": "61.4",
+   "topic": "Other"
+  },
+  {
+   "n": 170,
+   "index": 1967,
+   "problem": "What is the name of the CIA project whose user guide was published by WikiLeaks on 10 August 2017?",
+   "answer": "CouchPotato",
+   "topic": "Politics"
+  },
+  {
+   "n": 171,
+   "index": 3947,
+   "problem": "Which state of India was awarded the international honor for afforestation efforts at COP-28?",
+   "answer": "Bihar",
+   "topic": "Geography"
+  },
+  {
+   "n": 172,
+   "index": 2885,
+   "problem": "Which Indian state is also known as Veer Bhumi?",
+   "answer": "Himachal Pradesh",
+   "topic": "Geography"
+  },
+  {
+   "n": 173,
+   "index": 2358,
+   "problem": "From what year to what year was Muhammad Ayub Sheikh, who was a Pakistani politician, first a member of the National Assembly of Pakistan?",
+   "answer": "2008-2013",
+   "topic": "Politics"
+  },
+  {
+   "n": 174,
+   "index": 2942,
+   "problem": "Who won the second set in the match between Jaume Munar and Stefanos Tsitsipas in the 2020 French Open Men's Singles?",
+   "answer": "Jaume Munar",
+   "topic": "Sports"
+  },
+  {
+   "n": 175,
+   "index": 1084,
+   "problem": "According to the 2011 Nepal census, what percentage of the population of Nepal speaks Urdu?",
+   "answer": "2.61%",
+   "topic": "Geography"
+  },
+  {
+   "n": 176,
+   "index": 2541,
+   "problem": "On which day and month of 1956 was a letter sent to Dr. Rajendra Prasad, President of the Indian Union, by A.C. Bhaktivedanta, also known as A.C. Bhaktivedanta Swami Prabhupada?",
+   "answer": "21 November",
+   "topic": "Politics"
+  },
+  {
+   "n": 177,
+   "index": 3178,
+   "problem": "In what year was Celia Hoyles appointed Professor of Mathematical Education at the Institute of Education, University of London?",
+   "answer": "1984.",
+   "topic": "Other"
+  },
+  {
+   "n": 178,
+   "index": 3394,
+   "problem": "Name the first Indian artist to travel abroad for the purpose of studying printmaking as an art.",
+   "answer": " Mukul Dey ",
+   "topic": "Art"
+  },
+  {
+   "n": 179,
+   "index": 661,
+   "problem": "Who was the 3rd CEO of Lumon Industries in the show \"Severance\"?",
+   "answer": "Myrtle Eagan",
+   "topic": "TV shows"
+  },
+  {
+   "n": 180,
+   "index": 12,
+   "problem": "In which year did the Japanese scientist Koichi Mizushima receive the Kato Memorial Prize?",
+   "answer": "1999",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 181,
+   "index": 1575,
+   "problem": "Within plus or minus one minute, when did Rober Pier receive a yellow card in the La Liga match between Levante and Real Sociedad on May 6, 2022?",
+   "answer": "52nd minute",
+   "topic": "Sports"
+  },
+  {
+   "n": 182,
+   "index": 2739,
+   "problem": "What is the name of the sculpture Louise Bourgeois created in 1955?",
+   "answer": "One and Others",
+   "topic": "Art"
+  },
+  {
+   "n": 183,
+   "index": 1311,
+   "problem": "What day, month, and year was the album \"Beauty Marks\" by Ciara released on CD in Japan?",
+   "answer": "June 5, 2019",
+   "topic": "Music"
+  },
+  {
+   "n": 184,
+   "index": 1961,
+   "problem": "What day, month, and year was the dungeon Dire Maul originally added to the game \"World of Warcraft\"?",
+   "answer": "7 March 2005",
+   "topic": "Video games"
+  },
+  {
+   "n": 185,
+   "index": 1827,
+   "problem": "Anselm Kiefer had his first solo exhibition at the Neue Nationalgalerie in Berlin in what year?",
+   "answer": "1991",
+   "topic": "Art"
+  },
+  {
+   "n": 186,
+   "index": 3671,
+   "problem": "What year was Jerry Lee Lewis's 13th album released on Mercury Records?",
+   "answer": "1970",
+   "topic": "Music"
+  },
+  {
+   "n": 187,
+   "index": 3101,
+   "problem": "Which African country was the first to introduce shared parental leave?",
+   "answer": "South Africa",
+   "topic": "Politics"
+  },
+  {
+   "n": 188,
+   "index": 258,
+   "problem": "What is the name (first and last) of the 11th President of the University of Northern Iowa?",
+   "answer": "Mark A. Nook",
+   "topic": "Other"
+  },
+  {
+   "n": 189,
+   "index": 3295,
+   "problem": "In what year did Dennis Ichiyama become the designer-in-residence at the Hamilton Wood Type and Printing Museum in Two Rivers, Wisconsin, working with historic wood type?",
+   "answer": "1999",
+   "topic": "Art"
+  },
+  {
+   "n": 190,
+   "index": 3426,
+   "problem": "When was the exact day, month, and year the FPT University was founded?",
+   "answer": "September 8, 2006",
+   "topic": "Other"
+  },
+  {
+   "n": 191,
+   "index": 383,
+   "problem": "What year was the municipality of Támesis, Antioquia, Colombia, founded?",
+   "answer": "1858",
+   "topic": "Geography"
+  },
+  {
+   "n": 192,
+   "index": 1357,
+   "problem": "What's the official motto of the Austrian Decoration for Science and Art?",
+   "answer": "Litteris et Artibus",
+   "topic": "Art"
+  },
+  {
+   "n": 193,
+   "index": 3648,
+   "problem": "What is the forest cover area of Andhra Pradesh in square kilometers, according to the India State of Forest Report 2019?",
+   "answer": "29,137.40",
+   "topic": "Geography"
+  },
+  {
+   "n": 194,
+   "index": 523,
+   "problem": "Before the New 52, who murdered the supervillain Monsieur Mallah?",
+   "answer": "Gorilla Grodd",
+   "topic": "Other"
+  },
+  {
+   "n": 195,
+   "index": 2123,
+   "problem": "In which year did the United States Defense Health Agency first approve payment for sex reassignment surgery for an active-duty U.S. military service member?",
+   "answer": "2017",
+   "topic": "Politics"
+  },
+  {
+   "n": 196,
+   "index": 1291,
+   "problem": "What species of Polymixia fish is named after research scientist Gloria Hollister?",
+   "answer": "Polymixia hollisterea",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 197,
+   "index": 3656,
+   "problem": "Who was the first MVP woman player in the VNL tournament?",
+   "answer": "Michelle Bartsch-Hackley",
+   "topic": "Sports"
+  },
+  {
+   "n": 198,
+   "index": 4321,
+   "problem": "The book \"Rhine\" by Anselm Kiefer is from what year?",
+   "answer": "1981.",
+   "topic": "Art"
+  },
+  {
+   "n": 199,
+   "index": 3991,
+   "problem": "What GPU does the Lumia 550 have?",
+   "answer": "Qualcomm Adreno 304.",
+   "topic": "Science and technology"
+  },
+  {
+   "n": 200,
+   "index": 0,
+   "problem": "Who received the IEEE Frank Rosenblatt Award in 2010?",
+   "answer": "Michio Sugeno",
+   "topic": "Science and technology"
+  }
+ ]
+}

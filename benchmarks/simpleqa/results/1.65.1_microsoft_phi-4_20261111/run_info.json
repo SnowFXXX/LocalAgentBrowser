@@ -1,0 +1,6 @@
+{
+ "sample": "sample.json",
+ "model": "microsoft/phi-4 on OpenRouter",
+ "version": "1.65.1",
+ "completed": "Completed 2026-11-11T02:06:33, 50 questions, 28.4 min."
+}
