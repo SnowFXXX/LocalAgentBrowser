@@ -8,7 +8,9 @@ requests are all welcome.
 - **Report a bug** or **suggest a feature** using the [issue templates](https://github.com/SnowFXXX/LocalAgentBrowser/issues/new/choose).
 - **Share a run.** Results with other models, hardware or kinds of objectives are especially useful: the
   agent has been tuned on seven kinds of objectives and measured on four models (Qwen2.5 3B, 7B and 14B, and
-  Llama 3.1 8B), all on CPUs (see the README's "Tested on four models").
+  Llama 3.1 8B), all on CPUs (see the README's "Tested on four models"). It runs locally by default with LM
+  Studio; cloud models through OpenRouter, with your own key, are optional and were tested on 1.66 (see the
+  README's suite and SimpleQA results).
 - **Send a pull request.** For anything bigger than a small fix, please open an issue first so we can agree
   on the approach.
 
@@ -63,8 +65,8 @@ in `requirements.txt`; `BUILD.txt` in the installed folder records what went in.
   of [CHANGELOG.md](CHANGELOG.md).
 - Keep the code style consistent with the surrounding code: named constants in
   `localagentbrowser/config.py` with a comment explaining each, model-facing text in `prompts.py`, and
-  comments that explain why rather than what. The README's
-  [Code layout](README.md#code-layout) says which file holds what.
+  comments that explain why rather than what. The
+  [Code layout](docs/how-it-works.md#code-layout) section of How it works says which file holds what.
 - **Check the golden prompts.** `tests/test_golden_prompts.py` compares every message the agent sends to the
   model in five scripted runs with a recorded copy. A refactor must keep it passing unchanged. If your change is
   meant to change what the model sees, record it again (`GOLDEN_UPDATE=1 python -m pytest

@@ -43,6 +43,8 @@ Key facts:
 - [Example reports](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/examples/README.md): three unedited reports from the 1.66 test run (Phi-4), with what each got right and wrong
 - [Changelog](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/CHANGELOG.md): every version and why it changed
 - [Regression history](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md): each version measured on seven kinds of task
+- [SimpleQA results](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/benchmarks/simpleqa/README.md): the SimpleQA runs (50 and 200 questions), with every answer and grade
+- [SimpleQA dataset](https://huggingface.co/datasets/SnowFX/localagentbrowser-simpleqa): the same answers and grades on Hugging Face
 - [Technical paper](https://snowfxxx.github.io/LocalAgentBrowser/paper.html): Verification over Trust; the design, a four-model evaluation and where the measures failed
 
 ## Optional
