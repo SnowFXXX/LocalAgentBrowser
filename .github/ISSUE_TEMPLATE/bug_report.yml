@@ -30,7 +30,7 @@ body:
     attributes:
       label: Agent version
       description: Shown by `pip show localagentbrowser`; with the Windows installer, in Windows Settings → Apps ("LocalAgentBrowser version ..."); or the commit you are on if you run from a clone.
-      placeholder: "1.65"
+      placeholder: "1.66.1"
     validations:
       required: true
   - type: input
