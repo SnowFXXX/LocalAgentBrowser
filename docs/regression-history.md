@@ -347,7 +347,7 @@ have not been re-run on 1.66 yet.
   answers: a garbled count note ("ten more") after single-answer questions, and a cut number repeated in the "Left
   out" note, which OpenAI's grader read as the answer.
 
-### 1.67 (cloud runs 2026-11-17; the 7B run is a placeholder)
+### 1.67 (cloud runs 2026-11-17; the local 7B 2026-11-18)
 1.67 adds Clean Room, a private edition, and changes the agent for every model: a cut-off coverage reply is asked for
 again, and a check that still fails is reported as not checked instead of counted as covered. Four cloud models ran
 the suite once each, one at a time, on the frozen code:
@@ -370,7 +370,7 @@ The four cost $0.23 together; per-model costs are estimated from token counts.
   lists carbon dioxide as an output; GPT-4o-mini repeated a stale page's claim that SQLite lacks triggers; Phi-4 named
   PhotoCraft, an early-stage editor, as the third Photoshop alternative.
 
-**The local 7B run (2026-11-17 21:49) is a placeholder and isn't counted.** It was started without `--minutes 90`, so
+**An earlier local 7B run (2026-11-17 21:49) isn't counted.** It was started without `--minutes 90`, so
 the suite used its older built-in limits (25 to 60 minutes per task) instead of the 90 minutes every local result since
 1.63 used. It finished 3 of 7 in 272.3 minutes. The four unfinished tasks (comparison, cold brew, opinion,
 documentation) had found every checklist item and were at FINISH or its final check when 45 minutes ran out; in the
@@ -382,9 +382,32 @@ run, it showed no regression. Three code problems showed up on the documentation
 - The model's coverage verdict said nothing answered "how to create a virtual environment", over a discovery giving
   `python -m venv`.
 
-1.67 ships with the 1.64 local results, since a full local suite takes about six hours; **1.67.1** follows with a full
-7B suite at 90 minutes per task on the 1.67 code, which replaces this placeholder. The suite will default to 90 minutes
-and record the limit in each run, so a run can't be started with the wrong one unnoticed.
+1.67 shipped with the 1.64 local results while the 7B ran again. **The 7B at 90 minutes per task** (2026-11-18 07:05,
+commit 14589ad, the released 1.67 code), one model at a time:
+
+| Task | Finished | Turns | Model min | 1.64 model min | Problems |
+|---|---|---|---|---|---|
+| factual | yes | 4 | 16.2 | 17.2 | none |
+| list-photoshop | yes | 11 | 46.4 | 34.0 | none |
+| comparison | yes | 14 | 55.5 | 49.2 | no "My view:" paragraph |
+| howto-coldbrew | yes | 7 | 28.2 | 50.4 | 1 uncited paragraph (5 on 1.64) |
+| explanation | yes | 7 | 34.0 | 72.7 | none |
+| opinion | yes | 10 | 32.3 | 49.4 | result lacks omen/unlucky/death |
+| docs | yes | 22 | 78.7 | not finished | none |
+
+7 of 7 in 291.3 model minutes (1.64: 6 of 7, 360.8), with no outside knowledge, numbers or commands the discoveries
+don't give. Two tasks needed more than their old built-in limits: the list 46.4 minutes (40) and the comparison 55.5
+(45). The documentation task's three problems from the earlier run didn't recur: no discovery was refused as a
+question, the install item got a real command (`python -m pip install novas`) after a wrong one was refused, and
+coverage counted the create discovery. Read by hand, what the checks didn't catch:
+- The documentation answer gives `python -m venv C:\path\to\new\virtual\environment`, the create command, under "activate on
+  Windows": a real, cited command under the wrong step.
+- The comparison recommends PostgreSQL for a hobby project with a few hundred users, though its first finding says
+  SQLite suits an app whose database lives beside it and whose writes are brief.
+- The opinion answer's four findings are all from roamingbirds.com; its report says no second source was found.
+
+The suite will default to 90 minutes and record the limit in each run, so a run can't be started with the wrong one
+unnoticed.
 
 ## What the steps showed overall
 
