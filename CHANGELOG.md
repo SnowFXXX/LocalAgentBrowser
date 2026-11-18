@@ -1,12 +1,12 @@
 # Changelog
 
-Every version of LocalAgentBrowser, newest first. Each released version is also a tagged commit (`v1.11` … `v1.66.1`); 1.54 to 1.56 and 1.58 to 1.60 were internal steps
+Every version of LocalAgentBrowser, newest first. Each released version is also a tagged commit (`v1.11` … `v1.67`); 1.54 to 1.56 and 1.58 to 1.60 were internal steps
 measured on the regression suite and released as part of 1.57 and 1.61 (see
 [docs/regression-history.md](docs/regression-history.md)).
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
-## [Unreleased]
+## [1.67] - 2026-11-18
 ### Added
 - **Clean Room, a private edition.** A second Windows installer, `LocalAgentBrowser-CleanRoom-<version>-setup.exe`,
   and a second package, `localagentbrowser-cleanroom`, with the cloud code left out instead of turned off: no
@@ -69,6 +69,23 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
 - **Numbers inside chemical names** ("ribulose-1,5-bisphosphate", "glyceraldehyde-3-phosphate") are part of the
   name, not numbers to check: Phi-4's correct third Calvin-cycle stage was cut as an invented "1,5". Replayed on
   1,535 saved results, only such names are affected; a hyphenated quantity ("a 16-hour period") is still checked.
+### Measured
+- The suite on four cloud models, one run each, one model at a time, on this code (November 17): every one finished
+  7 of 7, with no gaps filled from the model's own knowledge, by the suite's measures. Phi-4 4.9 model min, 3 uncited
+  lines (1 on 1.66); GPT-4o-mini 5.6 min, 1 (1); Llama 3.1 8B 3.0 min, 1 (3); Gemma 3 4B 6.8 min (23.6 on 1.66), 2
+  (5). The four cost $0.23 together. No coverage item went unchecked; on 1.66, 2 to 9 per model had been counted as
+  covered after a failed check.
+- Read by hand, what no check caught: Gemma repeated one sentence under three parts of the explanation, and its cold
+  brew has no real steps; Llama's cold brew has no steps and no line says they weren't found; GPT-4o-mini repeated a
+  stale page's claim that SQLite lacks triggers; Phi-4 named PhotoCraft, an early-stage editor, as a Photoshop
+  alternative.
+- **The local 7B run is a placeholder, not a result.** It was started without `--minutes 90`, so the suite used its
+  older built-in limits of 25 to 60 minutes per task instead of the 90 minutes every local result since 1.63 used. It
+  finished 3 of 7: the four unfinished tasks had found every item and were at their last step when 45 minutes ran
+  out, and in 1.64 three of them took 49 to 50 minutes. Compared turn by turn with the 1.64 run, it showed no
+  regression. A full local suite takes about six hours, so 1.67 ships with the 1.64 local results; **1.67.1** follows
+  as soon as possible with a full 7B suite at 90 minutes per task, which replaces this placeholder. See
+  [docs/regression-history.md](docs/regression-history.md).
 
 ## [1.66.1] - 2026-11-17
 Documentation only; the code is unchanged from 1.66, as measured. Released so PyPI's page matches the README.
