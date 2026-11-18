@@ -169,23 +169,32 @@ included, and was measured on cloud models (below); these local results are 1.64
 - On 1.63 the same models finished 6, 2, 2 and 0 of 7. Every step and run is in the
   [regression history](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md).
 
-**Cloud models** run the same code much faster, through your own OpenRouter account. On 1.66 the suite ran once on
-each of four cloud models (November 15, 2026), one model at a time; every one finished all seven tasks, and no
+**Cloud models** run the same code much faster, through your own OpenRouter account. On 1.67 the suite ran once on
+each of four cloud models (November 17, 2026), one model at a time; every one finished all seven tasks, and no
 finished result filled a gap from the model's own knowledge, by the suite's measures:
 
-| Cloud model | Tasks finished | Model time | Uncited lines (1.65 → 1.66) | Expected words missing (1.65 → 1.66) | Cost of the suite |
+| Cloud model | Tasks finished | Model time | Uncited lines (1.66 → 1.67) | Expected words missing (1.66 → 1.67) | Cost of the suite |
 |---|---|---|---|---|---|
-| `microsoft/phi-4` (the cloud default) | 7 of 7 | 5.6 min | 4 → **1** | 1 → **0** | $0.04 |
-| `openai/gpt-4o-mini` | 7 of 7 | 7.4 min | 12 → **1** | 0 → 0 | $0.06 |
-| `meta-llama/llama-3.1-8b-instruct` | 7 of 7 | 4.0 min | 21 → **3** | 8 → **1** | $0.14 |
-| `google/gemma-3-4b-it` | 7 of 7 (6 on 1.65) | 23.6 min | 9 → **5** | 6 → **3** | $0.06 |
+| `microsoft/phi-4` (the cloud default) | 7 of 7 | 4.9 min | 1 → 3 | 0 → 0 | about $0.03 |
+| `openai/gpt-4o-mini` | 7 of 7 | 5.6 min | 1 → 1 | 0 → 1 | about $0.10 |
+| `meta-llama/llama-3.1-8b-instruct` | 7 of 7 | 3.0 min | 3 → **1** | 1 → 3 | about $0.01 |
+| `google/gemma-3-4b-it` | 7 of 7 | 6.8 min (23.6 on 1.66) | 5 → **2** | 3 → 3 | about $0.02 |
+| `anthropic/claude-opus-5.5` | 7 of 7 | 22.6 min | 3 | 0 | $5.47 |
 
-One run each, scored by the suite's word checks; read by hand, Gemma's factual answer gave a glacier's elevation
-(3,200 m) as Kilimanjaro's height, from the right page but the wrong sentence, which no check caught (see
-[Limitations](#limitations)). Measured earlier on 1.65.1 and not yet re-run on 1.66: Gemini 3.8 Flash 7 of 7 (6.1
-min, 0 uncited lines, $0.24), GPT-5.6 Terra 7 of 7 (4.9 min, 2 uncited, $0.47), Qwen 2.5 72B 7 of 7 (on 1.65, 13.4
-min, 17 uncited, $0.14), and GPT-4o, which lost three tasks to OpenRouter's new-account rate limit that 1.66 now
-waits out.
+The four smaller models cost $0.23 together (per-model costs are estimated from their token counts). Opus 5.5 ran
+once on the 1.67 code before its last two output fixes. It gave the most thorough answers of any model, with about one
+citation every 16 words, and labelled its own weakest source ("from reader comments only, not authoritative"). The
+same checks held every model to the pages, from a 4B model to Opus.
+
+One run each, scored by the suite's word checks, and read by hand. What the checks didn't catch:
+- **Gemma** wrote the same sentence under three parts of the explanation, and its cold brew has no real steps.
+- **Llama**'s cold brew has no steps, though no line says they weren't found, and its explanation lists carbon dioxide
+  as an output.
+- **GPT-4o-mini** repeated a stale page's claim that SQLite lacks triggers and check constraints.
+- **Phi-4** named PhotoCraft, an early-stage editor, as the third Photoshop alternative.
+
+Measured earlier on 1.65.1: Gemini 3.8 Flash 7 of 7 (6.1 min, 0 uncited lines, $0.24), GPT-5.6 Terra 7 of 7 (4.9
+min, 2 uncited, $0.47), Qwen 2.5 72B 7 of 7 (on 1.65, 13.4 min, 17 uncited, $0.14).
 
 **Fifty SimpleQA questions** (a public benchmark of short, hard facts) on Phi-4, the same 50 each time: alone, with
 no browsing, it answered 1 correctly; with LocalAgentBrowser 1.65.1, 38 and 39; with 1.66, **45 (90%)**, 4 wrong and

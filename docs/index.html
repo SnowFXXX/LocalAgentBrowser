@@ -277,41 +277,49 @@
     </div>
     <p class="lead" style="font-size:17px;margin-top:22px"><strong>Or a cloud model, for fast answers.</strong> The same
       code can use a model in the cloud through your own OpenRouter account: a few minutes instead of an hour, but it
-      costs money, and your prompts and the pages read leave your computer. Off unless you turn it on. Measured on 1.66,
+      costs money, and your prompts and the pages read leave your computer. Off unless you turn it on. Measured on 1.67,
       one run each, one model at a time:</p>
     <div class="models">
       <div class="model best">
         <div class="tag">The cloud default</div>
         <h3>Phi-4</h3>
         <div class="score">7<small> of 7 finished</small></div>
-        <dl><dt>All 7 tasks</dt><dd>5.6 min</dd><dt>Uncited lines</dt><dd>1 (4 on 1.65)</dd><dt>Cost</dt><dd>$0.04</dd></dl>
-        <p>The cleanest results for the price. 85% on 200 SimpleQA questions.</p>
+        <dl><dt>All 7 tasks</dt><dd>4.9 min</dd><dt>Uncited lines</dt><dd>3 (1 on 1.66)</dd><dt>Cost</dt><dd>about $0.03</dd></dl>
+        <p>Clean results for the price. 85% on 200 SimpleQA questions.</p>
       </div>
       <div class="model">
         <div class="tag">OpenAI's small model</div>
         <h3>GPT-4o-mini</h3>
         <div class="score">7<small> of 7 finished</small></div>
-        <dl><dt>All 7 tasks</dt><dd>7.4 min</dd><dt>Uncited lines</dt><dd>1 (12 on 1.65)</dd><dt>Cost</dt><dd>$0.06</dd></dl>
-        <p>Every expected detail in every answer, by the suite's word checks.</p>
+        <dl><dt>All 7 tasks</dt><dd>5.6 min</dd><dt>Uncited lines</dt><dd>1 (1 on 1.66)</dd><dt>Cost</dt><dd>about $0.10</dd></dl>
+        <p>The most findings per task. Repeated one stale page's claim about SQLite, which no check caught.</p>
       </div>
       <div class="model">
-        <div class="tag">Most improved</div>
+        <div class="tag">The fastest</div>
         <h3>Llama 3.1 8B</h3>
         <div class="score">7<small> of 7 finished</small></div>
-        <dl><dt>All 7 tasks</dt><dd>4.0 min</dd><dt>Uncited lines</dt><dd>3 (21 on 1.65)</dd><dt>Cost</dt><dd>$0.14</dd></dl>
-        <p>The fastest. Its answers used to be lost when it repeated the prompt; 1.66 keeps them.</p>
+        <dl><dt>All 7 tasks</dt><dd>3.0 min</dd><dt>Uncited lines</dt><dd>1 (3 on 1.66)</dd><dt>Cost</dt><dd>about $0.01</dd></dl>
+        <p>Its cold brew answer has no steps, and no line says they weren't found.</p>
       </div>
       <div class="model">
         <div class="tag">The smallest</div>
         <h3>Gemma 3 4B</h3>
         <div class="score">7<small> of 7 finished</small></div>
-        <dl><dt>All 7 tasks</dt><dd>23.6 min</dd><dt>Uncited lines</dt><dd>5 (9 on 1.65)</dd><dt>Cost</dt><dd>$0.06</dd></dl>
-        <p>6 of 7 on 1.65. One answer gave a glacier's elevation as Kilimanjaro's height, which no check caught.</p>
+        <dl><dt>All 7 tasks</dt><dd>6.8 min</dd><dt>Uncited lines</dt><dd>2 (5 on 1.66)</dd><dt>Cost</dt><dd>about $0.02</dd></dl>
+        <p>Finishes everything, but its explanation repeats one sentence under three parts.</p>
+      </div>
+      <div class="model best">
+        <div class="tag">The most thorough</div>
+        <h3>Opus 5.5</h3>
+        <div class="score">7<small> of 7 finished</small></div>
+        <dl><dt>All 7 tasks</dt><dd>22.6 min</dd><dt>Uncited lines</dt><dd>3</dd><dt>Cost</dt><dd>$5.47</dd></dl>
+        <p>The richest answers, a citation every 16 words, and it labelled its own weakest source.</p>
       </div>
     </div>
     <p class="lead" style="font-size:17px;margin-top:22px">No finished answer filled a gap from the model's own knowledge,
-      by the suite's measures. On 1.65.1, Gemini 3.8 Flash and GPT-5.6 Terra also finished 7 of 7 (for $0.24 and $0.47),
-      and GPT-4o lost three tasks to a rate limit that 1.66 now waits out. <strong>On SimpleQA</strong>, a public
+      by the suite's measures: the same checks held every model to the pages, from a 4B model to Opus. The four smaller
+      models cost $0.23 together. On 1.65.1, Gemini 3.8 Flash and GPT-5.6 Terra also finished 7 of 7 (for $0.24 and
+      $0.47). <strong>On SimpleQA</strong>, a public
       benchmark of short, hard facts, Phi-4 with LocalAgentBrowser 1.66 answered 170 of the standard 200 (85%, likely
       range 79 to 89%), and was right 94% of the time when it answered. 19 times it said it couldn't verify an answer
       rather than guess; 11 answers were wrong.
