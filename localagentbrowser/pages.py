@@ -105,7 +105,7 @@ def without_trailing_punctuation(url):
     """An address taken from the model's text without the punctuation after it ("see https://x.org/page)." ends at
     "page"). A closing bracket is the address's own when it closes one opened in it: cutting every trailing ")" sent
     "https://en.wikipedia.org/wiki/Trevor_Evans_(journalist)" to "..._(journalist", which Wikipedia answered with an
-    empty search, about 40 times in the cloud SimpleQA runs."""
+    empty search, about 40 times in the SimpleQA runs."""
     while url and url[-1] in ".,;)\"'":
         if url[-1] == ")" and url.count("(") >= url.count(")"):
             break

@@ -1,9 +1,12 @@
 # Builds the Windows installer: installer\build\LocalAgentBrowser-<version>-setup.exe
-# Usage (from the repository): powershell -ExecutionPolicy Bypass -File installer\build.ps1
+# Usage (from the repository): powershell -ExecutionPolicy Bypass -File installer\build.ps1 [-CleanRoom]
+#   -CleanRoom builds Clean Room, a private edition: LocalAgentBrowser-CleanRoom-<version>-setup.exe, with the cloud
+#   code left out of the app and checked to be gone (tools\clean_room.py)
 #
 # The installed app carries its own Python (the official embeddable package from python.org), with the app's packages
 # installed beside it, so users need no Python of their own. Playwright's Chromium is downloaded on the user's PC
 # during setup, as every Playwright app does. Needs: Inno Setup 6 (ISCC.exe) and Python 3.13 (the py launcher).
+param([switch]$CleanRoom)
 $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
 $build = Join-Path $PSScriptRoot "build"
@@ -41,7 +44,7 @@ Get-ChildItem (Join-Path $stage "python") -Recurse -Directory -Filter "__pycache
 
 # 3. The app: the repository's tracked files as they are in this working tree (no tests, no drafts)
 Push-Location $repo
-$files = git ls-files | Where-Object { $_ -notmatch '^(tests|docs|benchmarks|installer|\.github)/' -and $_ -notmatch '^\.' }
+$files = git ls-files | Where-Object { $_ -notmatch '^(tests|docs|benchmarks|installer|cleanroom|\.github)/' -and $_ -notmatch '^\.' }
 foreach ($f in $files) {
     $dest = Join-Path $stage $f
     New-Item -ItemType Directory -Force (Split-Path -Parent $dest) | Out-Null
@@ -49,15 +52,21 @@ foreach ($f in $files) {
 }
 Pop-Location
 Copy-Item (Join-Path $PSScriptRoot "run_suite.cmd") (Join-Path $stage "tools\windows\run_suite.cmd")
+if ($CleanRoom) {
+    & py -3.13 (Join-Path $repo "tools\clean_room.py") stage $stage
+    if ($LASTEXITCODE -ne 0) { throw "Clean Room still has cloud code or wording (see above)" }
+}
 
 # 4. A record of what went in
-$record = @("LocalAgentBrowser $version", "built $(Get-Date -Format 'yyyy-MM-dd HH:mm')", "commit $(git -C $repo rev-parse --short HEAD)",
+$title = if ($CleanRoom) { "LocalAgentBrowser-CleanRoom" } else { "LocalAgentBrowser" }
+$record = @("$title $version", "built $(Get-Date -Format 'yyyy-MM-dd HH:mm')", "commit $(git -C $repo rev-parse --short HEAD)",
             "python-$pyVersion-embed-amd64.zip sha256 $pyHash", "packages:") +
           (& py -3.13 -m pip list --path (Join-Path $stage "python\Lib\site-packages") --format freeze)
 Set-Content (Join-Path $stage "BUILD.txt") -Encoding utf8 -Value $record
 
 # 5. The setup file
-& $iscc /Q "/DAppVersion=$version" "/DStage=$stage" "/O$build" (Join-Path $PSScriptRoot "LocalAgentBrowser.iss")
+$defines = @("/DAppVersion=$version", "/DStage=$stage") + $(if ($CleanRoom) { @("/DCleanRoom") } else { @() })
+& $iscc /Q @defines "/O$build" (Join-Path $PSScriptRoot "LocalAgentBrowser.iss")
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
-$setup = Join-Path $build "LocalAgentBrowser-$version-setup.exe"
+$setup = Join-Path $build "$title-$version-setup.exe"
 Write-Host "Built $setup ($([math]::Round((Get-Item $setup).Length / 1MB, 1)) MB), SHA-256 $((Get-FileHash $setup).Hash)"

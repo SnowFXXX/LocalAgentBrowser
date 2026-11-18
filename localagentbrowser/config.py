@@ -1,5 +1,7 @@
 """Settings: the LM Studio connection, read from environment variables, and every limit and threshold."""
+# cloud:start
 import json
+# cloud:end
 import os
 
 BASE_URL = os.environ.get("LMSTUDIO_BASE_URL", "http://localhost:1234/v1")
@@ -8,12 +10,14 @@ MODEL = os.environ.get("LMSTUDIO_MODEL", "qwen2.5-7b-instruct")
 
 API_KEY = os.environ.get("LMSTUDIO_API_KEY", "lm-studio")
 
+# cloud:start
 # Extra JSON fields sent with every model request, for servers other than LM Studio (empty by default). The cloud
 # mode sends OpenRouter's provider rules: only providers that honour the JSON format, and none that keep prompts.
 EXTRA_BODY = json.loads(os.environ.get("LMSTUDIO_EXTRA_BODY") or "{}")
 # Extra HTTP headers sent with every model request (empty by default). The cloud mode sends OpenRouter's app
 # attribution, so runs are listed under LocalAgentBrowser; remove LMSTUDIO_EXTRA_HEADERS to turn that off.
 EXTRA_HEADERS = json.loads(os.environ.get("LMSTUDIO_EXTRA_HEADERS") or "{}")
+# cloud:end
 
 CONTEXT_LENGTH = int(os.environ.get("LMSTUDIO_CONTEXT_LENGTH", "8192"))
 
@@ -22,6 +26,18 @@ SEARCH_URL = "https://html.duckduckgo.com/html/?q="
 # Sites a run must not read, comma-separated (a benchmark run excludes pages that republish its questions and answers):
 # "huggingface.co/datasets,github.com/openai/simple-evals". Empty, so off, unless set
 BLOCKED_SITES = [s.strip() for s in os.environ.get("LAB_BLOCKED_SITES", "").split(",") if s.strip()]
+
+# Google services Chromium calls by itself, unasked, even with Playwright's switches that turn its background
+# networking off: in a 2-page browse its net log showed account checks (accounts.google.com), push-message service
+# check-ins (android.clients.google.com, mtalk.google.com), a time check (clients2.google.com), the autofill server,
+# asked about each page visited (content-autofill.googleapis.com), and component updates (update.googleapis.com).
+# The agent's browser never needs them, so their names are never looked up: with these rules every one of those
+# calls failed (27 in the same browse) and the pages loaded the same. www.google.com is left alone, because pages
+# link to it, so one call Chromium makes there (/async/folae) still goes through.
+CHROMIUM_UNASKED_HOSTS = ("accounts.google.com", "android.clients.google.com", "mtalk.google.com", "clients2.google.com",
+                          "content-autofill.googleapis.com", "update.googleapis.com")
+CHROMIUM_ARGS = ["--host-resolver-rules=" + ", ".join(f"MAP {host} ~NOTFOUND" for host in CHROMIUM_UNASKED_HOSTS),
+                 "--allow-browser-signin=false", "--disable-sync"]
 
 REPORT_FILE = "research_report.md"
 
@@ -95,9 +111,11 @@ TURN_MAX_TOKENS = 600
 MODEL_TIMEOUT_SECONDS = 1800
 MAX_EVIDENCE_CHARS = 200  # Longest evidence quote per item shown to the final result
 MODEL_RETRY_WAITS = (5, 15, 30, 60, 120)  # Seconds waited before each new try of a model call the server failed (about 4 min in all)
+# cloud:start
 # Seconds waited before each new try of a rate-limited call (429), when the service does not say how long: a limit of
 # 20 requests a minute frees up within a minute, so the waits cover a few minutes of a busy limit
 RATE_LIMIT_WAITS = (20, 30, 60, 60, 90, 120)
+# cloud:end
 
 STALL_TURNS = 4          # Turns without a new discovery before the model is asked to check its progress
 

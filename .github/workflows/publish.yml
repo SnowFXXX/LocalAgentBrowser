@@ -19,10 +19,21 @@ jobs:
           pip install build twine
           python -m build
           python -m twine check dist/*
+      # Clean Room, a private edition: the same code with the cloud code left out (tools/clean_room.py strips a copy
+      # and fails if any is left), published as its own package, localagentbrowser-cleanroom
+      - name: Build the Clean Room package
+        run: |
+          python tools/clean_room.py package cleanroom-build
+          python -m build cleanroom-build --outdir dist-cleanroom
+          python -m twine check dist-cleanroom/*
       - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-cleanroom
+          path: dist-cleanroom/
 
   publish:
     needs: build
@@ -36,5 +47,20 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  publish-cleanroom:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi-cleanroom
+      url: https://pypi.org/project/localagentbrowser-cleanroom/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist-cleanroom
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
