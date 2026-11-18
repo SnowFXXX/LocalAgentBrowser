@@ -6,6 +6,12 @@ measured on the regression suite and released as part of 1.57 and 1.61 (see
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
+## [Unreleased]
+### Changed
+- **The regression suite gives every task 90 minutes by default** (`--minutes` still sets another limit), and each
+  run records its limit in run_info.json, summary.json and the summary's first line. The tasks' own limits of 25 to
+  60 minutes are gone: a 1.67 run started without `--minutes 90` by mistake was cut short by them.
+
 ## [1.67.2] - 2026-11-18
 ### Fixed
 - **Updating forgot the earlier install's choices.** Setup always started from its defaults and replaced the settings,
