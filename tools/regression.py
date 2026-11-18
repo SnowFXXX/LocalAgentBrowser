@@ -10,7 +10,7 @@ Usage:
     python tools/regression.py --rescore regression_runs/<run>   score an earlier run again, without the model
     python tools/regression.py --list              show the tasks
 
-Each task runs in its own process through tools/live_test.py, with its own time limit, in
+Each task runs in its own process through tools/live_test.py, up to 90 minutes by default (--minutes), in
 regression_runs/<version>_<model>_<date-time>/<task>/. Before the first task the model is loaded and its context
 length checked: every run uses the same context length (LMSTUDIO_CONTEXT_LENGTH, 8192 by default), so results from
 different models are measured under the same conditions. After every task, summary.json and summary.md in that folder are
@@ -42,7 +42,7 @@ import agent_browser as ab  # noqa: E402
 # forbid: words in the final result that show a condition of the objective was missed
 # source: pattern every discovery's page should match, for objectives that name where to look
 TASKS = [
-    {"id": "factual", "kind": "Factual question", "core": True, "minutes": 25,
+    {"id": "factual", "kind": "Factual question", "core": True,
      "objective": "What is the tallest mountain in Africa, and how tall is it in meters and in feet?",
      "expect": [["kilimanjaro"], ["5,895", "5895"], ["19,341", "19341", "19,340", "19340"]]},
     # Replaced the office-suites list in the core set on 2026-11-05: in all three list runs that day, on two PCs,
@@ -50,11 +50,11 @@ TASKS = [
     # well-known suites, with no other page backing them. The agent copied the page faithfully, so the task measured
     # the site. Same kind of task (three things meeting conditions, and what each is best at); the Photoshop list keeps
     # its id, and the office list keeps "list" as an extra task
-    {"id": "list-photoshop", "kind": "List of items", "core": True, "minutes": 40,
+    {"id": "list-photoshop", "kind": "List of items", "core": True,
      "objective": "Find three free, open-source alternatives to Adobe Photoshop and summarize the main strengths of each one.",
      "expect": [["gimp", "krita", "darktable", "inkscape", "pinta", "rawtherapee"]],
      "forbid": ["photopea", "affinity", "pixlr", "canva", "paint.net"]},
-    {"id": "comparison", "kind": "Comparison and recommendation", "core": True, "minutes": 45,
+    {"id": "comparison", "kind": "Comparison and recommendation", "core": True,
      "objective": "Compare SQLite and PostgreSQL for a small web application: setup and administration, handling of "
                   "many simultaneous users, and features. Then recommend one for a hobby project with a few hundred users.",
      "expect": [["sqlite"], ["postgresql", "postgres"], ["concurren", "simultaneous"], ["setup", "set up", "install",
@@ -63,31 +63,29 @@ TASKS = [
     # to the same guide, which has no section on care in the first two weeks, so that part could not be found there
     # whatever the agent did. Same kind of task (what you need, steps in order, and a follow-up part); a new id, so
     # its times are never compared with the repotting runs, which keep the id "howto"
-    {"id": "howto-coldbrew", "kind": "Step-by-step how-to", "core": True, "minutes": 45,
+    {"id": "howto-coldbrew", "kind": "Step-by-step how-to", "core": True,
      "objective": "How do I make cold brew coffee at home? List what I need with the quantities, give the steps in "
                   "order, and say how long it keeps in the fridge.",
      "expect": [["coffee"], ["water"], ["hour"], ["fridge", "refrigerat"]]},
-    {"id": "howto", "kind": "Step-by-step how-to", "core": False, "minutes": 45,
+    {"id": "howto", "kind": "Step-by-step how-to", "core": False,
      "objective": "How do I repot a houseplant? List what I need, give the steps in order, and say how to care for the "
                   "plant during the first two weeks after repotting.",
      "expect": [["pot"], ["soil", "potting mix"], ["water"], ["root"]]},
-    {"id": "explanation", "kind": "Explanation of a topic", "core": True, "minutes": 60,
+    {"id": "explanation", "kind": "Explanation of a topic", "core": True,
      "objective": "Explain how photosynthesis works: what goes in and what comes out, what happens in the "
                   "light-dependent reactions and in the Calvin cycle, and where in the plant cell each stage takes place.",
      "expect": [["carbon dioxide", "co2", "co₂"], ["oxygen"], ["glucose", "sugar", "carbohydrate", "g3p"],
                 ["thylakoid"], ["stroma"]]},
-    {"id": "opinion", "kind": "Opinion from several sources", "core": True, "minutes": 45,
+    {"id": "opinion", "kind": "Opinion from several sources", "core": True,
      "objective": "Find out how at least three different cultures or religions have viewed owls (for example as wise, "
                   "unlucky or sacred), then give your own opinion on why owls attract such different meanings.",
      "expect": [["owl"], ["wis"], ["omen", "unlucky", "death", "bad luck"]]},
-    # 45 minutes like the other tasks since 2026-10-18: at 30 it ran out twice while working through the official
-    # page, which it reads part by part
-    {"id": "docs", "kind": "Documentation research", "core": True, "minutes": 45,
+    {"id": "docs", "kind": "Documentation research", "core": True,
      "objective": "Using the official Python documentation, find out how to create a virtual environment with venv, how "
                   "to activate it on Windows and on macOS or Linux, and how to install packages into it.",
      "expect": [["python -m venv", "python3 -m venv", "py -m venv"], ["activate"], ["pip install"]],
      "source": r"(^|\.)python\.org$"},
-    {"id": "docs-strict", "kind": "Documentation research", "core": False, "minutes": 60,
+    {"id": "docs-strict", "kind": "Documentation research", "core": False,
      "objective": "Locate, analyze, and map out the exact implementation guidelines, parameter schemas, and terminal setup "
                   "commands for the natively integrated Playwright Test Agents (planner, generator, and healer). Your task "
                   "is divided into strict sequential milestones: 1) Use your SEARCH action to pinpoint official source "
@@ -99,20 +97,20 @@ TASKS = [
                   "actionable setup metrics matching the current official release rules.",
      "expect": [["init-agents"], ["planner"], ["generator"], ["healer"]],
      "source": r"(^|\.)playwright\.dev$"},
-    {"id": "opinion-cats", "kind": "Opinion from several sources", "core": False, "minutes": 45,
+    {"id": "opinion-cats", "kind": "Opinion from several sources", "core": False,
      "objective": "Research how different spiritual and religious traditions around the world have viewed cats, then "
                   "formulate your own spiritual opinion about cats, supported by what you found.",
      "expect": [["cat"], ["egypt", "islam", "buddhis", "japan", "norse", "christian"]]},
-    {"id": "list", "kind": "List of items", "core": False, "minutes": 45,
+    {"id": "list", "kind": "List of items", "core": False,
      "objective": "Name three free, open-source alternatives to Microsoft Office, and say what each one is best at.",
      "expect": [["libreoffice"], ["onlyoffice", "openoffice", "calligra"]],
      # Free but not open source (FreeOffice was given as the third item on 1.46), or not free at all
      "forbid": ["freeoffice", "wps office", "softmaker", "google docs", "zoho", "microsoft 365", "apple iwork"]},
-    {"id": "howto-sourdough", "kind": "Step-by-step how-to", "core": False, "minutes": 40,
+    {"id": "howto-sourdough", "kind": "Step-by-step how-to", "core": False,
      "objective": "How do I make a sourdough starter from scratch? Give a step-by-step plan with the quantities of flour "
                   "and water and what to do on each day.",
      "expect": [["flour"], ["water"], ["day"]]},
-    {"id": "comparison-rust", "kind": "Comparison and recommendation", "core": False, "minutes": 45,
+    {"id": "comparison-rust", "kind": "Comparison and recommendation", "core": False,
      "objective": "Compare Python and Rust for writing command-line tools in terms of performance, ease of learning, and "
                   "available libraries, then recommend one for a beginner.",
      "expect": [["python"], ["rust"], ["perform", "fast", "speed"], ["librar", "crate", "package"]]},
@@ -324,7 +322,8 @@ def model_line(meta):
 
 def summary_markdown(meta, scores, baseline=None):
     lines = [f"# Regression run {meta['name']}", "",
-             f"Version {meta['version']} (commit {meta['commit']}), {model_line(meta)}, started {meta['started']}.", "",
+             f"Version {meta['version']} (commit {meta['commit']}), {model_line(meta)}, started {meta['started']}"
+             + (f", up to {meta['minutes_per_task']:g} minutes per task." if meta.get("minutes_per_task") else "."), "",
              "| Task | Finished | Turns | Model min | Discoveries | Progress | Checks fired | Problems |",
              "|---|---|---|---|---|---|---|---|"]
     before = {s["id"]: s for s in (baseline or {}).get("scores", [])}
@@ -425,6 +424,10 @@ def write_run_info(folder, meta):
     return info
 
 
+# Every task's time limit unless --minutes says otherwise. The tasks had their own limits of 25 to 60 minutes until
+# 2026-11-18, when a run started without --minutes 90 by mistake was cut short by them; the published local results
+# have all been measured at 90.
+DEFAULT_MINUTES = 90
 FAILURE_PAUSE_SECONDS = 60  # Wait after a task ended by a failed model call, so a rate limit can clear
 # cloud:start
 CLOUD_URL = "https://openrouter.ai/api/v1"
@@ -529,7 +532,8 @@ def main():
     parser.add_argument("--only", help="comma-separated task ids to run")
     parser.add_argument("--baseline", help="summary.json of an earlier run to compare with")
     parser.add_argument("--rescore", help="score the task folders of an earlier run again instead of running")
-    parser.add_argument("--minutes", type=float, help="time limit for every task instead of each task's own")
+    parser.add_argument("--minutes", type=float, default=DEFAULT_MINUTES,
+                        help=f"time limit for each task (default {DEFAULT_MINUTES})")
     parser.add_argument("--model", help=f"the model to run, as LM Studio lists it (default: {ab.MODEL})")
     parser.add_argument("--list", action="store_true", help="list the tasks and exit")
     # cloud:start
@@ -548,7 +552,7 @@ def main():
         tasks = [t for t in TASKS if t["id"] in wanted]
     if args.list:
         for t in TASKS:
-            print(f"{t['id']:<16} {'core ' if t['core'] else 'extra'} {t['minutes']:>3} min  {t['kind']}: {t['objective'][:70]}...")
+            print(f"{t['id']:<16} {'core ' if t['core'] else 'extra'}  {t['kind']}: {t['objective'][:70]}...")
         return
     baseline = None
     if args.baseline:
@@ -580,13 +584,13 @@ def main():
     name = run_name(version, model, started)
     folder = os.path.join(runs_folder(), name)
     meta = {"name": name, "version": version, "commit": git_commit(), "started": f"{started:%Y-%m-%d %H:%M}",
-            "model": model, **loaded, "tasks": [t["id"] for t in tasks]}
+            "model": model, **loaded, "minutes_per_task": args.minutes, "tasks": [t["id"] for t in tasks]}
     info = write_run_info(folder, meta)
     print(f"Run info: {info['pc']}, commit {info['commit']}, changes {str(info['changes_sha256'])[:16]} "
           f"({len(info['changed_files'])} files)", flush=True)
     scores = []
     for number, task in enumerate(tasks, start=1):
-        minutes = args.minutes or task["minutes"]
+        minutes = args.minutes
         print(f"\n===== REGRESSION TASK {number}/{len(tasks)}: {task['id']} ({task['kind']}, up to {minutes:g} min) =====\n",
               flush=True)
         run_task(task, os.path.join(folder, task["id"]), minutes, model)

@@ -645,3 +645,20 @@ class TestCoverageNotChecked:
         score = rg.score_run(TASK, journal("LibreOffice [1].", "LibreOffice ..."), console)
         assert score["coverage_unchecked"] == 2 and score["coverage_retries"] == 1
         assert "2 checklist item(s) not checked (coverage reply failed)" in score["problems"]
+
+
+class TestTimeLimit:
+    """Every task gets 90 minutes unless --minutes says otherwise, and each run records its limit (a 2026-11-17 run
+    started without --minutes 90 was cut short by the tasks' old limits of 25 to 60 minutes)."""
+
+    def test_every_task_gets_the_default(self):
+        assert rg.DEFAULT_MINUTES == 90
+        assert not any("minutes" in t for t in rg.TASKS)
+
+    def test_the_summary_says_the_limit(self):
+        meta = {"name": "n", "version": "1.67.2", "commit": "c", "started": "s", "minutes_per_task": 90}
+        assert "started s, up to 90 minutes per task." in rg.summary_markdown(meta, [])
+
+    def test_older_runs_without_a_recorded_limit_still_summarise(self):
+        meta = {"name": "n", "version": "1.67", "commit": "c", "started": "s"}
+        assert "started s.\n" in rg.summary_markdown(meta, [])

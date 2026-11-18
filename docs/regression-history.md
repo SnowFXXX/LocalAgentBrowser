@@ -406,8 +406,8 @@ coverage counted the create discovery. Read by hand, what the checks didn't catc
   SQLite suits an app whose database lives beside it and whose writes are brief.
 - The opinion answer's four findings are all from roamingbirds.com; its report says no second source was found.
 
-The suite will default to 90 minutes and record the limit in each run, so a run can't be started with the wrong one
-unnoticed.
+Since then the suite gives every task 90 minutes by default and records the limit in each run, so a run can't be
+started with the wrong one unnoticed.
 
 ## What the steps showed overall
 
