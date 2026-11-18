@@ -125,6 +125,10 @@ var
   OptionalPage: TInputOptionWizardPage;
 #endif
   ModelIds, ModelDownloads: array[0..ModelCount] of String;
+  { An update starts from the earlier install's choices, read once from its settings folder }
+  Prefilled: Boolean;
+  { A model the earlier install used that isn't on the list (set by hand): kept unless another is chosen }
+  KeptModel: String;
 
 { Uninstall from the Start-menu shortcut: the same questions as the uninstaller's own, in boxes that open on top }
 function MessageBoxW(hWnd: Integer; lpText, lpCaption: String; uType: Cardinal): Integer;
@@ -176,6 +180,61 @@ begin
   Result := ModelDownloads[ChosenModel];
 end;
 
+{ The value a settings file sets for Name (a line: set "Name=value"), or '' }
+function SettingFromFile(FileName, Name: String): String;
+var
+  Lines: TArrayOfString;
+  I: Integer;
+  S, Start: String;
+begin
+  Result := '';
+  if not LoadStringsFromFile(FileName, Lines) then
+    Exit;
+  Start := 'set "' + Name + '=';
+  for I := 0 to GetArrayLength(Lines) - 1 do
+  begin
+    S := Trim(Lines[I]);
+    if Pos(Start, S) = 1 then
+    begin
+      Delete(S, 1, Length(Start));
+      if (Length(S) > 0) and (S[Length(S)] = '"') then
+        Delete(S, Length(S), 1);
+      Result := S;
+    end;
+  end;
+end;
+
+{ Updating: the pages start from what the earlier install chose, read from its settings folder, so clicking Next
+  keeps it. 1.67 always started from the defaults and replaced the settings, so an update on BB3 (2026-11-18)
+  switched off the earlier install's choices. A fresh install has no settings folder and keeps the defaults. }
+procedure PrefillFromEarlierInstall;
+var
+  Dir, Id: String;
+  I, Found: Integer;
+begin
+  Prefilled := True;
+  Dir := WizardDirValue + '\settings';
+  if not DirExists(Dir) then
+    Exit;
+  Id := SettingFromFile(Dir + '\model.cmd', 'LMSTUDIO_MODEL');
+  Found := ModelCount; { no model.cmd: the earlier install chose its model in LM Studio }
+  for I := 0 to ModelCount - 1 do
+    if CompareText(ModelIds[I], Id) = 0 then
+      Found := I;
+  if (Id <> '') and (Found = ModelCount) then
+    KeptModel := Id;
+  ModelPage.Values[Found] := True;
+#ifndef CleanRoom
+  OptionalPage.Values[0] := FileExists(Dir + '\cloud.cmd');
+#endif
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if (CurPageID = ModelPage.ID) and not Prefilled then
+    PrefillFromEarlierInstall;
+end;
+
 function WantsModelDownload: Boolean;
 begin
   { Never in a silent install: a model is several GB, and silent installs are for testing or for admins }
@@ -213,7 +272,7 @@ begin
     'LocalAgentBrowser runs on a model in LM Studio (lmstudio.ai). If LM Studio is installed, setup downloads the ' +
     'model you pick through it. Results are from the project''s 7-task test suite on an ordinary 6-core PC with no GPU.',
     True, False);
-  ModelPage.Add('Qwen2.5 7B Instruct (recommended): 4.7 GB, 8 GB RAM; finished 6 of 7 tasks');
+  ModelPage.Add('Qwen2.5 7B Instruct (recommended): 4.7 GB, 8 GB RAM; finished 7 of 7 tasks (on 1.67)');
   ModelPage.Add('Llama 3.1 8B Instruct: 4.9 GB, 8 GB RAM; finished 7 of 7 tasks');
   ModelPage.Add('Qwen2.5 14B Instruct: 9.0 GB, 16 GB RAM; finished 5 of 7, about 2.5 times slower');
   ModelPage.Add('Gemma 3 4B Instruct: 3.3 GB, 6 GB RAM; finished 6 of 7 tasks (on 1.66)');
@@ -252,6 +311,8 @@ var
 begin
   if ChosenModel < ModelCount then
     Model := ModelPage.CheckListBox.ItemCaption[ChosenModel]
+  else if KeptModel <> '' then
+    Model := 'Kept from the earlier install: ' + KeptModel
   else
     Model := 'None now: chosen later in LM Studio';
   ModelTitle := 'Model:';
@@ -289,6 +350,13 @@ begin
     SetArrayLength(Lines, 2);
     Lines[0] := 'rem Written by setup: the model chosen at install';
     Lines[1] := 'set "LMSTUDIO_MODEL=' + ModelIds[ChosenModel] + '"';
+    SaveStringsToFile(Dir + '\model.cmd', Lines, False);
+  end
+  else if KeptModel <> '' then
+  begin
+    SetArrayLength(Lines, 2);
+    Lines[0] := 'rem Written by setup: the model the earlier install used, kept';
+    Lines[1] := 'set "LMSTUDIO_MODEL=' + KeptModel + '"';
     SaveStringsToFile(Dir + '\model.cmd', Lines, False);
   end;
 #ifndef CleanRoom

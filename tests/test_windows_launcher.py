@@ -77,4 +77,36 @@ class TestLauncherRuns:
         (app / "settings" / "cloud.cmd").write_text('set "LAB_CLOUD=1"\r\nset "LMSTUDIO_MODEL=microsoft/phi-4"\r\n')
         out = self.run(app, "cloud")
         assert "OPENROUTER_API_KEY environment variable is not set" in out and self.stopped_before_any_run(out)
+
+
+class TestInstallerKeepsChoicesOnUpdate:
+    """An update over an earlier install starts from that install's choices (the BB3 update test, 2026-11-18: 1.67
+    started from the defaults, so clicking Next turned cloud models off and could switch the model)."""
+
+    def text(self):
+        with open(INSTALLER, encoding="utf-8") as f:
+            return f.read()
+
+    def code(self):
+        text = self.text()
+        start = text.index("procedure PrefillFromEarlierInstall;")
+        return text[start:text.index("\nend;", start)]
+
+    def test_the_model_and_cloud_choice_are_read_from_the_earlier_settings(self):
+        code = self.code()
+        assert "WizardDirValue + '\\settings'" in code
+        assert "SettingFromFile(Dir + '\\model.cmd', 'LMSTUDIO_MODEL')" in code
+        # The cloud choice only in the full edition
+        assert "#ifndef CleanRoom\n  OptionalPage.Values[0] := FileExists(Dir + '\\cloud.cmd');\n#endif" in code
+
+    def test_a_fresh_install_keeps_the_defaults(self):
+        code = self.code()
+        assert code.index("if not DirExists(Dir) then\n    Exit;") < code.index("ModelPage.Values[Found] := True;")
+
+    def test_the_pages_are_filled_once_when_the_model_page_first_shows(self):
+        assert "if (CurPageID = ModelPage.ID) and not Prefilled then\n    PrefillFromEarlierInstall;" in self.text()
+
+    def test_a_model_set_by_hand_is_kept(self):
+        assert "KeptModel := Id;" in self.code()
+        assert "'set \"LMSTUDIO_MODEL=' + KeptModel + '\"'" in self.text()
 # cloud:end

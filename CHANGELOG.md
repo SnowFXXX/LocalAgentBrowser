@@ -1,12 +1,21 @@
 # Changelog
 
-Every version of LocalAgentBrowser, newest first. Each released version is also a tagged commit (`v1.11` … `v1.67`); 1.54 to 1.56 and 1.58 to 1.60 were internal steps
+Every version of LocalAgentBrowser, newest first. Each released version is also a tagged commit (`v1.11` … `v1.67.2`); 1.54 to 1.56 and 1.58 to 1.60 were internal steps
 measured on the regression suite and released as part of 1.57 and 1.61 (see
 [docs/regression-history.md](docs/regression-history.md)).
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
-## [Unreleased]
+## [1.67.2] - 2026-11-18
+### Fixed
+- **Updating forgot the earlier install's choices.** Setup always started from its defaults and replaced the settings,
+  so updating 1.66 with cloud models on and clicking Next turned them off: no `cloud.cmd` and no (cloud) shortcut
+  (found in an update test on BB3, 1.66 then 1.67). It would also have switched a 1.66 install on Llama, Qwen 14B or
+  Qwen 3B to Qwen 7B. Setup now reads the earlier install's settings when it reaches the model page, so the model
+  and the cloud choice start as they were; a model set by hand that isn't on the list is kept unless another is
+  picked. A fresh install keeps the defaults.
+- Setup's Qwen2.5 7B entry says it finished 7 of 7 tasks (on 1.67), not 6.
+
 ### Measured
 - **The 7B on the 1.67 code, 90 minutes per task** (November 18): 7 of 7 in 291.3 model minutes (1.64: 6 of 7, 360.8),
   with no gaps filled from the model's own knowledge. It replaces the placeholder run below. Read by hand: the
