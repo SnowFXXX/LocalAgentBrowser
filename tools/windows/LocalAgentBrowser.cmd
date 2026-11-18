@@ -5,8 +5,10 @@ rem Used by the Start menu and desktop shortcuts: from the installer, or from a 
 title LocalAgentBrowser
 rem The program folder, as a plain full path (no "..\.." in messages)
 for %%i in ("%~dp0..\..") do set "APP=%%~fi"
-rem Choices made in setup: the model, and cloud models if they were turned on
+rem The model chosen in setup
 if exist "%APP%\settings\model.cmd" call "%APP%\settings\model.cmd"
+rem cloud:start
+rem Cloud models, if they were turned on in setup
 if exist "%APP%\settings\cloud.cmd" call "%APP%\settings\cloud.cmd"
 if defined LAB_CLOUD (
   if not defined OPENROUTER_API_KEY (
@@ -19,16 +21,18 @@ if defined LAB_CLOUD (
   )
   set "LMSTUDIO_API_KEY=%OPENROUTER_API_KEY%"
   echo Using cloud models through OpenRouter ^(%LMSTUDIO_MODEL%^): the prompts and pages read go to OpenRouter.
-) else (
-  powershell -NoProfile -Command "try { Invoke-RestMethod -TimeoutSec 5 http://localhost:1234/v1/models | Out-Null; exit 0 } catch { exit 1 }"
-  if errorlevel 1 (
-    echo LM Studio is not answering at http://localhost:1234.
-    echo Start LM Studio, load a model, and start its local server, then open LocalAgentBrowser again.
-    echo.
-    pause
-    exit /b 1
-  )
+  goto server_ready
 )
+rem cloud:end
+powershell -NoProfile -Command "try { Invoke-RestMethod -TimeoutSec 5 http://localhost:1234/v1/models | Out-Null; exit 0 } catch { exit 1 }"
+if errorlevel 1 (
+  echo LM Studio is not answering at http://localhost:1234.
+  echo Start LM Studio, load a model, and start its local server, then open LocalAgentBrowser again.
+  echo.
+  pause
+  exit /b 1
+)
+:server_ready
 rem Windows' own Documents folder (it may be in OneDrive), the same one the installer's "Past reports" shortcut opens
 for /f "delims=" %%d in ('powershell -NoProfile -Command "[Environment]::GetFolderPath('MyDocuments')"') do set "DOCS=%%d"
 if not defined DOCS set "DOCS=%USERPROFILE%\Documents"

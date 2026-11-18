@@ -1,6 +1,6 @@
 """Checked arithmetic on dates: ages and lengths of time worked out by the code from the dates the discoveries give.
 
-The number check cuts every number no discovery contains, and in two cloud SimpleQA runs it cut three right answers
+The number check cuts every number no discovery contains, and in two SimpleQA runs it cut three right answers
 each time: an age at death (80), a tenure (1 year and 161 days) and an age at a first publication (34), each worked
 out from dates a page gave. The model is not trusted to do the sum (Phi-4's draft for the tenure counted 30-day
 months and got 158 days); the code does it, shows the model the result with its working, and the number check

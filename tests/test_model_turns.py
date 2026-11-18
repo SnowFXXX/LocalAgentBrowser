@@ -281,6 +281,23 @@ class TestServerFailures:
         assert len(calls) == 1 and waits == []
 
 
+class TestModelServerAddress:
+    """The Clean Room edition only uses a model server on this PC or the local network (tests/test_clean_room.py
+    checks that it refuses others); the full edition takes any."""
+
+    @pytest.mark.parametrize("url", ["http://localhost:1234/v1", "http://127.0.0.1:1234/v1", "http://[::1]:1234/v1",
+                                     "http://192.168.1.20:1234/v1", "http://10.0.0.5:1234/v1", "http://172.16.4.2/v1",
+                                     "http://169.254.10.1:1234/v1"])
+    def test_this_pc_and_the_local_network_are_allowed(self, url):
+        assert agent.on_this_pc_or_network(url)
+
+    @pytest.mark.parametrize("url", ["https://8.8.8.8/v1", "http://172.32.0.1/v1", "http://[2001:4860:4860::8888]/v1",
+                                     "not a url", "http:///v1"])
+    def test_other_addresses_are_not(self, url):
+        assert not agent.on_this_pc_or_network(url)
+
+
+# cloud:start
 class TestCloudFailures:
     """How a cloud service fails: rate limits, provider errors, parameters no provider takes, and content filters.
     Three of eleven cloud models lost tasks to these in one week of testing, none because of the model's work."""
@@ -394,3 +411,4 @@ class TestCloudFailures:
         assert "content filter" in agent.failure_advice(agent.ModelRefused("x"))
         monkeypatch.setattr(agent, "BASE_URL", "http://localhost:1234/v1")
         assert "LM Studio" in agent.failure_advice(RuntimeError("x"))
+# cloud:end

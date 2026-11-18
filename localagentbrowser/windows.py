@@ -5,6 +5,7 @@ import ctypes
 import os
 import sys
 import tempfile
+import time
 
 SW_RESTORE, SW_MINIMIZE = 9, 6
 GA_ROOTOWNER = 3
@@ -85,6 +86,10 @@ def place(hwnd, side):
     ctypes.windll.user32.MoveWindow(hwnd, *half(side), True)
 
 
+def bring_to_front(hwnd):
+    ctypes.windll.user32.SetForegroundWindow(hwnd)
+
+
 def maximize_console():
     """At the start of a person's first run: the console full size, until the browser opens. From the second run in
     the same window (LAB_RUN_COUNT, set by the Windows launcher) it stays on the left, beside the last report."""
@@ -112,21 +117,52 @@ def browser_args():
             f"--window-size={round(width / scale)},{round(height / scale)}", f"--force-device-scale-factor={scale:.4f}"]
 
 
-def place_foreground_right(console_too=True):
-    """After the report opens in the default browser, in front: that window to the right half, the console left."""
+def window_title_starting(prefix):
+    """A visible top-level window whose title starts with the given text, or 0. Browsers add their own name after the
+    page's title ("Research report (...) - Google Chrome", "... and 1 more page - Microsoft Edge")."""
+    found = []
+    get_text = ctypes.windll.user32.GetWindowTextW
+
+    @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+    def each(hwnd, _):
+        text = ctypes.create_unicode_buffer(512)
+        get_text(hwnd, text, 512)
+        if text.value.startswith(prefix) and ctypes.windll.user32.IsWindowVisible(hwnd) and has_size(hwnd):
+            found.append(hwnd)
+            return False
+        return True
+
+    ctypes.windll.user32.EnumWindows(each, 0)
+    return found[0] if found else 0
+
+
+def place_report_right(title, wait=15.0, step=0.5):
+    """After the report page opens in the default browser: the window showing it (found by its page title, unique to
+    the run) to the right half and in front, the console to the left. If no window shows it within the wait, only the
+    console is placed.
+
+    This used to take whatever window was in front 2.5 s after opening the page. On BB3, over Remote Desktop, the
+    report was not in front by then: a minimized window of another program was, and it was restored and moved to the
+    right half, while the report stayed on the left over the console."""
     if not enabled():
         return
-    hwnd = ctypes.windll.user32.GetForegroundWindow()
     console = console_window()
+    hwnd, waited = 0, 0.0
+    while True:
+        hwnd = window_title_starting(title)
+        if hwnd or waited >= wait:
+            break
+        time.sleep(step)
+        waited += step
     if hwnd and hwnd != console:
         place(hwnd, "right")
+        bring_to_front(hwnd)
         try:
             with open(report_window_file(), "w") as f:
                 f.write(str(hwnd))
         except OSError:
             pass
-    if console_too:
-        place(console, "left")
+    place(console, "left")
 
 
 def report_window_file():

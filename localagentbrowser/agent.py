@@ -1,10 +1,19 @@
 """The agent loop: each turn's conversation with the model, the fresh prompt, in-turn retries, and main()."""
 import asyncio
+import ipaddress
 import json
 import re
-from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, BadRequestError, InternalServerError, NotFoundError, RateLimitError
+import socket
+import urllib.parse
+from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, BadRequestError, InternalServerError
+# cloud:start
+from openai import NotFoundError, RateLimitError
+# cloud:end
 from playwright.async_api import async_playwright
-from .config import API_KEY, BASE_URL, EXTRA_BODY, EXTRA_HEADERS, MAX_CHEAP_RETRIES, MAX_CONVERSATION_TOKENS, MAX_DISCOVERY_PROMPT_CHARS, MAX_FOLLOWUPS, MAX_JSON_RETRIES, MAX_QUERY_WORDS, MAX_VISITS_PER_URL, MODEL, MODEL_RETRY_WAITS, MODEL_TIMEOUT_SECONDS, RATE_LIMIT_WAITS, TURN_MAX_TOKENS, OBJECTIVE_CHECK_EVERY, REPORT_FILE, STALL_TURNS, TURN_PAUSE_SECONDS
+from .config import API_KEY, BASE_URL, CHROMIUM_ARGS, MAX_CHEAP_RETRIES, MAX_CONVERSATION_TOKENS, MAX_DISCOVERY_PROMPT_CHARS, MAX_FOLLOWUPS, MAX_JSON_RETRIES, MAX_QUERY_WORDS, MAX_VISITS_PER_URL, MODEL, MODEL_RETRY_WAITS, MODEL_TIMEOUT_SECONDS, TURN_MAX_TOKENS, OBJECTIVE_CHECK_EVERY, REPORT_FILE, STALL_TURNS, TURN_PAUSE_SECONDS
+# cloud:start
+from .config import EXTRA_BODY, EXTRA_HEADERS, RATE_LIMIT_WAITS
+# cloud:end
 from .prompts import CUT_OFF, FINAL_RESULT, FIRST_TURN_INSTRUCTION, GIVE_UP_RULE, READ_FIRST, RESPONSE_FORMAT, SYSTEM_PROMPT, TURN_INSTRUCTIONS
 from .text import extract_message_content, was_cut_off
 from .pages import build_environment, count_search_results, determine_url, is_search_page, load_page, normalize_url, read_more_target, render_part, search_query, section_heading, where_you_are, with_inner_headings, mark_refusing, site_of, site_refusal
@@ -196,12 +205,39 @@ async def request_decision(client, messages, journal, tried, page_state, current
             correction = escalation_message(len(refused), action, refusal[1], page_state, current_url) + "\nReply with only the JSON object."
         messages += [{"role": "assistant", "content": original_content}, {"role": "user", "content": correction}]
 
+# cloud:start
 class ModelRefused(Exception):
     """The model service answered with nothing because its content filter stopped the reply."""
+# cloud:end
 
 def is_local_server():
     return bool(re.match(r"https?://(localhost|127\.0\.0\.1|\[::1\])(:|/|$)", BASE_URL))
 
+def on_this_pc_or_network(url):
+    """Whether a server address is on this PC or the local network: every address its name stands for is a
+    loopback, private (home or office network) or link-local one. A name that cannot be looked up is not."""
+    host = urllib.parse.urlsplit(url).hostname
+    if not host:
+        return False
+    try:
+        addresses = {info[4][0] for info in socket.getaddrinfo(host, None)}
+    except (OSError, UnicodeError):
+        return False
+    for address in addresses:
+        ip = ipaddress.ip_address(address.split("%")[0])
+        if not (ip.is_loopback or ip.is_private or ip.is_link_local):
+            return False
+    return bool(addresses)
+
+def server_allowed():
+    """Whether the run may use the model server it is set to. The Clean Room edition (a private edition) only talks
+    to a model server on this PC or the local network, whatever LMSTUDIO_BASE_URL says; the full edition takes any."""
+    # cloud:start
+    return True
+    # cloud:end
+    return on_this_pc_or_network(BASE_URL)
+
+# cloud:start
 def retry_after(err):
     """The wait a rate-limited service asks for (its Retry-After header, in seconds), or None."""
     headers = getattr(getattr(err, "response", None), "headers", None) or {}
@@ -209,12 +245,20 @@ def retry_after(err):
         return min(float(headers.get("retry-after")), max(RATE_LIMIT_WAITS))
     except (TypeError, ValueError):
         return None
+# cloud:end
 
 def failure_advice(err):
-    """What a failed model call means and what to do, for the server the run actually uses. Every failure used to
-    say "Check that LM Studio is running at https://openrouter.ai/api/v1", which is wrong for a cloud run."""
-    if is_local_server():
-        return f"Check that LM Studio is running at {BASE_URL} and model '{MODEL}' is loaded."
+    """What a failed model call means and what to do, for the server the run actually uses."""
+    # cloud:start
+    # Every failure used to say "Check that LM Studio is running at https://openrouter.ai/api/v1", which is wrong
+    # for a cloud run
+    if not is_local_server():
+        return cloud_failure_advice(err)
+    # cloud:end
+    return f"Check that LM Studio is running at {BASE_URL} and model '{MODEL}' is loaded."
+
+# cloud:start
+def cloud_failure_advice(err):
     if isinstance(err, ModelRefused):
         return (f"The service's content filter stopped '{MODEL}''s reply; the same prompt gets the same answer, so the run "
                 "ends here instead of paying for repeats. Try another model, or another provider for this one.")
@@ -229,9 +273,12 @@ def failure_advice(err):
     if status == 404:
         return f"No provider for '{MODEL}' can take this request: check the model name on the service's model list."
     return f"The model service at {BASE_URL} failed the call for '{MODEL}'."
+# cloud:end
 
+# cloud:start
 # Sent once and refused by every provider of the model: dropped for the rest of the run (see with_retries)
 UNSUPPORTED_PARAMETERS = set()
+# cloud:end
 
 def with_retries(client):
     """The client, with each model call tried again when the server fails it (no connection, or a server error).
@@ -243,30 +290,36 @@ def with_retries(client):
     that call with "400 - Model unloaded by user or API request", so that refusal is retried too. A timeout is not
     retried: the server is up but the model has not finished, and a 3B model that kept writing for 10 minutes kept
     writing when the same request was sent again.
-
-    Cloud services fail in other ways, and three of eleven cloud models lost tasks to them in one week:
-    - 429, rate limited: GPT-4o and Opus 5.5 hit OpenRouter's 20 requests a minute for new accounts, and each task
-      after that ended on its first call. A 429 is waited out (the service's Retry-After, or RATE_LIMIT_WAITS).
-    - 400 "Provider returned error": Gemma 3 4B lost a task to one, on a provider that answered the next call. It
-      is the provider failing, not the request, so it is tried again like a server error.
-    - 404 "No endpoints found that can handle the requested parameters": Opus 5.5's providers stopped taking a
-      temperature, and with the cloud rule that every parameter be honoured, no provider was left. The parameter is
-      dropped for the rest of the run, said once on the console, and the call sent again.
-    - An empty reply stopped by the content filter: Opus 5.5 got 18 of them, each read as invalid JSON, retried and
-      billed. The same prompt gets the same answer, so it is not retried: ModelRefused ends the run with that reason.
     """
+    # cloud:start
+    # Cloud services fail in other ways, and three of eleven cloud models lost tasks to them in one week:
+    # - 429, rate limited: GPT-4o and Opus 5.5 hit OpenRouter's 20 requests a minute for new accounts, and each task
+    #   after that ended on its first call. A 429 is waited out (the service's Retry-After, or RATE_LIMIT_WAITS).
+    # - 400 "Provider returned error": Gemma 3 4B lost a task to one, on a provider that answered the next call. It
+    #   is the provider failing, not the request, so it is tried again like a server error.
+    # - 404 "No endpoints found that can handle the requested parameters": Opus 5.5's providers stopped taking a
+    #   temperature, and with the cloud rule that every parameter be honoured, no provider was left. The parameter is
+    #   dropped for the rest of the run, said once on the console, and the call sent again.
+    # - An empty reply stopped by the content filter: Opus 5.5 got 18 of them, each read as invalid JSON, retried and
+    #   billed. The same prompt gets the same answer, so it is not retried: ModelRefused ends the run with that reason.
+    # cloud:end
     create = client.chat.completions.create
 
     async def create_with_retries(*args, **kwargs):
+        server_waits = iter(MODEL_RETRY_WAITS)
+        # cloud:start
         if EXTRA_BODY:
             kwargs["extra_body"] = {**EXTRA_BODY, **(kwargs.get("extra_body") or {})}
-        server_waits = iter(MODEL_RETRY_WAITS)
         rate_waits = iter(RATE_LIMIT_WAITS)
+        # cloud:end
         while True:
+            # cloud:start
             for name in UNSUPPORTED_PARAMETERS:
                 kwargs.pop(name, None)
+            # cloud:end
             try:
                 response = await create(*args, **kwargs)
+            # cloud:start
             except RateLimitError as err:
                 wait = next(rate_waits, None)
                 if wait is None:
@@ -282,27 +335,39 @@ def with_retries(client):
                           "(the model's own default is used).")
                     continue
                 raise
+            # cloud:end
             except (APIConnectionError, InternalServerError, BadRequestError) as err:
-                unloaded = isinstance(err, BadRequestError) and re.search(r"\b(unloaded|not loaded)\b", str(err), re.I)
-                provider = isinstance(err, BadRequestError) and re.search(r"provider returned error", str(err), re.I)
+                retried = isinstance(err, BadRequestError) and re.search(r"\b(unloaded|not loaded)\b", str(err), re.I)
+                # cloud:start
+                retried = retried or (isinstance(err, BadRequestError) and re.search(r"provider returned error", str(err), re.I))
+                # cloud:end
                 wait = next(server_waits, None)
-                if wait is None or isinstance(err, APITimeoutError) or (isinstance(err, BadRequestError) and not (unloaded or provider)):
+                if wait is None or isinstance(err, APITimeoutError) or (isinstance(err, BadRequestError) and not retried):
                     raise
-                hint = ("LM Studio loads the model again by itself if it was unloaded." if is_local_server()
-                        else "The provider may answer the next call.")
+                hint = "LM Studio loads the model again by itself if it was unloaded."
+                # cloud:start
+                if not is_local_server():
+                    hint = "The provider may answer the next call."
+                # cloud:end
                 print(f"⚠️ The model server failed the call ({type(err).__name__}: {err}). Trying again in {wait} s; {hint}")
                 await asyncio.sleep(wait)
                 continue
+            # cloud:start
             choice = (getattr(response, "choices", None) or [None])[0]
             if getattr(choice, "finish_reason", None) == "content_filter" and not extract_message_content(response):
                 raise ModelRefused(f"the content filter of {getattr(response, 'provider', None) or 'the provider'} "
                                    f"stopped the reply (empty, finish reason content_filter)")
+            # cloud:end
             return response
 
     client.chat.completions.create = create_with_retries
     return client
 
 async def main():
+    if not server_allowed():
+        print(f"❌ The model server {BASE_URL} is not on this PC or your local network, and this edition only uses one "
+              "that is. Set LMSTUDIO_BASE_URL to LM Studio's address (default http://localhost:1234/v1).")
+        return
     # The client's own silent retries are off (its default retried a timed-out runaway reply twice); with_retries
     # decides what is tried again
     client = with_retries(AsyncOpenAI(
@@ -310,7 +375,9 @@ async def main():
         api_key=API_KEY,
         max_retries=0,
         timeout=MODEL_TIMEOUT_SECONDS,
-        default_headers=EXTRA_HEADERS or None
+        # cloud:start
+        default_headers=EXTRA_HEADERS or None,
+        # cloud:end
     ))
 
     # A person's run (not a test run): the console full size until the browser opens beside it
@@ -344,7 +411,7 @@ async def main():
         # Side by side for a person watching: the browser on the right half and the console on the left, with the
         # page zoomed out so it is laid out about as wide as in a test run (windows.py); test runs are unchanged
         side_by_side = windows.browser_args()
-        browser = await p.chromium.launch(headless=False, args=side_by_side)
+        browser = await p.chromium.launch(headless=False, args=[*side_by_side, *CHROMIUM_ARGS])
         # No user_agent override: headed Chromium already reports a real, version-matched Chrome UA
         context = await browser.new_context(
             java_script_enabled=True,

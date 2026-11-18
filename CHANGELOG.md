@@ -7,7 +7,33 @@ Timings are from live runs on the development machine (Intel i5-9500, 6 cores, n
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
 
 ## [Unreleased]
+### Added
+- **Clean Room, a private edition.** A second Windows installer, `LocalAgentBrowser-CleanRoom-<version>-setup.exe`,
+  and a second package, `localagentbrowser-cleanroom`, with the cloud code left out instead of turned off: no
+  OpenRouter option in setup, no cloud settings or extra request settings, no cloud failure handling, and no
+  `--cloud` in the test suite. It uses a model server only on this PC or the local network, whatever
+  `LMSTUDIO_BASE_URL` says, and ships its own short README instead of the project's documents. It installs beside the
+  full edition, with its own folder and shortcuts. The editions share one code base with the cloud code marked; the
+  build strips it and fails if any cloud code or wording is left, and the tests run the whole suite on a stripped
+  copy.
+- **Chromium's own calls to Google are blocked.** Even with Playwright's switches, the agent's browser checked
+  accounts, push messages, the time and component updates with Google, and asked Google's autofill server about each
+  page it visited. Those hosts are now never looked up (both editions); measured on a 2-page browse, every one of
+  those calls failed and the pages loaded the same. One call to www.google.com still goes through, because pages
+  link to that host.
+
 ### Fixed
+- **The report could open in the wrong place, and move another program's window.** After a run, the window in front
+  2.5 seconds after the report was opened was taken to be the report and moved to the right half. In a fresh-install
+  test on another PC over Remote Desktop, the report wasn't in front yet: a minimized window of another program was,
+  and it was restored and moved to the right while the report covered the console. Now the report page's title names
+  its run, and only the window showing that title is moved (waiting up to 15 seconds for it); if none appears, no
+  other window is touched. Tested again on the same PC: the report on the right, in front, and the other window left
+  minimized.
+- **Uninstalling left the program folder behind.** Python writes cache folders beside every module it runs, and the
+  uninstaller removed only the files setup had installed, so the folder stayed and the next install warned that it
+  already existed. The uninstaller now removes setup's own folders whole (never the reports, which are in
+  Documents). Tested on the same PC: after a start and an uninstall, the folder was gone.
 - **Coverage checks cut off mid-reply counted as covered.** Each checklist item's coverage check had a 400-token
   reply limit; a model copying long evidence (Opus 5.5 most of all) was cut off mid-JSON, and the code counted the
   item as covered without checking it: 9 items in four tasks of an Opus suite, and 60 across every model family

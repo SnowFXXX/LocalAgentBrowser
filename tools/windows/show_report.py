@@ -8,12 +8,11 @@ import html
 import os
 import re
 import sys
-import time
 import webbrowser
 
 PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Research report</title>
+<title>{title}</title>
 <style>
 /* Dark always (the user's choice, 2026-11-07), in the project website's colors */
 :root {{ color-scheme: dark;
@@ -146,21 +145,27 @@ def main(folder):
     with open(report, encoding="utf-8") as f:
         body = to_html(f.read())
     page = os.path.join(folder, "research_report.html")
+    title = page_title(folder)
     with open(page, "w", encoding="utf-8") as f:
-        f.write(PAGE.format(body=body, source=html.escape(report)))
+        f.write(PAGE.format(title=html.escape(title), body=body, source=html.escape(report)))
     # Side by side (localagentbrowser/windows.py): the console, in front now, stays on the left half, and the browser
-    # window the report opens in, which comes to the front, goes to the right half
+    # window showing the report, found by the page's title, goes to the right half
     side = side_by_side()
     if side:
         side.console_window()
     webbrowser.open("file:///" + page.replace("\\", "/"))
     if side:
-        time.sleep(REPORT_WINDOW_WAIT)
-        side.place_foreground_right()
+        side.place_report_right(title, wait=REPORT_WINDOW_WAIT)
     return 0
 
 
-REPORT_WINDOW_WAIT = 2.5  # Seconds for the browser to open the report and come to the front
+REPORT_WINDOW_WAIT = 15  # Seconds to wait at most for the browser to show the report (a cold start over Remote Desktop)
+
+
+def page_title(folder):
+    """The report page's title, with the run folder's name, so its browser window is told apart from the run before's
+    (whose report may still be open): "Research report (2026-11-17_172719)"."""
+    return f"Research report ({os.path.basename(os.path.normpath(folder))})"
 
 
 def side_by_side():

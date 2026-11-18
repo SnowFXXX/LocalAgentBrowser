@@ -52,6 +52,18 @@ It builds `installer\build\LocalAgentBrowser-<version>-setup.exe` with its own P
 in `requirements.txt`; `BUILD.txt` in the installed folder records what went in. The setup script is
 `installer/LocalAgentBrowser.iss`.
 
+### Clean Room, a private edition
+
+`installer\build.ps1 -CleanRoom` builds `LocalAgentBrowser-CleanRoom-<version>-setup.exe`, with the cloud code left
+out of the app rather than turned off, and its own AppId, folder and shortcuts. The `localagentbrowser-cleanroom`
+package is built the same way (`python tools/clean_room.py package FOLDER`, then `python -m build FOLDER`; the
+publish workflow does both). The editions are one code base: cloud code is marked with `# cloud:start` and
+`# cloud:end` lines in Python (`rem cloud:start` / `rem cloud:end` in `.cmd` files, `#ifndef CleanRoom` in the setup
+script). `tools/clean_room.py` removes the marked regions, swaps in Clean Room's README (`cleanroom/README.md`) and
+package name, leaves out the documents written for the full edition, then fails the build if any text file still
+uses a cloud word (OpenRouter, the extra request settings, rate limits and so on). Any new cloud code goes inside a
+region; `tests/test_clean_room.py` strips a copy of the repository and runs the whole test suite on it.
+
 ## Guidelines
 
 - **Keep the agent general-purpose.** It is meant to handle any objective. Rules, filters and prompts should
