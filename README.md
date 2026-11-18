@@ -141,7 +141,7 @@ reads. During setup only, the Chromium download and the model you pick. Nothing 
 sites see a visit from your connection, as they would if you browsed yourself. And it runs at your own hardware's
 speed.
 
-**Get it:** **[`LocalAgentBrowser-CleanRoom-1.67-setup.exe`](https://github.com/SnowFXXX/LocalAgentBrowser/releases/download/v1.67/LocalAgentBrowser-CleanRoom-1.67-setup.exe)**, or from the
+**Get it:** **[`LocalAgentBrowser-CleanRoom-1.67.2-setup.exe`](https://github.com/SnowFXXX/LocalAgentBrowser/releases/download/v1.67.2/LocalAgentBrowser-CleanRoom-1.67.2-setup.exe)**, or from the
 [latest release](https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest) (see
 [the installer](#windows-the-installer-recommended); the steps are the same, without the cloud page), or
 `pip install localagentbrowser-cleanroom` (install one edition or the other in a given environment, not both).
@@ -228,7 +228,7 @@ a PC with little memory. Any instruction-tuned model LM Studio serves should wor
 
 1. Install [LM Studio](https://lmstudio.ai) (free). You don't need to download a model in it yet. (Not needed if
    you'll only use cloud models.)
-2. Download **[`LocalAgentBrowser-1.67-setup.exe`](https://github.com/SnowFXXX/LocalAgentBrowser/releases/download/v1.67/LocalAgentBrowser-1.67-setup.exe)** and run it (all downloads and release notes:
+2. Download **[`LocalAgentBrowser-1.67.2-setup.exe`](https://github.com/SnowFXXX/LocalAgentBrowser/releases/download/v1.67.2/LocalAgentBrowser-1.67.2-setup.exe)** and run it (all downloads and release notes:
    [the latest release](https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest)).
    - Windows may say **"Windows protected your PC"**, because the installer isn't code-signed yet. Click
      **More info → Run anyway**.
@@ -251,7 +251,7 @@ reports in Documents are kept.
 ### Windows: the Clean Room installer
 
 For [Clean Room, a private edition](#clean-room-a-private-edition), download
-**[`LocalAgentBrowser-CleanRoom-1.67-setup.exe`](https://github.com/SnowFXXX/LocalAgentBrowser/releases/download/v1.67/LocalAgentBrowser-CleanRoom-1.67-setup.exe)** (or from the
+**[`LocalAgentBrowser-CleanRoom-1.67.2-setup.exe`](https://github.com/SnowFXXX/LocalAgentBrowser/releases/download/v1.67.2/LocalAgentBrowser-CleanRoom-1.67.2-setup.exe)** (or from the
 [latest release](https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest)) and follow the steps above: setup is
 the same, without the cloud page. It installs beside the standard edition, with its own folder and shortcuts, and opens
 as **LocalAgentBrowser Clean Room**. With pip: `pip install localagentbrowser-cleanroom`.
