@@ -51,7 +51,9 @@
                background: var(--chip); border: 1.5px solid var(--chip-line); }
   .flow i { color: var(--muted); font-style: normal; }
   .flow span.end { background: var(--mint-bg); border-color: var(--mint-line); color: var(--mint-hi); }
-  .ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
+  .ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; align-items: flex-start; }
+  .dl { display: inline-flex; flex-direction: column; align-items: center; gap: 6px; }
+  .dl-note { font-size: 13px; color: var(--sub); }
   .new { margin: 26px 0 0; padding: 10px 16px; border-left: 4px solid var(--mint); background: rgba(18,49,43,.45);
          border-radius: 0 10px 10px 0; color: var(--sub); font-size: 17px; max-width: 760px; }
   .new strong { color: var(--ink); }
@@ -177,7 +179,8 @@
       <strong>In 1.66:</strong> sturdier cloud runs, the console and browser side by side, and 85% on the standard 200
       SimpleQA questions with Phi-4.</p>
     <div class="ctas">
-      <a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest">Download for Windows</a>
+      <span class="dl"><a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/download/v1.67/LocalAgentBrowser-1.67-setup.exe">Download for Windows</a><a class="dl-note" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/tag/v1.67">All downloads and release notes</a></span>
+      <a class="btn" href="#editions">Clean Room, a private edition</a>
       <a class="btn" href="#install">Other ways to install</a>
       <a class="btn" href="https://github.com/SnowFXXX/LocalAgentBrowser">View on GitHub</a>
       <a class="btn" href="#article">Read the article</a>
@@ -379,7 +382,7 @@
           <li>Trying local and cloud models on the same tasks</li>
           <li>Measuring how small models behave as agents</li>
         </ul>
-        <div class="ctas"><a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest">Download for Windows</a>
+        <div class="ctas"><span class="dl"><a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/download/v1.67/LocalAgentBrowser-1.67-setup.exe">Download for Windows</a><a class="dl-note" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/tag/v1.67">All downloads and release notes</a></span>
           <a class="btn" href="#install">pip and other ways</a></div>
       </div>
       <div class="card" id="cleanroom">
@@ -409,7 +412,7 @@
         <p style="margin-top:18px"><strong>What it connects to:</strong> LM Studio, the search engine (DuckDuckGo) and the pages it reads; during
           setup, the browser download and your model. <strong>What it isn't:</strong> anonymous browsing. The sites it
           reads see a visit, as when you browse yourself.</p>
-        <div class="ctas"><a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest">Download Clean Room</a>
+        <div class="ctas"><span class="dl"><a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/download/v1.67/LocalAgentBrowser-CleanRoom-1.67-setup.exe">Download Clean Room</a><a class="dl-note" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/tag/v1.67">All downloads and release notes</a></span>
           <a class="btn" href="https://github.com/SnowFXXX/LocalAgentBrowser#clean-room-a-private-edition">Read more</a></div>
       </div>
     </div>
@@ -431,7 +434,8 @@
         <h3>Windows: the installer</h3>
         <ol class="start">
           <li>Install <a href="https://lmstudio.ai">LM Studio</a> (not needed if you'll only use cloud models).</li>
-          <li>Download <strong>LocalAgentBrowser-1.66-setup.exe</strong> from the latest release and run it. If Windows
+          <li>Download <a href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/download/v1.67/LocalAgentBrowser-1.67-setup.exe"><strong>LocalAgentBrowser-1.67-setup.exe</strong></a> (or, for the private
+            edition, <a href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/download/v1.67/LocalAgentBrowser-CleanRoom-1.67-setup.exe"><strong>LocalAgentBrowser-CleanRoom-1.67-setup.exe</strong></a>) and run it. If Windows
             says it protected your PC, click <strong>More info → Run anyway</strong>: the installer isn't code-signed yet.</li>
           <li>Pick what to install and one of the four tested models; setup downloads it through LM Studio, and the
             browser the agent uses. Cloud models are optional and off unless you tick them. No administrator rights,
@@ -450,7 +454,8 @@
           <figure style="margin:0"><a href="assets/side-by-side-run.png"><img src="assets/side-by-side-run.png" alt="A run on Windows: the console on the left, the page being read on the right"></a><figcaption>Watch it work: console left, browser right</figcaption></figure>
           <figure style="margin:0"><a href="assets/side-by-side-report.png"><img src="assets/side-by-side-report.png" alt="The finished report on the right, with the cited answer; the console asks for another objective"></a><figcaption>The report opens on the right</figcaption></figure>
         </div>
-        <div class="ctas"><a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest">Download for Windows</a></div>
+        <div class="ctas"><span class="dl"><a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/download/v1.67/LocalAgentBrowser-1.67-setup.exe">Download for Windows</a><a class="dl-note" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/tag/v1.67">All downloads and release notes</a></span>
+          <a class="btn" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/download/v1.67/LocalAgentBrowser-CleanRoom-1.67-setup.exe">Download Clean Room</a></div>
       </div>
       <div>
         <h3>Any system: pip</h3>
