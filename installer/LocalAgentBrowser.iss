@@ -179,7 +179,7 @@ end;
 function WantsModelDownload: Boolean;
 begin
   { Never in a silent install: a model is several GB, and silent installs are for testing or for admins }
-  { With cloud models chosen too, the model is still downloaded: the plain shortcut always uses LM Studio }
+  { Whatever else is chosen: the LocalAgentBrowser shortcut always uses LM Studio }
   Result := (ChosenModel < ModelCount) and FileExists(LmsPath('')) and (not WizardSilent);
 end;
 
