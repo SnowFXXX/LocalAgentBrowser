@@ -21,7 +21,8 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
   page it visited. Those hosts are now never looked up (both editions); measured on a 2-page browse, every one of
   those calls failed and the pages loaded the same. One call to www.google.com still goes through, because pages
   link to that host.
-- **Gemma 3 4B in setup's model list** (2.5 GB; 6 of 7 tasks on 1.66), between Qwen2.5 14B and Qwen2.5 3B.
+- **Gemma 3 4B in setup's model list** (3.3 GB with its image part, as LM Studio downloads it; 6 of 7 tasks on
+  1.66), between Qwen2.5 14B and Qwen2.5 3B.
 
 ### Changed
 - **Two shortcuts when cloud models are turned on.** Setup adds **LocalAgentBrowser (cloud)** beside
