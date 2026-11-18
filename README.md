@@ -151,8 +151,9 @@ speed.
 Releases that change how the agent works are measured on the same seven tasks, one of each kind it's built for: a
 fact, a list with conditions, a comparison with a recommendation, a how-to, an explanation, views from several
 sources, and a lookup in official documentation. In 1.64, four local models ran them with identical code, 90 minutes
-per task, on an ordinary 6-core PC with no GPU (Intel i5-9500). 1.66 changes the agent for every model, local ones
-included, and was measured on cloud models (below); these local results are 1.64's, not yet re-measured on 1.66:
+per task, on an ordinary 6-core PC with no GPU (Intel i5-9500). 1.66 and 1.67 change the agent for every model, local
+ones included, and were measured on cloud models (below); these local results are 1.64's, until 1.67.1 (see the note
+under the table):
 
 | Model (Q4_K_M) | Download | RAM | Tasks finished | Model time | Gaps filled from its own knowledge |
 |---|---|---|---|---|---|
@@ -168,6 +169,14 @@ included, and was measured on cloud models (below); these local results are 1.64
 - **The 3B** fits small PCs. It finished 3 tasks (none on 1.63), and one of them has a claim the checks missed.
 - On 1.63 the same models finished 6, 2, 2 and 0 of 7. Every step and run is in the
   [regression history](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md).
+
+**The 1.67 run of the 7B is a placeholder, not a result.** It was started without the 90-minute limit, a mistake in
+how the run was started, so the suite used its older built-in limits of 25 to 60 minutes per task. It finished 3 of 7:
+the four unfinished tasks had found every item they needed and were at their last step when 45 minutes ran out, and in
+1.64 three of the same tasks took 49 to 50 minutes. Compared turn by turn with the 1.64 run, it showed no regression.
+A full suite takes about six hours on this PC, and 1.67 brings Clean Room and the 1.67 cloud results, so it ships now
+with the 1.64 local results above. **1.67.1 follows as soon as possible** with a full 7B suite at 90 minutes per task
+on the 1.67 code, which replaces this placeholder; the placeholder isn't counted anywhere.
 
 **Cloud models** run the same code much faster, through your own OpenRouter account. On 1.67 the suite ran once on
 each of four cloud models (November 17, 2026), one model at a time; every one finished all seven tasks, and no
