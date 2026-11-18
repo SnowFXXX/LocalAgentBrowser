@@ -29,7 +29,9 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
   Studio, so switching is a matter of which one you open. Before, turning on cloud models made the one shortcut use
   the cloud until `settings\cloud.cmd` was deleted. **After updating from 1.66 with cloud models on, the main
   shortcut uses LM Studio:** open LocalAgentBrowser (cloud) for cloud runs. Running setup again without cloud models
-  removes the (cloud) shortcut, and "Start now" at the end of setup opens the one the install was set up for.
+  removes the (cloud) shortcut, and "Start now" at the end of setup opens the one the install was set up for. With
+  cloud models on, setup now also downloads the chosen LM Studio model, which it used to skip, since the plain
+  shortcut uses it (found in the fresh-install test of 1.67 on another PC).
 
 ### Fixed
 - **The report could open in the wrong place, and move another program's window.** After a run, the window in front

@@ -179,10 +179,8 @@ end;
 function WantsModelDownload: Boolean;
 begin
   { Never in a silent install: a model is several GB, and silent installs are for testing or for admins }
+  { With cloud models chosen too, the model is still downloaded: the plain shortcut always uses LM Studio }
   Result := (ChosenModel < ModelCount) and FileExists(LmsPath('')) and (not WizardSilent);
-#ifndef CleanRoom
-  Result := Result and (not OptionalPage.Values[0]);
-#endif
 end;
 
 #ifndef CleanRoom
@@ -225,8 +223,9 @@ begin
 #ifndef CleanRoom
 
   OptionalPage := CreateInputOptionPage(ModelPage.ID, 'Optional', 'Off unless you turn it on.',
-    'Use cloud models instead of LM Studio, through your own OpenRouter account. The objective, the prompts and ' +
-    'the pages the agent reads are then sent to OpenRouter and the model''s provider, and each run costs money on ' +
+    'Also use cloud models, through your own OpenRouter account, from a second shortcut: LocalAgentBrowser (cloud). ' +
+    'The LocalAgentBrowser shortcut always uses LM Studio. Runs from the (cloud) shortcut send the objective, the ' +
+    'prompts and the pages the agent reads to OpenRouter and the model''s provider, and each costs money on ' +
     'your account. You set your key yourself in the OPENROUTER_API_KEY environment variable; setup never asks for it. ' +
     'Runs are attributed to LocalAgentBrowser in OpenRouter''s app listings.',
     False, False);
@@ -257,10 +256,9 @@ begin
     Model := 'None now: chosen later in LM Studio';
   ModelTitle := 'Model:';
 #ifndef CleanRoom
-  { With cloud models on, the summary names the cloud model the runs will use, and says the LM Studio model is for
-    when cloud models are turned off }
+  { With cloud models on, the summary says which shortcut uses which model }
   if OptionalPage.Values[0] then
-    ModelTitle := 'Model in LM Studio (used when cloud models are turned off):';
+    ModelTitle := 'Model in LM Studio (the LocalAgentBrowser shortcut):';
 #endif
   Result := '';
   AddSection(Result, MemoDirInfo, NewLine);
@@ -268,7 +266,7 @@ begin
   AddSection(Result, ModelTitle + NewLine + Space + Model, NewLine);
 #ifndef CleanRoom
   if OptionalPage.Values[0] then
-    AddSection(Result, 'Cloud models:' + NewLine + Space + 'On: OpenRouter''s ' + CloudModel + ', with your own key', NewLine)
+    AddSection(Result, 'Cloud models:' + NewLine + Space + 'On: OpenRouter''s ' + CloudModel + ', with your own key (the LocalAgentBrowser (cloud) shortcut)', NewLine)
   else
     AddSection(Result, 'Cloud models:' + NewLine + Space + 'Off', NewLine);
 #endif
