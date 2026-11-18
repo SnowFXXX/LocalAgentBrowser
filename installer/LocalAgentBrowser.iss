@@ -216,7 +216,7 @@ begin
   ModelPage.Add('Qwen2.5 7B Instruct (recommended): 4.7 GB, 8 GB RAM; finished 6 of 7 tasks');
   ModelPage.Add('Llama 3.1 8B Instruct: 4.9 GB, 8 GB RAM; finished 7 of 7 tasks');
   ModelPage.Add('Qwen2.5 14B Instruct: 9.0 GB, 16 GB RAM; finished 5 of 7, about 2.5 times slower');
-  ModelPage.Add('Gemma 3 4B Instruct: 2.5 GB, 6 GB RAM; finished 6 of 7 tasks (on 1.66)');
+  ModelPage.Add('Gemma 3 4B Instruct: 3.3 GB, 6 GB RAM; finished 6 of 7 tasks (on 1.66)');
   ModelPage.Add('Qwen2.5 3B Instruct: 1.9 GB, 4 GB RAM; finished 3 of 7, for small PCs');
   ModelPage.Add('None now: I''ll choose a model in LM Studio myself');
   ModelPage.Values[0] := True;
@@ -266,7 +266,7 @@ begin
   AddSection(Result, ModelTitle + NewLine + Space + Model, NewLine);
 #ifndef CleanRoom
   if OptionalPage.Values[0] then
-    AddSection(Result, 'Cloud models:' + NewLine + Space + 'On: OpenRouter''s ' + CloudModel + ', with your own key (the LocalAgentBrowser (cloud) shortcut)', NewLine)
+    AddSection(Result, 'Cloud models:' + NewLine + Space + 'On: ' + CloudModel + ' via OpenRouter, your own key, from the (cloud) shortcut', NewLine)
   else
     AddSection(Result, 'Cloud models:' + NewLine + Space + 'Off', NewLine);
 #endif
