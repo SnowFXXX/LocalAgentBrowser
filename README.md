@@ -226,13 +226,15 @@ a PC with little memory. Any instruction-tuned model LM Studio serves should wor
    - Windows may say **"Windows protected your PC"**, because the installer isn't code-signed yet. Click
      **More info → Run anyway**.
    - It installs for your Windows account only, with no administrator rights, and brings its own Python.
-3. Setup asks what to install (LocalAgentBrowser, and optionally the test suite), which of the four tested models to
+3. Setup asks what to install (LocalAgentBrowser, and optionally the test suite), which of the five tested models to
    download through LM Studio, and whether to use cloud models (off unless you tick it). It then downloads the
    Chromium browser the agent uses (about 150 MB, once).
-4. Open **LocalAgentBrowser** from the Start menu or the desktop.
+4. Open **LocalAgentBrowser** from the Start menu or the desktop. If you turned on cloud models, setup also adds
+   **LocalAgentBrowser (cloud)**. The plain shortcut always uses the model in LM Studio; only the (cloud) one sends
+   your runs to OpenRouter.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/installer/3-model.png" alt="Setup: choose one of the four tested models, with its size, memory and results" width="400">
+  <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/installer/3-model.png" alt="Setup: choose one of the tested models, with its size, memory and results" width="400">
   <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/installer/4-cloud-option.png" alt="Setup: cloud models, off unless you tick the box" width="400">
 </p>
 
@@ -293,7 +295,8 @@ your browser when the run ends.
    differ) and start the local server (Developer tab → Start Server). With cloud models turned on, skip this step and
    set your OpenRouter key in the `OPENROUTER_API_KEY` environment variable instead (without the installer, see
    the [FAQ](#faq) for the other settings).
-2. Start LocalAgentBrowser: the Start-menu shortcut on Windows, or `localagentbrowser` in a terminal.
+2. Start LocalAgentBrowser: the Start-menu shortcut on Windows (**LocalAgentBrowser (cloud)** for cloud models), or
+   `localagentbrowser` in a terminal.
 3. Type your objective, for example *What is the tallest mountain in Africa, and how tall is it in meters and in
    feet?* A Chromium window opens and the agent starts working. The first step takes a minute or two on a CPU. On
    Windows (1.66), the console and the browser sit side by side, the console on the left and the browser on the
@@ -451,6 +454,12 @@ providers not to store or train on them). You set your own key in the `OPENROUTE
 installer never asks for it. Cloud runs are listed under LocalAgentBrowser in OpenRouter's app rankings (no request
 content is shared); to turn that off, delete the `LMSTUDIO_EXTRA_HEADERS` line in the installer's
 `settings\cloud.cmd`.
+
+**How do I switch between local and cloud models?** With cloud models turned on in setup, you get two shortcuts
+(from 1.67): **LocalAgentBrowser** always uses the model in LM Studio, and **LocalAgentBrowser (cloud)** uses the
+cloud model through OpenRouter. Open whichever you want for that run; nothing else changes. To add or remove the
+cloud shortcut, run setup again and tick or untick cloud models: your reports are kept. (Up to 1.66, turning on cloud
+models made the one shortcut use the cloud; after updating, that shortcut uses LM Studio.)
 
 **How do I turn on cloud models without the installer?** Set your key in `OPENROUTER_API_KEY`, then these, in
 the same window before you start the agent. In Windows' command prompt:
