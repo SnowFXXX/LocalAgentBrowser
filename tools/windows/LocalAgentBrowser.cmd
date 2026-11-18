@@ -8,13 +8,25 @@ for %%i in ("%~dp0..\..") do set "APP=%%~fi"
 rem The model chosen in setup
 if exist "%APP%\settings\model.cmd" call "%APP%\settings\model.cmd"
 rem cloud:start
-rem Cloud models, if they were turned on in setup
-if exist "%APP%\settings\cloud.cmd" call "%APP%\settings\cloud.cmd"
+rem Cloud models only from the "LocalAgentBrowser (cloud)" shortcut, which passes "cloud"; the plain shortcut always
+rem uses the model in LM Studio, so nothing leaves the PC unless that shortcut was the one opened
+set "LAB_CLOUD="
+if /i "%~1"=="cloud" (
+  if not exist "%APP%\settings\cloud.cmd" (
+    echo Cloud models were not turned on in setup. To use them, run setup again and tick "Use cloud models";
+    echo to use LM Studio, open the LocalAgentBrowser shortcut instead.
+    echo.
+    pause
+    exit /b 1
+  )
+  call "%APP%\settings\cloud.cmd"
+)
 if defined LAB_CLOUD (
+  title LocalAgentBrowser ^(cloud^)
   if not defined OPENROUTER_API_KEY (
     echo Cloud models are turned on, but the OPENROUTER_API_KEY environment variable is not set.
     echo Set it to your OpenRouter key in Windows ^(Edit environment variables for your account^), then open
-    echo LocalAgentBrowser again. To use LM Studio instead, delete "%APP%\settings\cloud.cmd".
+    echo LocalAgentBrowser ^(cloud^) again. To use LM Studio instead, open the LocalAgentBrowser shortcut.
     echo.
     pause
     exit /b 1
