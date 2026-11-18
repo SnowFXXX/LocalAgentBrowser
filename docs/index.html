@@ -77,6 +77,8 @@
   .card p { color: var(--sub); font-size: 16px; }
   .card.warn { border-color: rgba(240,168,96,.55); }
   .card.warn .num { color: var(--amber); }
+  .card h4 { margin: 22px 0 8px; font-size: 16px; color: var(--ink); }
+  .card .list li { font-size: 15px; }
   figure { margin-top: 40px; }
   figure img { width: 100%; height: auto; display: block; border-radius: 14px; border: 1px solid var(--chip-line); }
   figcaption { font-size: 15px; color: var(--muted); margin-top: 10px; }
@@ -151,6 +153,7 @@
       <li><a href="#claims">The claims</a></li>
       <li><a href="#models">Four models</a></li>
       <li><a href="#how">How it works</a></li>
+      <li><a href="#editions">Editions</a></li>
       <li><a href="#install">Install</a></li>
       <li><a href="#challenge">The challenge</a></li>
       <li><a href="https://github.com/SnowFXXX/LocalAgentBrowser">GitHub</a></li>
@@ -169,8 +172,10 @@
     </div>
     <p class="new"><strong>L.A.B. for short, in a LAB COAT: Citations Over Assumed Truth.</strong> Our principle is
       Verification Over Trust.</p>
-    <p class="new"><strong>New in 1.66:</strong> sturdier cloud runs, more of every answer checked in code, the console and
-      browser side by side, and 85% on the standard 200 SimpleQA questions with Phi-4.</p>
+    <p class="new"><strong>New in 1.67: <a href="#cleanroom">Clean Room</a>, a private edition.</strong> The same agent
+      with the cloud option not just off but gone, and a model only on your own PC or network.
+      <strong>In 1.66:</strong> sturdier cloud runs, the console and browser side by side, and 85% on the standard 200
+      SimpleQA questions with Phi-4.</p>
     <div class="ctas">
       <a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest">Download for Windows</a>
       <a class="btn" href="#install">Other ways to install</a>
@@ -179,6 +184,7 @@
     </div>
     <div class="pills">
       <span class="pill">Local by default</span><span class="pill">Cloud optional</span>
+      <span class="pill">Clean Room: a private edition</span>
       <span class="pill">Tested on local and cloud models</span><span class="pill">Windows installer</span>
       <span class="pill">Free and open source (MIT)</span><span class="pill">LM Studio + Playwright</span>
     </div>
@@ -337,7 +343,83 @@
   </div>
 </section>
 
-<section id="install" class="alt">
+<section id="editions" class="alt">
+  <div class="wrap">
+    <div class="kicker">Two editions</div>
+    <h2>Pick the one that fits <em>how you work.</em></h2>
+    <p class="lead">Both editions are built from the same code and released together, and both run the same agent with
+      the same checks: every finding copied from the page it came from, every claim cited, and what wasn't found
+      reported as not found. They install side by side on Windows, and both block the browser's own calls to Google.</p>
+    <div class="two">
+      <div class="card" id="standard">
+        <div class="num">STANDARD EDITION</div>
+        <h3>Local models, with optional cloud models</h3>
+        <p>The full LocalAgentBrowser. A model in LM Studio on your own computer, and a cloud model through your own
+          OpenRouter account when you want speed.</p>
+        <h4>Local, by default</h4>
+        <ul class="list">
+          <li><strong>No GPU, no API key, no account.</strong> Built and tested on an ordinary CPU; setup offers four
+            tested models and downloads the one you pick.</li>
+          <li><strong>Free to run, as often as you like.</strong> About 10 to 60 minutes a run on a CPU.</li>
+          <li><strong>Your objective and report stay home.</strong> Only searches and page visits go out.</li>
+        </ul>
+        <h4>Cloud, if you turn it on</h4>
+        <ul class="list">
+          <li><strong>Answers in minutes:</strong> the seven-task suite in 4 to 24 minutes.</li>
+          <li><strong>Cents, not dollars:</strong> $0.04 to $0.14 a suite; 85% on 200 SimpleQA questions with Phi-4 for
+            $0.58.</li>
+          <li><strong>Bigger models without the hardware,</strong> held to the pages by the same checks.</li>
+          <li><strong>Your key, your choice.</strong> Off unless you tick it; providers are asked not to store or train
+            on your prompts, which then go to OpenRouter and the model's provider.</li>
+        </ul>
+        <h4>Use it for</h4>
+        <ul class="list">
+          <li>Everyday research: facts, lists, comparisons, how-tos, explanations</li>
+          <li>Quick answers when you can't wait an hour</li>
+          <li>Trying local and cloud models on the same tasks</li>
+          <li>Measuring how small models behave as agents</li>
+        </ul>
+        <div class="ctas"><a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest">Download for Windows</a>
+          <a class="btn" href="#install">pip and other ways</a></div>
+      </div>
+      <div class="card" id="cleanroom">
+        <div class="num">CLEAN ROOM, A PRIVATE EDITION</div>
+        <h3>Nothing to switch off</h3>
+        <p>LocalAgentBrowser with the cloud option taken out. Not turned off: the cloud code is removed before the
+          edition is built, and the build reads every file and fails if any of it is left. The whole test suite runs on
+          the stripped copy.</p>
+        <h4>What makes it private</h4>
+        <ul class="list">
+          <li><strong>No cloud code at all.</strong> No cloud settings, no keys, no cloud page in setup: nothing to
+            switch on by mistake.</li>
+          <li><strong>Your model, your network.</strong> It only uses a model server on your own PC or your local
+            network, whatever the settings say, and refuses to start otherwise.</li>
+          <li><strong>The browser keeps to itself:</strong> Chromium's own calls to Google are blocked.</li>
+          <li><strong>Its own install,</strong> folder, shortcuts and uninstaller, beside the standard edition.</li>
+          <li><strong>Easy to audit:</strong> the editions differ only in marked lines of code.</li>
+        </ul>
+        <h4>Use it for</h4>
+        <ul class="list">
+          <li><strong>Sensitive research:</strong> health, legal and money questions, family matters</li>
+          <li><strong>Work under a data policy:</strong> client work, confidential projects, employers that don't allow
+            AI services</li>
+          <li><strong>Shared and managed PCs:</strong> schools, libraries, offices, family computers</li>
+          <li><strong>A GPU box on your network:</strong> LM Studio on your strongest machine, Clean Room on any PC</li>
+        </ul>
+        <p style="margin-top:18px"><strong>What it connects to:</strong> LM Studio, the search engine (DuckDuckGo) and the pages it reads; during
+          setup, the browser download and your model. <strong>What it isn't:</strong> anonymous browsing. The sites it
+          reads see a visit, as when you browse yourself.</p>
+        <div class="ctas"><a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest">Download Clean Room</a>
+          <a class="btn" href="https://github.com/SnowFXXX/LocalAgentBrowser#clean-room-a-private-edition">Read more</a></div>
+      </div>
+    </div>
+    <p class="lead" style="font-size:16px;margin-top:26px">On Windows: <code>LocalAgentBrowser-&lt;version&gt;-setup.exe</code>
+      or <code>LocalAgentBrowser-CleanRoom-&lt;version&gt;-setup.exe</code>. With pip: <code>pip install localagentbrowser</code>
+      or <code>pip install localagentbrowser-cleanroom</code> (one or the other in a given environment).</p>
+  </div>
+</section>
+
+<section id="install">
   <div class="wrap">
     <div class="kicker">Install</div>
     <h2>Runs on the computer <em>you already have.</em></h2>
@@ -403,13 +485,16 @@ localagentbrowser</code></pre>
         </ul>
         <p class="lead" style="font-size:16px">Local by default: searches go to DuckDuckGo and pages load like in any
           browser, while the model and the report stay on your computer. Cloud models are an option you turn on
-          yourself, with your own key; then your prompts and the pages read go to the cloud provider.</p>
+          yourself, with your own key; then your prompts and the pages read go to the cloud provider. Want that option
+          gone altogether? Install <a href="#cleanroom">Clean Room</a>.</p>
       </div>
     </div>
     <p class="lead" style="margin-top:30px">See <a href="https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/examples/README.md">three
       example reports</a>, unedited, with what each got right and wrong.</p>
   </div>
 </section>
+
+
 
 <section id="challenge" class="challenge grid-bg">
   <div class="wrap">

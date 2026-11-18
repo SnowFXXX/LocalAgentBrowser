@@ -20,6 +20,10 @@ Only the latest version is supported with fixes.
   model runs on your own LM Studio server.
 - **Keep LM Studio's server local.** The agent talks to the address in `LMSTUDIO_BASE_URL` (by default
   `localhost`). If you expose LM Studio on a network, protect it as you would any other service.
+- **Clean Room, a private edition (from 1.67)** has no cloud code at all: it is removed before the edition is built,
+  and the build fails if any is left. It also refuses a model server anywhere but this PC or the local network,
+  whatever `LMSTUDIO_BASE_URL` says. Both editions block the browser's own calls to Google (account checks, push
+  messages, component updates and autofill lookups).
 - **Your OpenRouter key (cloud models only).** Keep it in the `OPENROUTER_API_KEY` environment variable of your
   own account. Setup never asks for it and never stores it: the cloud settings file it writes holds no key, and the
   agent sends the key only to OpenRouter. A spending limit in your OpenRouter account caps what a run can cost.

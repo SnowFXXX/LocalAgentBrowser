@@ -48,6 +48,11 @@ The code is in the `localagentbrowser` package, one file per job, each depending
 `agent_browser.py` keeps `python agent_browser.py` working from a clone. The Windows installer is built from
 `installer/` (see [CONTRIBUTING.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/CONTRIBUTING.md)).
 
+**Clean Room, a private edition**, is built from the same code. The cloud code is marked (`# cloud:start` and
+`# cloud:end`), and `tools/clean_room.py` removes it, swaps in Clean Room's own README (`cleanroom/README.md`), then
+reads every file and fails the build if a cloud word is left. `tests/test_clean_room.py` runs the whole test suite
+on the stripped copy, so both editions are tested on every change.
+
 ## Keeping a small model on track
 
 - **Rules enforced in code, not just stated in the prompt.** Repeated searches, visiting the current page,

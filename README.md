@@ -7,8 +7,10 @@ you can check, or says honestly what it couldn't find.**
 **L.A.B.** for short, and it wears a LAB COAT: **Citations Over Assumed Truth.** Every claim in an answer points to the
 page it came from, and code checks it is there, because the project's principle is **Verification Over Trust**.
 
-**New in 1.66:** sturdier cloud runs, more of every answer checked in code, and the console and browser
-[side by side](#first-run) on Windows, run after run. **In 1.65:** a
+**New in 1.67: [Clean Room](#clean-room-a-private-edition), a private edition.** The same agent with the cloud option
+not just off but gone: the code for it is removed before the edition is built, and the build fails if any is left.
+It talks to a model only on your own PC or network. **In 1.66:** sturdier cloud runs, more of every answer checked in
+code, and the console and browser [side by side](#first-run) on Windows. **In 1.65:** a
 [Windows installer](#windows-the-installer-recommended) with a choice of tested models, and optional cloud models
 through [OpenRouter](https://openrouter.ai) for fast answers.
 
@@ -17,6 +19,7 @@ through [OpenRouter](https://openrouter.ai) for fast answers.
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/LICENSE)
 ![Python 3.10–3.13](https://img.shields.io/badge/python-3.10%E2%80%933.13-blue.svg)
 ![Local by default, cloud optional](https://img.shields.io/badge/LLM-local%20by%20default%20%C2%B7%20cloud%20optional-green.svg)
+[![Clean Room: a private edition](https://img.shields.io/badge/Clean%20Room-a%20private%20edition-blue.svg)](#clean-room-a-private-edition)
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/social-preview.png" alt="LocalAgentBrowser: an AI that can't cover up. SEARCH, NAVIGATE, READ_MORE, DISCOVER, FINISH. Local by default, cloud optional, four models tested on a CPU, Windows installer, free and open source." width="820">
@@ -30,7 +33,8 @@ can use a cloud model instead. Every claim in its answer points to the page it c
 - 🔒 **Local by default, cloud if you choose.** By default the model runs in your own LM Studio, with no API key, and
   your objective and report stay on your computer (searches go to DuckDuckGo and pages load like in any browser).
   Cloud models through OpenRouter are an option you turn on yourself, with your own key: much faster, but your
-  prompts and the pages read leave your computer.
+  prompts and the pages read leave your computer. Or choose [Clean Room](#clean-room-a-private-edition), the private
+  edition, which has no cloud option at all (see [Two editions](#two-editions)).
 - ✅ **Checks instead of trust.** Findings must be copied from the page shown, commands must appear on the page
   exactly, and numbers no finding gives are cut. What it can't find is listed as not found, not filled in.
 - 🧭 **Unattended.** It searches, opens pages, reads long pages part by part, records what's relevant and finishes
@@ -47,9 +51,100 @@ can use a cloud model instead. Every claim in its answer points to the page it c
 
 ## Contents
 
-[Tested on four models](#tested-on-four-models) · [Install](#install) · [First run](#first-run) ·
+[Two editions](#two-editions) · [Tested on four models](#tested-on-four-models) · [Install](#install) · [First run](#first-run) ·
 [What a run looks like](#what-a-run-looks-like) · [How it works](#how-it-works) · [Settings](#settings) ·
 [FAQ](#faq) · [Limitations](#limitations) · [Roadmap](#roadmap) · [Testing](#testing) · [Contributing](#contributing)
+
+## Two editions
+
+LocalAgentBrowser comes in two editions, built from the same code and released together. Both run the same agent
+with the same checks: every finding copied from the page it came from, every claim cited, and what wasn't found
+reported as not found.
+
+| | **Standard edition** | **Clean Room, a private edition** |
+|---|---|---|
+| Model | LM Studio on your PC by default; cloud models through OpenRouter if you turn them on | LM Studio on your PC or your local network, only |
+| Cloud option | Off unless you turn it on, with your own key | Not there: removed before the edition is built |
+| Speed | Your hardware's, or a few minutes a run in the cloud | Your hardware's |
+| Cost | Free locally; cents a run in the cloud | Free |
+| What leaves your computer | Searches and page visits; with cloud models on, your prompts and the pages read too | Searches and page visits |
+| Windows installer | `LocalAgentBrowser-<version>-setup.exe` | `LocalAgentBrowser-CleanRoom-<version>-setup.exe` |
+| pip | `pip install localagentbrowser` | `pip install localagentbrowser-cleanroom` |
+| Best for | Everyday research, quick answers when time matters, comparing models | Sensitive topics, strict data policies, shared PCs |
+
+Both install side by side on Windows, each with its own folder and shortcuts, and both block the browser's own
+calls to Google (account checks, push-message check-ins, component updates and autofill lookups).
+
+### Standard edition: local models, with optional cloud models
+
+The full LocalAgentBrowser. It runs on a model in LM Studio on your own computer, and when you want speed it can use
+a cloud model through your own OpenRouter account instead.
+
+**Local models, by default**
+
+- **No GPU, no API key, no account.** Built and tested on an ordinary 6-core CPU with small models; the installer
+  offers the four [tested models](#tested-on-four-models) and downloads the one you pick through LM Studio.
+- **Free to run, as often as you like.** A run takes about 10 to 60 minutes on a CPU, so start it and let it work.
+- **Your objective and report stay on your computer.** Only the searches and page visits go out, as when you browse.
+
+**Cloud models, if you turn them on**
+
+- **Answers in minutes.** The whole seven-task suite took 4 to 24 minutes on cloud models, against hours on a CPU.
+- **Cents, not dollars.** $0.04 to $0.14 for the whole suite on 1.66; Phi-4, the cloud default, answered 170 of the
+  standard 200 [SimpleQA](#tested-on-four-models) questions (85%) for $0.58.
+- **Bigger models without the hardware.** Any model OpenRouter lists, with the same checks holding it to the pages.
+- **Your key, your account, your choice.** Off unless you tick it in setup; you set the key yourself and setup never
+  asks for it. The agent asks providers not to store or train on your prompts. With cloud models on, your prompts and
+  the pages read go to OpenRouter and the model's provider.
+
+**Use it for**
+
+- Everyday research on your own PC: facts, lists with conditions, comparisons, how-tos, explanations.
+- Quick answers when you can't wait an hour: turn on cloud models for the day.
+- Trying models: the same tasks on a local model and a cloud one, side by side; the test suite runs either.
+- Developers and researchers measuring how small models behave as agents.
+
+### Clean Room, a private edition
+
+LocalAgentBrowser with the cloud option taken out. Not switched off: the cloud code is removed before the edition is
+built, and the build reads every file and fails if any of it is left. The whole test suite runs on the stripped
+copy, so Clean Room is tested on every change, the same as the standard edition.
+
+**What makes it private**
+
+- **No cloud code at all.** No OpenRouter settings, no keys, no cloud option in setup, and nothing in the program
+  that could send your prompts to an online AI service. There is nothing to switch on by mistake.
+- **Your model, your network.** It only uses a model server on your own PC or your local network (a home or office
+  address), whatever `LMSTUDIO_BASE_URL` says. Point it anywhere else and it refuses to start.
+- **The browser keeps to itself.** Chromium's own calls to Google are blocked, as in the standard edition.
+- **Its own install.** Its own folder, shortcuts and uninstaller, beside the standard edition if you have both, and
+  its own short README that says exactly what it connects to.
+- **Easy to audit.** The editions differ only in marked lines of code, and `tools/clean_room.py` shows exactly what
+  is removed.
+
+**What it connects to:** LM Studio (on this PC or your network), the search engine (DuckDuckGo) and the pages the agent
+reads. During setup only, the Chromium download and the model you pick. Nothing else.
+
+**Use it for**
+
+- **Sensitive research:** health, legal and money questions, family matters, anything you'd rather no AI company
+  saw.
+- **Work under a data policy:** client work, confidential projects, or an employer that doesn't allow sending data
+  to AI services.
+- **Shared and managed PCs:** schools, libraries, offices and family computers, where nobody should be able to turn
+  on a paid cloud option.
+- **A GPU box on your network:** run LM Studio on your most powerful machine and Clean Room on any PC in the house
+  or office.
+- **Peace of mind:** for anyone who wants a research agent that can't send their work to the cloud, by design.
+
+**What it isn't:** anonymous browsing. Searches still go to DuckDuckGo and pages are fetched from the web, so those
+sites see a visit from your connection, as they would if you browsed yourself. And it runs at your own hardware's
+speed.
+
+**Get it:** `LocalAgentBrowser-CleanRoom-<version>-setup.exe` from the
+[latest release](https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest) (see
+[the installer](#windows-the-installer-recommended); the steps are the same, without the cloud page), or
+`pip install localagentbrowser-cleanroom` (install one edition or the other in a given environment, not both).
 
 ## Tested on four models
 
@@ -134,6 +229,14 @@ a PC with little memory. Any instruction-tuned model LM Studio serves should wor
 
 To remove it: **Start menu → LocalAgentBrowser → Uninstall LocalAgentBrowser**, or Windows Settings → Apps. Your
 reports in Documents are kept.
+
+### Windows: the Clean Room installer
+
+For [Clean Room, a private edition](#clean-room-a-private-edition), download
+**`LocalAgentBrowser-CleanRoom-<version>-setup.exe`** from the same
+[latest release](https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest) and follow the steps above: setup is
+the same, without the cloud page. It installs beside the standard edition, with its own folder and shortcuts, and opens
+as **LocalAgentBrowser Clean Room**. With pip: `pip install localagentbrowser-cleanroom`.
 
 ### Any system: pip
 
@@ -326,7 +429,11 @@ With cloud models turned on, a turn takes seconds.
 **Is anything sent to the internet?** By default no AI service is involved and nothing about your run is uploaded.
 The agent does browse the real web: searches, written from your objective, go to DuckDuckGo, and pages load
 normally. If you turn on cloud models, the objective, the prompts and the pages read go to OpenRouter and the model's
-provider.
+provider. If you want that option not to exist at all, use [Clean Room](#clean-room-a-private-edition).
+
+**What is Clean Room?** A private edition of LocalAgentBrowser, released with every version from 1.67: the same
+agent and checks, with the cloud code removed before it is built, and a model server allowed only on your own PC or
+network. See [Clean Room, a private edition](#clean-room-a-private-edition).
 
 **What are cloud models?** An option, off unless you turn it on, for people with an
 [OpenRouter](https://openrouter.ai) account: the agent then uses a model in the cloud instead of LM Studio. It's much
