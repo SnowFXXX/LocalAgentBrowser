@@ -152,12 +152,11 @@ Releases that change how the agent works are measured on the same seven tasks, o
 fact, a list with conditions, a comparison with a recommendation, a how-to, an explanation, views from several
 sources, and a lookup in official documentation. In 1.64, four local models ran them with identical code, 90 minutes
 per task, on an ordinary 6-core PC with no GPU (Intel i5-9500). 1.66 and 1.67 change the agent for every model, local
-ones included, and were measured on cloud models (below); these local results are 1.64's, until 1.67.1 (see the note
-under the table):
+ones included: the default 7B ran the suite again on 1.67, and the other three local results are 1.64's:
 
 | Model (Q4_K_M) | Download | RAM | Tasks finished | Model time | Gaps filled from its own knowledge |
 |---|---|---|---|---|---|
-| **Qwen2.5-7B-Instruct** (default) | 4.7 GB | 8 GB | 6 of 7 | 361 min | 0 |
+| **Qwen2.5-7B-Instruct** (default), on 1.67 | 4.7 GB | 8 GB | **7 of 7** | 291 min | 0 |
 | **Llama-3.1-8B-Instruct** | 4.9 GB | 8 GB | **7 of 7** | 303 min | 0 |
 | **Qwen2.5-14B-Instruct** | 9.0 GB | 16 GB | 5 of 7 | 565 min | 0 |
 | **Qwen2.5-3B-Instruct** | 1.9 GB | 4 GB | 3 of 7 | 490 min | 0 |
@@ -170,13 +169,12 @@ under the table):
 - On 1.63 the same models finished 6, 2, 2 and 0 of 7. Every step and run is in the
   [regression history](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/regression-history.md).
 
-**The 1.67 run of the 7B is a placeholder, not a result.** It was started without the 90-minute limit, a mistake in
-how the run was started, so the suite used its older built-in limits of 25 to 60 minutes per task. It finished 3 of 7:
-the four unfinished tasks had found every item they needed and were at their last step when 45 minutes ran out, and in
-1.64 three of the same tasks took 49 to 50 minutes. Compared turn by turn with the 1.64 run, it showed no regression.
-A full suite takes about six hours on this PC, and 1.67 brings Clean Room and the 1.67 cloud results, so it ships now
-with the 1.64 local results above. **1.67.1 follows as soon as possible** with a full 7B suite at 90 minutes per task
-on the 1.67 code, which replaces this placeholder; the placeholder isn't counted anywhere.
+**The 7B on 1.67 finished all seven tasks** (November 18, 2026, 90 minutes per task as before), in 291 model minutes
+against 361 on 1.64, which finished 6. No finished result filled a gap from its own knowledge. Read by hand, three
+results have mistakes no check caught: the documentation answer puts the create command under "activate on Windows";
+the comparison recommends PostgreSQL for a small hobby project, though its own first finding favours SQLite; and the
+opinion answer draws on one website, which its report says. An earlier 1.67 run, started by mistake with the suite's
+shorter built-in limits, isn't counted.
 
 **Cloud models** run the same code much faster, through your own OpenRouter account. On 1.67 the suite ran once on
 each of four cloud models (November 17, 2026), one model at a time; every one finished all seven tasks, and no
