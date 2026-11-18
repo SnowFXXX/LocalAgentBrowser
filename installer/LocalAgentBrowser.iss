@@ -68,12 +68,25 @@ Source: "{#Stage}\tools\windows\run_suite.cmd"; DestDir: "{app}\tools\windows"; 
 ; program folder from being removed by the uninstaller
 Name: "{group}\{#AppTitle}"; Filename: "{app}\tools\windows\LocalAgentBrowser.cmd"; WorkingDir: "{userdocs}"; IconFilename: "{app}\tools\windows\localagentbrowser.ico"; Comment: "Research an objective with a local model"
 Name: "{autodesktop}\{#AppTitle}"; Filename: "{app}\tools\windows\LocalAgentBrowser.cmd"; WorkingDir: "{userdocs}"; IconFilename: "{app}\tools\windows\localagentbrowser.ico"; Comment: "Research an objective with a local model"; Tasks: desktopicon
+#ifndef CleanRoom
+; With cloud models chosen, a second shortcut beside the local one: the plain shortcut always uses LM Studio, so a run
+; only goes to OpenRouter when this one is opened (the launcher's "cloud" argument)
+Name: "{group}\{#AppTitle} (cloud)"; Filename: "{app}\tools\windows\LocalAgentBrowser.cmd"; Parameters: "cloud"; WorkingDir: "{userdocs}"; IconFilename: "{app}\tools\windows\localagentbrowser.ico"; Comment: "Research an objective with a cloud model through OpenRouter (your own key)"; Check: CloudChosen
+Name: "{autodesktop}\{#AppTitle} (cloud)"; Filename: "{app}\tools\windows\LocalAgentBrowser.cmd"; Parameters: "cloud"; WorkingDir: "{userdocs}"; IconFilename: "{app}\tools\windows\localagentbrowser.ico"; Comment: "Research an objective with a cloud model through OpenRouter (your own key)"; Tasks: desktopicon; Check: CloudChosen
+#endif
 Name: "{group}\Past reports"; Filename: "{userdocs}\LocalAgentBrowser runs"
 Name: "{group}\Run the test suite"; Filename: "{app}\tools\windows\run_suite.cmd"; WorkingDir: "{userdocs}"; IconFilename: "{app}\tools\windows\localagentbrowser.ico"; Components: suite
 ; The uninstaller restarts itself from a temporary copy, and that copy may not be allowed to come to the front: its
 ; "Are you sure" box then opened behind other windows, minimized. From this shortcut it runs without its own boxes
 ; (/SILENT) and asks with boxes that always open on top (see InitializeUninstall)
 Name: "{group}\Uninstall {#AppTitle}"; Filename: "{uninstallexe}"; Parameters: "/SILENT /FROMSHORTCUT"
+
+#ifndef CleanRoom
+[InstallDelete]
+; An earlier install's cloud shortcuts go, so they come back only when cloud models are chosen again
+Type: files; Name: "{group}\{#AppTitle} (cloud).lnk"
+Type: files; Name: "{autodesktop}\{#AppTitle} (cloud).lnk"
+#endif
 
 [Dirs]
 Name: "{userdocs}\LocalAgentBrowser runs"; Flags: uninsneveruninstall
@@ -82,7 +95,12 @@ Name: "{userdocs}\LocalAgentBrowser runs"; Flags: uninsneveruninstall
 ; The downloads run without a console window of their own; setup's progress page shows what is happening
 Filename: "{app}\python\python.exe"; Parameters: "-m playwright install chromium"; StatusMsg: "Downloading the Chromium browser the agent uses (about 150 MB, once)..."; Flags: waituntilterminated runhidden
 Filename: "{code:LmsPath}"; Parameters: "get {code:ModelDownload} -y"; StatusMsg: "Downloading the chosen model through LM Studio (several GB; this can take a while)..."; Check: WantsModelDownload; Flags: waituntilterminated runhidden
+#ifdef CleanRoom
 Filename: "{app}\tools\windows\LocalAgentBrowser.cmd"; WorkingDir: "{userdocs}"; Description: "Start {#AppTitle} now"; Flags: postinstall nowait skipifsilent shellexec unchecked
+#else
+; With cloud models chosen, "Start now" opens the launcher the way the cloud shortcut does
+Filename: "{app}\tools\windows\LocalAgentBrowser.cmd"; Parameters: "{code:StartParameters}"; WorkingDir: "{userdocs}"; Description: "Start {#AppTitle} now"; Flags: postinstall nowait skipifsilent shellexec unchecked
+#endif
 
 [UninstallDelete]
 ; Setup's own folders, whole: Python writes a __pycache__ folder beside every module it runs, and the uninstaller
@@ -97,7 +115,7 @@ Type: filesandordirs; Name: "{app}\__pycache__"
 
 [Code]
 const
-  ModelCount = 4;
+  ModelCount = 5;
 #ifndef CleanRoom
   CloudModel = 'microsoft/phi-4';
 #endif
@@ -167,14 +185,30 @@ begin
 #endif
 end;
 
+#ifndef CleanRoom
+function CloudChosen: Boolean;
+begin
+  Result := OptionalPage.Values[0];
+end;
+
+function StartParameters(Param: String): String;
+begin
+  if CloudChosen then
+    Result := 'cloud'
+  else
+    Result := '';
+end;
+
+#endif
 procedure InitializeWizard;
 begin
   { Tested on the release's own suite (7 tasks, 90 minutes each, on a 6-core CPU with no GPU) }
   ModelIds[0] := 'qwen2.5-7b-instruct';        ModelDownloads[0] := 'https://huggingface.co/lmstudio-community/Qwen2.5-7B-Instruct-GGUF@Q4_K_M';
   ModelIds[1] := 'meta-llama-3.1-8b-instruct'; ModelDownloads[1] := 'https://huggingface.co/lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF@Q4_K_M';
   ModelIds[2] := 'qwen2.5-14b-instruct';       ModelDownloads[2] := 'https://huggingface.co/lmstudio-community/Qwen2.5-14B-Instruct-GGUF@Q4_K_M';
-  ModelIds[3] := 'qwen2.5-3b-instruct';        ModelDownloads[3] := 'https://huggingface.co/lmstudio-community/Qwen2.5-3B-Instruct-GGUF@Q4_K_M';
-  ModelIds[4] := '';                           ModelDownloads[4] := '';
+  ModelIds[3] := 'gemma-3-4b-it';              ModelDownloads[3] := 'https://huggingface.co/lmstudio-community/gemma-3-4b-it-GGUF@Q4_K_M';
+  ModelIds[4] := 'qwen2.5-3b-instruct';        ModelDownloads[4] := 'https://huggingface.co/lmstudio-community/Qwen2.5-3B-Instruct-GGUF@Q4_K_M';
+  ModelIds[5] := '';                           ModelDownloads[5] := '';
 
   ModelPage := CreateInputOptionPage(wpSelectComponents, 'Choose a model',
     'Pick one of the models LocalAgentBrowser was tested with. You can use any other model later.',
@@ -184,6 +218,7 @@ begin
   ModelPage.Add('Qwen2.5 7B Instruct (recommended): 4.7 GB, 8 GB RAM; finished 6 of 7 tasks');
   ModelPage.Add('Llama 3.1 8B Instruct: 4.9 GB, 8 GB RAM; finished 7 of 7 tasks');
   ModelPage.Add('Qwen2.5 14B Instruct: 9.0 GB, 16 GB RAM; finished 5 of 7, about 2.5 times slower');
+  ModelPage.Add('Gemma 3 4B Instruct: 2.5 GB, 6 GB RAM; finished 6 of 7 tasks (on 1.66)');
   ModelPage.Add('Qwen2.5 3B Instruct: 1.9 GB, 4 GB RAM; finished 3 of 7, for small PCs');
   ModelPage.Add('None now: I''ll choose a model in LM Studio myself');
   ModelPage.Values[0] := True;
@@ -263,7 +298,7 @@ begin
   begin
     SetArrayLength(Lines, 8);
     Lines[0] := 'rem Written by setup: cloud models through OpenRouter, chosen at install. The key comes from your own';
-    Lines[1] := 'rem OPENROUTER_API_KEY environment variable and is never stored here. Delete this file to use LM Studio again.';
+    Lines[1] := 'rem OPENROUTER_API_KEY environment variable and is never stored here. Used only by the (cloud) shortcut.';
     Lines[2] := 'set "LAB_CLOUD=1"';
     Lines[3] := 'set "LMSTUDIO_BASE_URL=https://openrouter.ai/api/v1"';
     Lines[4] := 'set "LMSTUDIO_MODEL=' + CloudModel + '"';
