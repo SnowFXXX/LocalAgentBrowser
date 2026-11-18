@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="google-site-verification" content="Ro0o4mqjvdOCVnwGtTao8F__S7BkFmtEytfMc-7gSuM">
 <title>LocalAgentBrowser</title>
 <meta name="description" content="An autonomous web research agent on your own computer, with a local AI model or, if you choose, a cloud one. Code checks every finding against the page it came from; what wasn't found is reported as not found.">
 <meta property="og:title" content="LocalAgentBrowser">
@@ -51,7 +52,9 @@
                background: var(--chip); border: 1.5px solid var(--chip-line); }
   .flow i { color: var(--muted); font-style: normal; }
   .flow span.end { background: var(--mint-bg); border-color: var(--mint-line); color: var(--mint-hi); }
-  .ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
+  .ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; align-items: flex-start; }
+  .dl { display: inline-flex; flex-direction: column; align-items: center; gap: 6px; }
+  .dl-note { font-size: 13px; color: var(--sub); }
   .new { margin: 26px 0 0; padding: 10px 16px; border-left: 4px solid var(--mint); background: rgba(18,49,43,.45);
          border-radius: 0 10px 10px 0; color: var(--sub); font-size: 17px; max-width: 760px; }
   .new strong { color: var(--ink); }
@@ -77,6 +80,8 @@
   .card p { color: var(--sub); font-size: 16px; }
   .card.warn { border-color: rgba(240,168,96,.55); }
   .card.warn .num { color: var(--amber); }
+  .card h4 { margin: 22px 0 8px; font-size: 16px; color: var(--ink); }
+  .card .list li { font-size: 15px; }
   figure { margin-top: 40px; }
   figure img { width: 100%; height: auto; display: block; border-radius: 14px; border: 1px solid var(--chip-line); }
   figcaption { font-size: 15px; color: var(--muted); margin-top: 10px; }
@@ -151,6 +156,7 @@
       <li><a href="#claims">The claims</a></li>
       <li><a href="#models">Four models</a></li>
       <li><a href="#how">How it works</a></li>
+      <li><a href="#editions">Editions</a></li>
       <li><a href="#install">Install</a></li>
       <li><a href="#challenge">The challenge</a></li>
       <li><a href="https://github.com/SnowFXXX/LocalAgentBrowser">GitHub</a></li>
@@ -169,16 +175,20 @@
     </div>
     <p class="new"><strong>L.A.B. for short, in a LAB COAT: Citations Over Assumed Truth.</strong> Our principle is
       Verification Over Trust.</p>
-    <p class="new"><strong>New in 1.66:</strong> sturdier cloud runs, more of every answer checked in code, the console and
-      browser side by side, and 85% on the standard 200 SimpleQA questions with Phi-4.</p>
+    <p class="new"><strong>New in 1.67: <a href="#cleanroom">Clean Room</a>, a private edition.</strong> The same agent
+      with the cloud option not just off but gone, and a model only on your own PC or network.
+      <strong>In 1.66:</strong> sturdier cloud runs, the console and browser side by side, and 85% on the standard 200
+      SimpleQA questions with Phi-4.</p>
     <div class="ctas">
-      <a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest">Download for Windows</a>
+      <span class="dl"><a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/download/v1.67/LocalAgentBrowser-1.67-setup.exe">Download for Windows</a><a class="dl-note" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/tag/v1.67">All downloads and release notes</a></span>
+      <a class="btn" href="#editions">Clean Room, a private edition</a>
       <a class="btn" href="#install">Other ways to install</a>
       <a class="btn" href="https://github.com/SnowFXXX/LocalAgentBrowser">View on GitHub</a>
       <a class="btn" href="#article">Read the article</a>
     </div>
     <div class="pills">
       <span class="pill">Local by default</span><span class="pill">Cloud optional</span>
+      <span class="pill">Clean Room: a private edition</span>
       <span class="pill">Tested on local and cloud models</span><span class="pill">Windows installer</span>
       <span class="pill">Free and open source (MIT)</span><span class="pill">LM Studio + Playwright</span>
     </div>
@@ -234,8 +244,10 @@
     <h2>Pick the model that fits <em>your PC.</em></h2>
     <p class="lead">On your own computer, measured on version 1.64: the same seven tasks, the same code, 90 minutes per
       task, on an ordinary 6-core office PC with no graphics card. None of them filled a gap in a finished answer from
-      its own knowledge. 1.66 changes the agent for every model and was measured on cloud models (below); these local
-      results are 1.64's, not yet re-measured.</p>
+      its own knowledge. 1.66 and 1.67 change the agent for every model and were measured on cloud models (below); these
+      local results are 1.64's. The 1.67 run of the 7B was started with the wrong time limit (45 minutes a task instead
+      of 90), so it's a placeholder, not counted: it showed no regression against 1.64, and 1.67.1 follows as soon as
+      possible with a full 90-minute run.</p>
     <div class="models">
       <div class="model best">
         <div class="tag">The default</div>
@@ -268,41 +280,49 @@
     </div>
     <p class="lead" style="font-size:17px;margin-top:22px"><strong>Or a cloud model, for fast answers.</strong> The same
       code can use a model in the cloud through your own OpenRouter account: a few minutes instead of an hour, but it
-      costs money, and your prompts and the pages read leave your computer. Off unless you turn it on. Measured on 1.66,
+      costs money, and your prompts and the pages read leave your computer. Off unless you turn it on. Measured on 1.67,
       one run each, one model at a time:</p>
     <div class="models">
       <div class="model best">
         <div class="tag">The cloud default</div>
         <h3>Phi-4</h3>
         <div class="score">7<small> of 7 finished</small></div>
-        <dl><dt>All 7 tasks</dt><dd>5.6 min</dd><dt>Uncited lines</dt><dd>1 (4 on 1.65)</dd><dt>Cost</dt><dd>$0.04</dd></dl>
-        <p>The cleanest results for the price. 85% on 200 SimpleQA questions.</p>
+        <dl><dt>All 7 tasks</dt><dd>4.9 min</dd><dt>Uncited lines</dt><dd>3 (1 on 1.66)</dd><dt>Cost</dt><dd>about $0.03</dd></dl>
+        <p>Clean results for the price. 85% on 200 SimpleQA questions.</p>
       </div>
       <div class="model">
         <div class="tag">OpenAI's small model</div>
         <h3>GPT-4o-mini</h3>
         <div class="score">7<small> of 7 finished</small></div>
-        <dl><dt>All 7 tasks</dt><dd>7.4 min</dd><dt>Uncited lines</dt><dd>1 (12 on 1.65)</dd><dt>Cost</dt><dd>$0.06</dd></dl>
-        <p>Every expected detail in every answer, by the suite's word checks.</p>
+        <dl><dt>All 7 tasks</dt><dd>5.6 min</dd><dt>Uncited lines</dt><dd>1 (1 on 1.66)</dd><dt>Cost</dt><dd>about $0.10</dd></dl>
+        <p>The most findings per task. Repeated one stale page's claim about SQLite, which no check caught.</p>
       </div>
       <div class="model">
-        <div class="tag">Most improved</div>
+        <div class="tag">The fastest</div>
         <h3>Llama 3.1 8B</h3>
         <div class="score">7<small> of 7 finished</small></div>
-        <dl><dt>All 7 tasks</dt><dd>4.0 min</dd><dt>Uncited lines</dt><dd>3 (21 on 1.65)</dd><dt>Cost</dt><dd>$0.14</dd></dl>
-        <p>The fastest. Its answers used to be lost when it repeated the prompt; 1.66 keeps them.</p>
+        <dl><dt>All 7 tasks</dt><dd>3.0 min</dd><dt>Uncited lines</dt><dd>1 (3 on 1.66)</dd><dt>Cost</dt><dd>about $0.01</dd></dl>
+        <p>Its cold brew answer has no steps, and no line says they weren't found.</p>
       </div>
       <div class="model">
         <div class="tag">The smallest</div>
         <h3>Gemma 3 4B</h3>
         <div class="score">7<small> of 7 finished</small></div>
-        <dl><dt>All 7 tasks</dt><dd>23.6 min</dd><dt>Uncited lines</dt><dd>5 (9 on 1.65)</dd><dt>Cost</dt><dd>$0.06</dd></dl>
-        <p>6 of 7 on 1.65. One answer gave a glacier's elevation as Kilimanjaro's height, which no check caught.</p>
+        <dl><dt>All 7 tasks</dt><dd>6.8 min</dd><dt>Uncited lines</dt><dd>2 (5 on 1.66)</dd><dt>Cost</dt><dd>about $0.02</dd></dl>
+        <p>Finishes everything, but its explanation repeats one sentence under three parts.</p>
+      </div>
+      <div class="model best">
+        <div class="tag">The most thorough</div>
+        <h3>Opus 5.5</h3>
+        <div class="score">7<small> of 7 finished</small></div>
+        <dl><dt>All 7 tasks</dt><dd>22.6 min</dd><dt>Uncited lines</dt><dd>3</dd><dt>Cost</dt><dd>$5.47</dd></dl>
+        <p>The richest answers, a citation every 16 words, and it labelled its own weakest source.</p>
       </div>
     </div>
     <p class="lead" style="font-size:17px;margin-top:22px">No finished answer filled a gap from the model's own knowledge,
-      by the suite's measures. On 1.65.1, Gemini 3.8 Flash and GPT-5.6 Terra also finished 7 of 7 (for $0.24 and $0.47),
-      and GPT-4o lost three tasks to a rate limit that 1.66 now waits out. <strong>On SimpleQA</strong>, a public
+      by the suite's measures: the same checks held every model to the pages, from a 4B model to Opus. The four smaller
+      models cost $0.23 together. On 1.65.1, Gemini 3.8 Flash and GPT-5.6 Terra also finished 7 of 7 (for $0.24 and
+      $0.47). <strong>On SimpleQA</strong>, a public
       benchmark of short, hard facts, Phi-4 with LocalAgentBrowser 1.66 answered 170 of the standard 200 (85%, likely
       range 79 to 89%), and was right 94% of the time when it answered. 19 times it said it couldn't verify an answer
       rather than guess; 11 answers were wrong.
@@ -337,7 +357,83 @@
   </div>
 </section>
 
-<section id="install" class="alt">
+<section id="editions" class="alt">
+  <div class="wrap">
+    <div class="kicker">Two editions</div>
+    <h2>Pick the one that fits <em>how you work.</em></h2>
+    <p class="lead">Both editions are built from the same code and released together, and both run the same agent with
+      the same checks: every finding copied from the page it came from, every claim cited, and what wasn't found
+      reported as not found. They install side by side on Windows, and both block the browser's own calls to Google.</p>
+    <div class="two">
+      <div class="card" id="standard">
+        <div class="num">STANDARD EDITION</div>
+        <h3>Local models, with optional cloud models</h3>
+        <p>The full LocalAgentBrowser. A model in LM Studio on your own computer, and a cloud model through your own
+          OpenRouter account when you want speed.</p>
+        <h4>Local, by default</h4>
+        <ul class="list">
+          <li><strong>No GPU, no API key, no account.</strong> Built and tested on an ordinary CPU; setup offers five
+            tested models and downloads the one you pick.</li>
+          <li><strong>Free to run, as often as you like.</strong> About 10 to 60 minutes a run on a CPU.</li>
+          <li><strong>Your objective and report stay home.</strong> Only searches and page visits go out.</li>
+        </ul>
+        <h4>Cloud, if you turn it on</h4>
+        <ul class="list">
+          <li><strong>Answers in minutes:</strong> the seven-task suite in 4 to 24 minutes.</li>
+          <li><strong>Cents, not dollars:</strong> $0.04 to $0.14 a suite; 85% on 200 SimpleQA questions with Phi-4 for
+            $0.58.</li>
+          <li><strong>Bigger models without the hardware,</strong> held to the pages by the same checks.</li>
+          <li><strong>Your key, your choice.</strong> Off unless you tick it; providers are asked not to store or train
+            on your prompts, which then go to OpenRouter and the model's provider.</li>
+        </ul>
+        <h4>Use it for</h4>
+        <ul class="list">
+          <li>Everyday research: facts, lists, comparisons, how-tos, explanations</li>
+          <li>Quick answers when you can't wait an hour</li>
+          <li>Trying local and cloud models on the same tasks</li>
+          <li>Measuring how small models behave as agents</li>
+        </ul>
+        <div class="ctas"><span class="dl"><a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/download/v1.67/LocalAgentBrowser-1.67-setup.exe">Download for Windows</a><a class="dl-note" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/tag/v1.67">All downloads and release notes</a></span>
+          <a class="btn" href="#install">pip and other ways</a></div>
+      </div>
+      <div class="card" id="cleanroom">
+        <div class="num">CLEAN ROOM, A PRIVATE EDITION</div>
+        <h3>Nothing to switch off</h3>
+        <p>LocalAgentBrowser with the cloud option taken out. Not turned off: the cloud code is removed before the
+          edition is built, and the build reads every file and fails if any of it is left. The whole test suite runs on
+          the stripped copy.</p>
+        <h4>What makes it private</h4>
+        <ul class="list">
+          <li><strong>No cloud code at all.</strong> No cloud settings, no keys, no cloud page in setup: nothing to
+            switch on by mistake.</li>
+          <li><strong>Your model, your network.</strong> It only uses a model server on your own PC or your local
+            network, whatever the settings say, and refuses to start otherwise.</li>
+          <li><strong>The browser keeps to itself:</strong> Chromium's own calls to Google are blocked.</li>
+          <li><strong>Its own install,</strong> folder, shortcuts and uninstaller, beside the standard edition.</li>
+          <li><strong>Easy to audit:</strong> the editions differ only in marked lines of code.</li>
+        </ul>
+        <h4>Use it for</h4>
+        <ul class="list">
+          <li><strong>Sensitive research:</strong> health, legal and money questions, family matters</li>
+          <li><strong>Work under a data policy:</strong> client work, confidential projects, employers that don't allow
+            AI services</li>
+          <li><strong>Shared and managed PCs:</strong> schools, libraries, offices, family computers</li>
+          <li><strong>A GPU box on your network:</strong> LM Studio on your strongest machine, Clean Room on any PC</li>
+        </ul>
+        <p style="margin-top:18px"><strong>What it connects to:</strong> LM Studio, the search engine (DuckDuckGo) and the pages it reads; during
+          setup, the browser download and your model. <strong>What it isn't:</strong> anonymous browsing. The sites it
+          reads see a visit, as when you browse yourself.</p>
+        <div class="ctas"><span class="dl"><a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/download/v1.67/LocalAgentBrowser-CleanRoom-1.67-setup.exe">Download Clean Room</a><a class="dl-note" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/tag/v1.67">All downloads and release notes</a></span>
+          <a class="btn" href="https://github.com/SnowFXXX/LocalAgentBrowser#clean-room-a-private-edition">Read more</a></div>
+      </div>
+    </div>
+    <p class="lead" style="font-size:16px;margin-top:26px">On Windows: <code>LocalAgentBrowser-&lt;version&gt;-setup.exe</code>
+      or <code>LocalAgentBrowser-CleanRoom-&lt;version&gt;-setup.exe</code>. With pip: <code>pip install localagentbrowser</code>
+      or <code>pip install localagentbrowser-cleanroom</code> (one or the other in a given environment).</p>
+  </div>
+</section>
+
+<section id="install">
   <div class="wrap">
     <div class="kicker">Install</div>
     <h2>Runs on the computer <em>you already have.</em></h2>
@@ -349,26 +445,29 @@
         <h3>Windows: the installer</h3>
         <ol class="start">
           <li>Install <a href="https://lmstudio.ai">LM Studio</a> (not needed if you'll only use cloud models).</li>
-          <li>Download <strong>LocalAgentBrowser-1.66-setup.exe</strong> from the latest release and run it. If Windows
+          <li>Download <a href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/download/v1.67/LocalAgentBrowser-1.67-setup.exe"><strong>LocalAgentBrowser-1.67-setup.exe</strong></a> (or, for the private
+            edition, <a href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/download/v1.67/LocalAgentBrowser-CleanRoom-1.67-setup.exe"><strong>LocalAgentBrowser-CleanRoom-1.67-setup.exe</strong></a>) and run it. If Windows
             says it protected your PC, click <strong>More info → Run anyway</strong>: the installer isn't code-signed yet.</li>
-          <li>Pick what to install and one of the four tested models; setup downloads it through LM Studio, and the
+          <li>Pick what to install and one of the five tested models; setup downloads it through LM Studio, and the
             browser the agent uses. Cloud models are optional and off unless you tick them. No administrator rights,
             no Python needed.</li>
           <li>In LM Studio, load the model with a context length of 8192 and start the local server (Developer tab →
             Start Server). With cloud models, set your key in the <code>OPENROUTER_API_KEY</code> environment variable
             instead.</li>
           <li>Open <strong>LocalAgentBrowser</strong> from the Start menu and type your question. The report opens in
-            your browser when it's done.</li>
+            your browser when it's done. With cloud models on, open <strong>LocalAgentBrowser (cloud)</strong> instead:
+            the plain shortcut always stays local.</li>
         </ol>
         <div class="two" style="margin-top:20px;gap:14px">
-          <figure style="margin:0"><a href="assets/installer/3-model.png"><img src="assets/installer/3-model.png" alt="Setup: choose one of the four tested models"></a><figcaption>Choose a tested model</figcaption></figure>
+          <figure style="margin:0"><a href="assets/installer/3-model.png"><img src="assets/installer/3-model.png" alt="Setup: choose one of the tested models"></a><figcaption>Choose a tested model</figcaption></figure>
           <figure style="margin:0"><a href="assets/installer/4-cloud-option.png"><img src="assets/installer/4-cloud-option.png" alt="Setup: cloud models, off unless ticked"></a><figcaption>Cloud models: your choice</figcaption></figure>
         </div>
         <div class="two" style="margin-top:14px;gap:14px">
           <figure style="margin:0"><a href="assets/side-by-side-run.png"><img src="assets/side-by-side-run.png" alt="A run on Windows: the console on the left, the page being read on the right"></a><figcaption>Watch it work: console left, browser right</figcaption></figure>
           <figure style="margin:0"><a href="assets/side-by-side-report.png"><img src="assets/side-by-side-report.png" alt="The finished report on the right, with the cited answer; the console asks for another objective"></a><figcaption>The report opens on the right</figcaption></figure>
         </div>
-        <div class="ctas"><a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/latest">Download for Windows</a></div>
+        <div class="ctas"><span class="dl"><a class="btn primary" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/download/v1.67/LocalAgentBrowser-1.67-setup.exe">Download for Windows</a><a class="dl-note" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/tag/v1.67">All downloads and release notes</a></span>
+          <a class="btn" href="https://github.com/SnowFXXX/LocalAgentBrowser/releases/download/v1.67/LocalAgentBrowser-CleanRoom-1.67-setup.exe">Download Clean Room</a></div>
       </div>
       <div>
         <h3>Any system: pip</h3>
@@ -403,13 +502,16 @@ localagentbrowser</code></pre>
         </ul>
         <p class="lead" style="font-size:16px">Local by default: searches go to DuckDuckGo and pages load like in any
           browser, while the model and the report stay on your computer. Cloud models are an option you turn on
-          yourself, with your own key; then your prompts and the pages read go to the cloud provider.</p>
+          yourself, with your own key; then your prompts and the pages read go to the cloud provider. Want that option
+          gone altogether? Install <a href="#cleanroom">Clean Room</a>.</p>
       </div>
     </div>
     <p class="lead" style="margin-top:30px">See <a href="https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/docs/examples/README.md">three
       example reports</a>, unedited, with what each got right and wrong.</p>
   </div>
 </section>
+
+
 
 <section id="challenge" class="challenge grid-bg">
   <div class="wrap">

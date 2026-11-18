@@ -347,6 +347,45 @@ have not been re-run on 1.66 yet.
   answers: a garbled count note ("ten more") after single-answer questions, and a cut number repeated in the "Left
   out" note, which OpenAI's grader read as the answer.
 
+### 1.67 (cloud runs 2026-11-17; the 7B run is a placeholder)
+1.67 adds Clean Room, a private edition, and changes the agent for every model: a cut-off coverage reply is asked for
+again, and a check that still fails is reported as not checked instead of counted as covered. Four cloud models ran
+the suite once each, one at a time, on the frozen code:
+
+| Model | Finished | Model time | Uncited lines (1.66 → 1.67) | Expected words missing (1.66 → 1.67) | Outside knowledge | Cost |
+|---|---|---|---|---|---|---|
+| Phi-4 | 7 of 7 | 4.9 min | 1 → 3 | 0 → 0 | 0 | about $0.03 |
+| GPT-4o-mini | 7 of 7 | 5.6 min | 1 → 1 | 0 → 1 | 0 | about $0.10 |
+| Llama-3.1-8B | 7 of 7 | 3.0 min | 3 → 1 | 1 → 3 | 0 | about $0.01 |
+| Gemma-3-4B | 7 of 7 | 6.8 min (23.6 on 1.66) | 5 → 2 | 3 → 3 | 0 | about $0.02 |
+
+The four cost $0.23 together; per-model costs are estimated from token counts.
+
+- **Coverage items left unchecked on 1.66.** On 1.66 a coverage reply that failed counted its item as covered. That
+  happened 2 times on Gemma's list, 1 on Llama's opinion and 3 on Phi-4's comparison and explanation (cloud), 2 on
+  the local Gemma's list, and 9 times on Opus 5.5 across four tasks, which led to the fix. GPT-4o-mini had none. On
+  the 1.67 cloud runs, no item went unchecked.
+- **Read by hand,** what the checks didn't catch: Gemma wrote one sentence under three parts of the explanation and its
+  cold brew has no real steps; Llama's cold brew has no steps and no line says they weren't found, and its explanation
+  lists carbon dioxide as an output; GPT-4o-mini repeated a stale page's claim that SQLite lacks triggers; Phi-4 named
+  PhotoCraft, an early-stage editor, as the third Photoshop alternative.
+
+**The local 7B run (2026-11-17 21:49) is a placeholder and isn't counted.** It was started without `--minutes 90`, so
+the suite used its older built-in limits (25 to 60 minutes per task) instead of the 90 minutes every local result since
+1.63 used. It finished 3 of 7 in 272.3 minutes. The four unfinished tasks (comparison, cold brew, opinion,
+documentation) had found every checklist item and were at FINISH or its final check when 45 minutes ran out; in the
+1.64 run, comparison, cold brew and opinion took 49.2, 50.4 and 49.4 minutes. Compared turn by turn with the 1.64
+run, it showed no regression. Three code problems showed up on the documentation task, to fix after the release:
+- "When used from within a virtual environment, ... pip will install ..." was refused five times as a discovery that
+  "only asks questions": the check reads a sentence starting with "When" as a question (unchanged since 1.64).
+- The install-packages item, which needs an install command since 1.66, had none, so the finish was sent back.
+- The model's coverage verdict said nothing answered "how to create a virtual environment", over a discovery giving
+  `python -m venv`.
+
+1.67 ships with the 1.64 local results, since a full local suite takes about six hours; **1.67.1** follows with a full
+7B suite at 90 minutes per task on the 1.67 code, which replaces this placeholder. The suite will default to 90 minutes
+and record the limit in each run, so a run can't be started with the wrong one unnoticed.
+
 ## What the steps showed overall
 
 - **The fixed checklist was the big step** (1.53). The model no longer invents parts of the objective or loses

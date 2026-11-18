@@ -30,7 +30,12 @@ Key facts:
   things the pages didn't prove are marked ("not shown in the pages read to be open-source").
 - Privacy: searches, written from your objective, go to DuckDuckGo, and pages are read from the web like any browser;
   by default the objective itself, the model and the report stay on your computer (with cloud models turned on,
-  the objective, the prompts and the pages read go to OpenRouter and the model's provider).
+  the objective, the prompts and the pages read go to OpenRouter and the model's provider). From 1.67 both editions
+  block the browser's own calls to Google (account checks, push messages, component updates, autofill lookups).
+- Clean Room, a private edition (from 1.67): the same agent and checks with the cloud code removed before it is built,
+  and the build fails if any is left; it uses a model server only on the user's own PC or local network. Windows:
+  LocalAgentBrowser-CleanRoom-<version>-setup.exe on the GitHub releases, installed beside the full edition; any system:
+  `pip install localagentbrowser-cleanroom`.
 - L.A.B. (LocalAgentBrowser) follows LAB COAT, Citations Over Assumed Truth: every line of an answer should come
   from a page it read, with the source, rather than from what the model assumes.
 - License: MIT.
