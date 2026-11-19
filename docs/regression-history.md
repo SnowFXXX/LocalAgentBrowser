@@ -382,7 +382,7 @@ run, it showed no regression. Three code problems showed up on the documentation
 - The model's coverage verdict said nothing answered "how to create a virtual environment", over a discovery giving
   `python -m venv`.
 
-1.67 shipped with the 1.64 local results while the 7B ran again. **The 7B at 90 minutes per task** (2026-11-18 07:05,
+1.67 shipped with the 1.64 local results while the 7B ran again, as the 1.67.1 work (released as part of 1.67.2). **The 7B at 90 minutes per task** (2026-11-18 07:05,
 commit 14589ad, the released 1.67 code), one model at a time:
 
 | Task | Finished | Turns | Model min | 1.64 model min | Problems |

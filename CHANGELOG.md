@@ -1,7 +1,7 @@
 # Changelog
 
 Every version of LocalAgentBrowser, newest first. Each released version is also a tagged commit (`v1.11` … `v1.67.2`); 1.54 to 1.56 and 1.58 to 1.60 were internal steps
-measured on the regression suite and released as part of 1.57 and 1.61 (see
+measured on the regression suite and released as part of 1.57 and 1.61, and 1.67.1 was released as part of 1.67.2 (see
 [docs/regression-history.md](docs/regression-history.md)).
 Timings are from live runs on the development machine (Intel i5-9500, 6 cores, no GPU, Qwen2.5-7B-Instruct
 Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model call.
@@ -22,9 +22,12 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
   picked. A fresh install keeps the defaults.
 - Setup's Qwen2.5 7B entry says it finished 7 of 7 tasks (on 1.67), not 6.
 
+## [1.67.1] - not released separately (released as part of 1.67.2)
+The fix for 1.67's local 7B run, which was started with the wrong time limit (45 minutes a task instead of 90).
+
 ### Measured
 - **The 7B on the 1.67 code, 90 minutes per task** (November 18): 7 of 7 in 291.3 model minutes (1.64: 6 of 7, 360.8),
-  with no gaps filled from the model's own knowledge. It replaces the placeholder run below. Read by hand: the
+  with no gaps filled from the model's own knowledge. It replaces 1.67's placeholder run. Read by hand: the
   documentation answer puts the create command under "activate on Windows", the comparison recommends PostgreSQL for
   a small hobby project, and the opinion answer draws on one website. See
   [docs/regression-history.md](docs/regression-history.md).
@@ -110,7 +113,7 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
   finished 3 of 7: the four unfinished tasks had found every item and were at their last step when 45 minutes ran
   out, and in 1.64 three of them took 49 to 50 minutes. Compared turn by turn with the 1.64 run, it showed no
   regression. A full local suite takes about six hours, so 1.67 ships with the 1.64 local results; **1.67.1** follows
-  as soon as possible with a full 7B suite at 90 minutes per task, which replaces this placeholder (done: see above). See
+  as soon as possible with a full 7B suite at 90 minutes per task, which replaces this placeholder (done in 1.67.1: see above). See
   [docs/regression-history.md](docs/regression-history.md).
 
 ## [1.66.1] - 2026-11-17
