@@ -23,6 +23,14 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
 - **A finding the page states that starts with "When", "Where" or "How" is no longer refused as "only asks
   questions"** (the 1.67 7B's "When used from within a virtual environment, ... pip will install ..."). A sentence
   copied from the page shown, of six words or more and not ending in "?", is the page's statement.
+- **"10 mins" in a finding is the same time as "10 minutes" in the result** (also "hrs", "wks", "yrs"). Opus 5.5's
+  cold brew result had its right "10 minutes" cut, from a recipe card's "Prep Time: 10 mins".
+- **The checks' own "Left out, because ..." notes no longer count as numbers missing from the discoveries.** On the
+  saved suite runs, 9 of 400 results had the numbers their note named as cut flagged a second time.
+- **Control characters are taken out of findings and the final result** (tabs and line breaks stay): a reply's
+  JSON "\b" is read as a backspace.
+- **A byte-order mark before a piped objective is dropped** (PowerShell and Notepad can add one).
+- **The regression suite's explanation task accepts "O2" and "O₂" for oxygen**, but not the "O2" inside "CO2".
 
 ## [1.67.2] - 2026-11-18
 ### Fixed

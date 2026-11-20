@@ -902,6 +902,27 @@ def test_a_time_needs_the_same_number_given_as_a_time():
     assert ab.unverified_numbers(text, found) == ["2 weeks"]
 
 
+def test_a_short_unit_is_the_same_time():
+    found = discoveries("Steep for 10 mins, stir, then rest 2 hrs. It keeps 2 wks.")
+    text = "Steep for 10 minutes [1], then rest 2 hours [1]. It keeps for 2 weeks [1]."
+    assert ab.unverified_numbers(text, found) == []
+    # "10 min" is not "10 hours", and "minimum" is not a unit
+    assert ab.unverified_numbers("Steep for 10 hours [1].", discoveries("Steep for 10 min.")) == ["10 hours"]
+    assert ab.unverified_numbers("Steep for 10 hours [1].", discoveries("A minimum of 10 hours.")) == []
+
+
+def test_the_checks_own_left_out_notes_are_not_numbers_missing_from_the_discoveries():
+    found = discoveries("Steep for 12 hours.")
+    text = ("Steep for 12 hours [1].\n\nLeft out, because no discovery gives these numbers (the pages read may still "
+            "have them): 33 years, 80")
+    assert ab.unverified_numbers(text, found) == []
+
+
+def test_control_characters_are_taken_out_of_a_result_but_not_line_breaks():
+    raw = json.dumps({"result": "Use \bthe \x00venv module [1].\n\tThen\x7f activate it [1]."})
+    assert ab.result_text(raw) == "Use the venv module [1].\n\tThen activate it [1]."
+
+
 def test_one_sentence_given_for_several_items_counts_only_where_it_has_their_words():
     from localagentbrowser.coverage import shared_evidence_items
     checklist = [{"text": t} for t in ("Compare SQLite and PostgreSQL setup and administration",

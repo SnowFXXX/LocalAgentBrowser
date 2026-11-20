@@ -38,6 +38,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 import agent_browser as ab  # noqa: E402
 
+
+def says(word, text):
+    """An expected word is found in the lowercased text: as written, or as a regular expression if it starts with
+    a word boundary (r"\\bo2\\b" is oxygen's formula, not the end of "co2")."""
+    return bool(re.search(word, text)) if word.startswith(r"\b") else word in text
+
+
 # expect: groups of words the final result must contain, one alternative per group being enough
 # forbid: words in the final result that show a condition of the objective was missed
 # source: pattern every discovery's page should match, for objectives that name where to look
@@ -74,7 +81,7 @@ TASKS = [
     {"id": "explanation", "kind": "Explanation of a topic", "core": True,
      "objective": "Explain how photosynthesis works: what goes in and what comes out, what happens in the "
                   "light-dependent reactions and in the Calvin cycle, and where in the plant cell each stage takes place.",
-     "expect": [["carbon dioxide", "co2", "co₂"], ["oxygen"], ["glucose", "sugar", "carbohydrate", "g3p"],
+     "expect": [["carbon dioxide", "co2", "co₂"], ["oxygen", r"\bo2\b", r"\bo₂\b"], ["glucose", "sugar", "carbohydrate", "g3p"],
                 ["thylakoid"], ["stroma"]]},
     {"id": "opinion", "kind": "Opinion from several sources", "core": True,
      "objective": "Find out how at least three different cultures or religions have viewed owls (for example as wise, "
@@ -255,7 +262,8 @@ def score_run(task, journal, console="", checklist=None):
         "gap_statements": [m.group(0) for m in GAP_STATEMENT.finditer(result)],
         "caveats": result.count(CAVEAT),
         "outside_knowledge": outside_knowledge(result),
-        "missing": ["/".join(group[:3]) for group in task.get("expect", []) if not any(word in low for word in group)],
+        "missing": ["/".join(w.replace(r"\b", "") for w in group[:3]) for group in task.get("expect", [])
+                    if not any(says(word, low) for word in group)],
         # A forbidden item marked by the agent's own caveat ("FreeOffice (not shown in the pages read to be ...") is
         # flagged to the reader, so it does not count as a missed condition
         "forbidden": [word for word in task.get("forbid", []) if word in low

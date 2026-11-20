@@ -43,13 +43,13 @@ SCRIPT = [
 CHECKLIST_REPLY = json.dumps({"parts": ["the setup", "the fact"]})  # the objective split, before turn 1
 
 
-def run_agent(monkeypatch, tmp_path, objective_check_every=None, script=SCRIPT):
+def run_agent(monkeypatch, tmp_path, objective_check_every=None, script=SCRIPT, typed="test objective"):
     client, model = fake_client([CHECKLIST_REPLY] + script, prompt_tokens=None)
     real_sleep = asyncio.sleep
     monkeypatch.setattr(agent, "async_playwright", SITE.playwright)
     monkeypatch.setattr(agent, "AsyncOpenAI", lambda **kwargs: client)
     monkeypatch.setattr(ab.asyncio, "sleep", lambda seconds, *a, **k: real_sleep(0, *a, **k))
-    monkeypatch.setattr(builtins, "input", lambda prompt="": "test objective")
+    monkeypatch.setattr(builtins, "input", lambda prompt="": typed)
     monkeypatch.chdir(tmp_path)
     if objective_check_every:
         monkeypatch.setattr(agent, "OBJECTIVE_CHECK_EVERY", objective_check_every)
@@ -60,6 +60,12 @@ def run_agent(monkeypatch, tmp_path, objective_check_every=None, script=SCRIPT):
 
 def last_message(call):
     return call[-1]["content"]
+
+
+def test_a_byte_order_mark_before_a_piped_objective_is_dropped(monkeypatch, tmp_path):
+    calls, _ = run_agent(monkeypatch, tmp_path, typed="﻿test objective\n")
+    assert "### HIGH-LEVEL OBJECTIVE\ntest objective\n" in calls[0][1]["content"]
+    assert "﻿" not in json.dumps(calls, ensure_ascii=False)
 
 
 def test_full_run(monkeypatch, tmp_path):

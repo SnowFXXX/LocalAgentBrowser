@@ -15,7 +15,7 @@ from .config import API_KEY, BASE_URL, CHROMIUM_ARGS, MAX_CHEAP_RETRIES, MAX_CON
 from .config import EXTRA_BODY, EXTRA_HEADERS, RATE_LIMIT_WAITS
 # cloud:end
 from .prompts import CUT_OFF, FINAL_RESULT, FIRST_TURN_INSTRUCTION, GIVE_UP_RULE, READ_FIRST, RESPONSE_FORMAT, SYSTEM_PROMPT, TURN_INSTRUCTIONS
-from .text import extract_message_content, was_cut_off
+from .text import extract_message_content, was_cut_off, without_control_characters
 from .pages import build_environment, count_search_results, determine_url, is_search_page, load_page, normalize_url, read_more_target, render_part, search_query, section_heading, where_you_are, with_inner_headings, mark_refusing, site_of, site_refusal
 from .checklist import after_discovery_advice, check_parts, checklist_lines, link_discovery, split_objective
 from .coverage import amounts_not_found, coverage_refusal, not_found_items, record_install_line, remember_install_lines
@@ -182,7 +182,7 @@ async def request_decision(client, messages, journal, tried, page_state, current
                 continue
 
         action = str(action_decision.get("action", "FINISH")).upper()
-        parameter = str(action_decision.get("parameter", "")).strip()
+        parameter = without_control_characters(action_decision.get("parameter", "")).strip()
         refusal = check_decision(action, parameter, journal, tried, page_state, current_url,
                                  action_decision.get("thought_process", ""))
         if not refusal or len(refused) >= MAX_CHEAP_RETRIES:
@@ -384,7 +384,8 @@ async def main():
     windows.maximize_console()
     print("=" * 56)
     print("Initializing Autonomous Discovery Agent Setup...")
-    objective = input("Define the Agent's High-Level Objective: ").strip()
+    # Text piped in from PowerShell or a file saved by Notepad can start with a byte-order mark, which is not whitespace
+    objective = input("Define the Agent's High-Level Objective: ").lstrip("﻿").strip()
     if not objective:
         print("The objective cannot be empty.")
         return
@@ -429,7 +430,7 @@ async def main():
                     decision, refused = await run_agent_turn(client, page, objective, journal, current_url, tried, page_state, conversation, loop_warning=loop_msg)
                     thought = decision.get("thought_process", "No reasoning recorded.")
                     action = str(decision.get("action", "FINISH")).upper()
-                    parameter = str(decision.get("parameter", "")).strip()
+                    parameter = without_control_characters(decision.get("parameter", "")).strip()
                     loop_msg = None
                 except ValueError as parse_err:
                     print(f"Warning: {parse_err} Skipping turn.")

@@ -6,7 +6,7 @@ import re
 from .config import COMPOSE_MAX_TOKENS, COMPOSE_RETRY_MAX_TOKENS, JOURNAL_BATCH, MAX_EVIDENCE_CHARS, MAX_JOURNAL_DETAIL_CHARS, MAX_JOURNAL_REASON_CHARS, MAX_THOUGHT_CHARS, MODEL, REPORT_FILE, VIEW_MAX_TOKENS
 from .prompts import (COMPOSE_SYSTEM, NO_RESULT, RESULT_FORMAT, RESULT_REPLY, RESULT_RETRY, RESULT_TOO_LONG, RESULT_UNCITED,
                       RESULT_UNFINISHED, UNFINISHED_NOTE)
-from .text import MISSING_STOPWORDS, NUMBER_WORDS, OPINION_REQUEST, SPELLED_NUMBERS, extract_message_content, plain_words, shorten, was_cut_off, with_digits, word_pairs
+from .text import MISSING_STOPWORDS, NUMBER_WORDS, OPINION_REQUEST, SPELLED_NUMBERS, extract_message_content, plain_words, shorten, was_cut_off, with_digits, without_control_characters, word_pairs
 from .pages import normalize_url
 from .grounding import code_text, invented_code
 from .checklist import checklist_lines
@@ -81,8 +81,11 @@ def unverified_numbers(text, discoveries, objective=""):
 
     A small model writing a how-to filled a gap with an invented quantity ("45 grams of lukewarm water (about
     1/4 cup)"); numbers are where such errors do the most harm and the easiest place to check them.
+    The checks' own "Left out, because ..." notes are not the result's claims: the numbers they name as cut were
+    flagged again as numbers missing from the discoveries.
     """
-    text = re.sub(r"\[\d+(?:\s*[-–,;]\s*\d+)*\]", " ", str(text))  # Citation markers: [2], [4, 5], [1-4]
+    text = LEFT_OUT_NOTE.sub("", str(text))
+    text = re.sub(r"\[\d+(?:\s*[-–,;]\s*\d+)*\]", " ", text)  # Citation markers: [2], [4, 5], [1-4]
     # Numbered list items and headings ("#### 1. Setup"), bold ones too: "**1. Explain what goes into
     # photosynthesis:**" had its "1" taken for an invented number and cut, mangling the label
     text = re.sub(r"(?m)^\s*(?:#+\s*)?(?:[*_]{1,2})?\d+[.)]\s", " ", text)
@@ -121,13 +124,16 @@ def unverified_numbers(text, discoveries, objective=""):
     return unverified
 
 DURATION = re.compile(r"(?<![A-Za-z_])(\d+(?:[.,/]\d+)*)((?:\s*(?:-|–|to|or|and)\s*\d+(?:[.,/]\d+)*)*)\s*"
-                      r"(minute|hour|day|week|month|year)s?\b", re.I)
+                      r"(minute|min|hour|hr|day|week|wk|month|year|yr)s?\b", re.I)
+# A page's "steep for 10 mins" is the result's "10 minutes": the short forms are the same unit
+SHORT_UNITS = {"min": "minute", "hr": "hour", "wk": "week", "yr": "year"}
 
 def durations_in(text):
     """(number, unit) for each time given: "12 to 24 hours" gives both 12 and 24 as hours."""
     for match in DURATION.finditer(text):
+        unit = match.group(3).lower()
         for number in [match.group(1)] + NUMBER_PATTERN.findall(match.group(2)):
-            yield number, match.group(3).lower()
+            yield number, SHORT_UNITS.get(unit, unit)
 
 SPELLED_AMOUNT = re.compile(r"\b(" + "|".join(SPELLED_NUMBERS) + r")\s+(?:minute|hour|day|week|month|year|cup|ounce|"
                             r"gram|tablespoon|teaspoon|liter|litre|quart|pound|meter|metre|foot|feet|mile|kilometer|"
@@ -865,7 +871,7 @@ def without_echoed_prompt(text):
 def result_text(raw):
     """The text of a final-result reply: the "result" field, read leniently (a server may ignore the format, and a
     reply cut off at the token limit is not valid JSON), without prompt sections the reply repeated back."""
-    return without_repeated_sections(without_echoed_prompt(raw_text(raw)))
+    return without_repeated_sections(without_echoed_prompt(without_control_characters(raw_text(raw))))
 
 LEFTOVER_HEADING = re.compile(r"^#+\s*\**\s*(?:summary|recap|in summary|overview|results?|conclusion)\s*\**:?\s*$", re.I)
 SAME_HEADING_SIZE = 0.75  # The smaller heading's words, as a share of the larger's, for two to be the same part

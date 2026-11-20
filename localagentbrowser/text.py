@@ -83,6 +83,13 @@ def was_cut_off(response):
     first_choice = choices[0] if choices else None
     return getattr(first_choice, "finish_reason", None) == "length"
 
+CONTROL_CHARACTERS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+def without_control_characters(text):
+    """Text without control characters other than tabs and line breaks. A reply's JSON "\\b" (a regular expression's
+    word boundary, written in a finding) is read as a backspace, which then sat in the finding and the result."""
+    return CONTROL_CHARACTERS.sub("", str(text))
+
 def shorten(text, limit):
     text = " ".join(str(text).split())
     return text if len(text) <= limit else text[:limit].rstrip() + "..."

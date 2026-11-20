@@ -77,6 +77,12 @@ class TestScoreRun:
         assert score["bad_citations"] == [3]
         assert len(score["problems"]) == 3
 
+    def test_oxygen_can_be_given_as_its_formula_but_not_found_inside_co2(self):
+        task = next(t for t in rg.TASKS if t["id"] == "explanation")
+        for said in ("It gives off O2.", "It gives off O₂.", "It gives off oxygen."):
+            assert "oxygen/o2/o₂" not in rg.score_run(task, journal(said, "x"))["missing"], said
+        assert "oxygen/o2/o₂" in rg.score_run(task, journal("It takes in CO2 and CO₂.", "x"))["missing"]
+
     def test_unfinished_run_and_model_time(self):
         console = "   (model call 60.0s, prompt=1 tok, completion=1 tok)\n   (model call 30.0s, ...)\nTEST TIME LIMIT REACHED"
         score = rg.score_run(TASK, journal(None, "LibreOffice ..."), console)
