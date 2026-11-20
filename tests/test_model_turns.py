@@ -71,7 +71,10 @@ class TestCheapRetries:
         decision, _ = turn(client)
         assert decision["action"] == "DISCOVER" and len(model.calls) == 2
         first, second = model.calls
-        assert second[:len(first)] == first and len(second) == len(first) + 1  # the cut reply is not shown again
+        # The cut reply is not shown again: a short stand-in takes its place, so the turns still alternate (the fake
+        # refuses any request whose turns don't, as Gemma's chat template does)
+        assert second[:len(first)] == first and len(second) == len(first) + 2
+        assert second[-2] == {"role": "assistant", "content": ab.CUT_REPLY}
         assert "cut off at 600 tokens" in second[-1]["content"] and "3 to 10 words" in second[-1]["content"]
 
     def test_reply_cut_off_inside_a_search_query_searches_with_its_start(self, scrapes):
@@ -91,7 +94,22 @@ class TestCheapRetries:
         decision, _ = turn(client)
         assert ab.cut_decision(cut) is None
         assert ab.cut_decision(cut, on_search_page=True)["action"] == "DISCOVER"  # refused there, never recorded
-        assert len(model.calls) == 2 and decision["action"] == "SEARCH" and "cut off" in model.calls[1][-1]["content"]
+        assert len(model.calls) == 2 and decision["action"] == "SEARCH"
+        # Asked for a shorter DISCOVER itself, not a generic "shorter reply" (half of the cut DISCOVERs were copied
+        # as long again)
+        correction = model.calls[1][-1]["content"]
+        assert "Your DISCOVER was cut off at 600 tokens" in correction and "at most 150 words" in correction
+        assert model.calls[1][-2] == {"role": "assistant", "content": ab.CUT_REPLY}
+
+    def test_reply_cut_off_inside_a_finish_finishes(self, scrapes):
+        # Opus 5.5 wrote whole answers into FINISH's parameter and was cut off; the final result is written in a
+        # step of its own, so the FINISH stands (its first FINISH in a turn is still asked to confirm, as always)
+        cut = '{"thought_process": "Every item is covered.", "action": "FINISH", "parameter": "' + "A long answer. " * 80
+        client, model = fake_client([(cut, "length"), (cut, "length")])
+        decision, refused = turn(client)
+        assert [r["journal_action"] for r in refused] == ["CONFIRM_FINISH"]  # the usual one check, no cut-off retry
+        assert len(model.calls) == 2 and decision["action"] == "FINISH" and decision["parameter"] == ""
+        assert ab.cut_action(cut) == "FINISH" and ab.cut_action('{"thought_process": "long') == ""
 
     def test_valid_first_reply_costs_one_call(self, scrapes):
         client, model = fake_client([reply("SEARCH", "fresh query")])

@@ -16,7 +16,7 @@ from .config import API_KEY, BASE_URL, CHROMIUM_ARGS, MAX_CHEAP_RETRIES, MAX_CON
 # cloud:start
 from .config import EXTRA_BODY, EXTRA_HEADERS, RATE_LIMIT_WAITS
 # cloud:end
-from .prompts import CUT_OFF, FINAL_RESULT, FIRST_TURN_INSTRUCTION, GIVE_UP_RULE, READ_FIRST, RESPONSE_FORMAT, SYSTEM_PROMPT, TURN_INSTRUCTIONS
+from .prompts import CUT_OFF, CUT_OFF_DISCOVER, CUT_OFF_DISCOVER_WORDS, CUT_REPLY, FINAL_RESULT, FIRST_TURN_INSTRUCTION, GIVE_UP_RULE, READ_FIRST, RESPONSE_FORMAT, SYSTEM_PROMPT, TURN_INSTRUCTIONS
 from .text import extract_message_content, was_cut_off, without_control_characters
 from .pages import build_environment, count_search_results, determine_url, is_search_page, load_page, normalize_url, read_more_target, render_part, search_query, section_heading, where_you_are, with_inner_headings, mark_refusing, site_of, site_refusal
 from .checklist import after_discovery_advice, check_parts, checklist_lines, link_discovery, split_objective
@@ -133,6 +133,14 @@ def cut_decision(raw, on_search_page=False):
         words = words[:MAX_QUERY_WORDS]
     return {"thought_process": thought, "action": action, "parameter": " ".join(words), "checklist_items": []} if words else None
 
+CUT_ACTION = re.compile(r'"action"\s*:\s*"([A-Z_]+)"')
+
+def cut_action(raw):
+    """The action a reply cut off at the length limit had named before the cut, or "" if it was cut before naming
+    one (inside a long thought_process)."""
+    found = CUT_ACTION.search(str(raw))
+    return found.group(1) if found else ""
+
 async def request_decision(client, messages, journal, tried, page_state, current_url):
     # Cheap retries: a reply that is invalid or would be refused is answered with a short correction
     # appended to the same conversation. Everything before the correction is identical to what LM Studio
@@ -168,6 +176,13 @@ async def request_decision(client, messages, journal, tried, page_state, current
             action_decision = cut_decision(raw_content, is_search_page(current_url)) if was_cut_off(response) else None
             if action_decision:
                 print(f"The reply was cut off inside its parameter; going on with its start: [{action_decision['action']}] {action_decision['parameter'][:120]}")
+            elif was_cut_off(response) and cut_action(raw_content) == "FINISH":
+                # Opus 5.5 wrote whole answers into FINISH's parameter and was cut off, and asked again it wrote them
+                # again: the final result is written from the discoveries in a step of its own, so the FINISH stands
+                # and its cut text is not used
+                print("The reply was cut off inside its FINISH; going on with FINISH (the final result is written "
+                      "in its own step).")
+                action_decision = {"thought_process": "", "action": "FINISH", "parameter": "", "checklist_items": []}
             else:
                 json_failures += 1
                 print(f"Warning: Model returned invalid JSON (attempt {json_failures}/{MAX_JSON_RETRIES}): {raw_content[:200]}")
@@ -176,8 +191,10 @@ async def request_decision(client, messages, journal, tried, page_state, current
                 if was_cut_off(response):
                     # A 3B model's replies ran past the cap in 25 replies of one suite; asked only for valid JSON, it
                     # wrote the same long reply again, and 8 turns were lost. The cut reply is left out, so the model
-                    # is not shown a long reply to continue.
-                    messages += [{"role": "user", "content": CUT_OFF.format(limit=TURN_MAX_TOKENS)}]
+                    # is not shown a long reply to continue; a short stand-in keeps the turns alternating.
+                    correction = (CUT_OFF_DISCOVER.format(limit=TURN_MAX_TOKENS, words=CUT_OFF_DISCOVER_WORDS)
+                                  if cut_action(raw_content) == "DISCOVER" else CUT_OFF.format(limit=TURN_MAX_TOKENS))
+                    messages += [{"role": "assistant", "content": CUT_REPLY}, {"role": "user", "content": correction}]
                     continue
                 messages += [{"role": "assistant", "content": original_content},
                              {"role": "user", "content": f"That reply was not a valid JSON object ({parse_err}). Reply with only the JSON object in the mandatory format."}]

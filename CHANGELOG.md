@@ -31,6 +31,16 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
   56 saved results asked for steps, it flags those two and no other.
 
 ### Fixed
+- **A reply cut off at the length limit no longer ends the task on models whose chat template needs alternating
+  turns.** The retry put its correction straight after the prompt, two user messages in a row, and LM Studio
+  refused it for Gemma 3 4B (error 400): three of the 1.67.2 Gemma run's tasks ended so. The correction now follows a
+  short stand-in for the cut reply. Checked live on Gemma 3 4B: two user messages in a row are refused, and three
+  cut-off retries in a row are accepted. The tests' fake model now refuses any request whose turns don't alternate,
+  on every path.
+- **A cut-off DISCOVER is asked for a shorter DISCOVER, and a cut-off FINISH stands.** In the saved runs, 34 of 74
+  turn replies cut off at the limit were cut off again after the general "reply again, shorter" note. Opus 5.5 copied
+  long passages into DISCOVER, and wrote whole answers into FINISH's parameter, which is never used (the final result
+  is written from the discoveries in its own step).
 - **A finding the page states that starts with "When", "Where" or "How" is no longer refused as "only asks
   questions"** (the 1.67 7B's "When used from within a virtual environment, ... pip will install ..."). A sentence
   copied from the page shown, of six words or more and not ending in "?", is the page's statement.
