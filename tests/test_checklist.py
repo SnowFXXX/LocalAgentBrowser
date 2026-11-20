@@ -339,6 +339,19 @@ class TestNotFound:
         assert "Write nothing about the NOT FOUND items" in request
         assert text == "Result [1].\n\nNot found in the pages read:\n- Care"
 
+    def test_an_item_the_result_answers_from_a_cited_discovery_is_not_also_listed_as_not_found(self):
+        # Phi-4 gave both dates from discovery [1], and the code then listed both as not found
+        said = "He served as the 17th Chief Justice of India from 12 July 1985 until his retirement on 20 December 1986 [1]."
+        client, _ = fake_client([said])
+        items = checklist("Find the start date of his tenure as the Chief Justice of India",
+                          "Find the end date of his tenure as the Chief Justice of India", "Find his birthplace")
+        found = discoveries("From 12 July 1985 until his retirement on 20 December 1986.")
+        text = asyncio.run(ab.compose_final_result(client, "objective", found, items, [1, 2, 3]))
+        assert text == said + "\n\nNot found in the pages read:\n- Find his birthplace"
+        # A cited sentence that says the thing was not found answers nothing
+        assert not ab.answered_in_result("Find his birthplace", "His birthplace was not found [1].")
+        assert not ab.answered_in_result("Find his birthplace", "His birthplace was Bombay.")
+
 
 class TestConditionsOnlyOnCountedItems:
     def test_a_question_s_own_wording_is_not_a_condition(self):

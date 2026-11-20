@@ -29,6 +29,10 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
 - **A finding the page states that starts with "When", "Where" or "How" is no longer refused as "only asks
   questions"** (the 1.67 7B's "When used from within a virtual environment, ... pip will install ..."). A sentence
   copied from the page shown, of six words or more and not ending in "?", is the page's statement.
+- **An item the result answers from a cited discovery is no longer also listed as "Not found in the pages read"**.
+  Phi-4's SimpleQA result gave a judge's tenure "from 12 July 1985 until his retirement on 20 December 1986 [1]" and
+  then listed the start and end dates as not found. A cited sentence with most of the item's words, that does not
+  itself say something was not found, counts as the answer: 14 of 69 such lines in the saved results.
 - **"10 mins" in a finding is the same time as "10 minutes" in the result** (also "hrs", "wks", "yrs"). Opus 5.5's
   cold brew result had its right "10 minutes" cut, from a recipe card's "Prep Time: 10 mins".
 - **A number given with another unit than its discovery's is checked like an invented one** (temperature, length,

@@ -272,6 +272,27 @@ def without_missing_citations(text, count):
 
 CITATION = re.compile(r"\[\d+(?:\s*[-–,;]\s*\d+)*\]")
 MATCHED_LINE_SHARE = 0.5  # Share of a line's word pairs that must be in one discovery for the code to cite it
+
+# The asking words of a checklist item, not what it is about
+ASKING_WORDS = MISSING_STOPWORDS | {"list", "give", "say", "explain", "describe", "name", "find", "determine", "what",
+                                    "which", "how", "who", "when", "where", "does", "did", "this", "that", "each",
+                                    "your", "own"}
+SAYS_NOT_FOUND = re.compile(r"\bnot (?:been )?(?:found|mentioned|given|stated|specified|provided|shown)\b|"
+                            r"\bno (?:information|mention)\b", re.I)
+
+def answered_in_result(item, text):
+    """True when a sentence of the result that cites a discovery has most of a checklist item's words (by their
+    first five letters) and does not itself say something was not found. The coverage check had called the item
+    unanswered, yet Phi-4's SimpleQA result gave "from 12 July 1985 until his retirement on 20 December 1986 [1]"
+    and then listed the start and end dates as not found (16 such lines in 76 saved results with the list)."""
+    wanted = {w[:5] for w in plain_words(item) if len(w) > 2} - {w[:5] for w in ASKING_WORDS}
+    if len(wanted) < 2:
+        return False
+    for sentence in re.split(r"(?<=[.!?])\s+|\n", LEFT_OUT_NOTE.sub("", str(text))):
+        if CITATION.search(sentence) and not SAYS_NOT_FOUND.search(sentence):
+            if len(wanted & {w[:5] for w in plain_words(sentence)}) >= max(2, (len(wanted) + 1) // 2):
+                return True
+    return False
 MIN_MATCHED_PAIRS = 4  # Shorter lines ("**Setup:**") are not cited by the code
 SENTENCE_OPENERS = {"the", "this", "these", "that", "those", "its", "it's", "both", "each", "here", "there", "they",
                     "you", "your", "for", "with", "when", "while", "after", "before", "then", "also", "and", "but",
@@ -802,7 +823,8 @@ async def compose_final_result(client, objective, journal, checklist=None, not_f
         working = span_working(text, found, objective)
         if working:
             text += "\n\n" + working
-    # Reported by the code as well, whatever the result says
+    # Reported by the code as well, unless the result answers the item from a cited discovery anyway
+    unfound = [t for t in unfound if not answered_in_result(t, text)] if text != NO_RESULT else unfound
     unfound_lines = ([f"- {t}" for t in unfound] + [f"- {t}: the amounts it asks for" for t in amountless]
                      + [f"- {t}: none of the {in_words(wanted)} were found" if not k else
                         f"- {t}: {in_words(wanted - k)} more (only {in_words(k)} of the {in_words(wanted)} were found)"
