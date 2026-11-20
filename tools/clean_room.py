@@ -31,7 +31,7 @@ CLOUD_WORDS = re.compile(r"cloud|openrouter|extra_body|extra_headers|data_collec
                          r"retry_after|modelrefused|content_filter|unsupported_parameters", re.I)
 # Left out of Clean Room: the build tools, and the documents written for the full edition and its development
 LEFT_OUT = ("tools/clean_room.py", "tests/test_clean_room.py", "cleanroom", "CHANGELOG.md", "SECURITY.md",
-            "CONTRIBUTING.md", "llms.txt")
+            "CONTRIBUTING.md", "llms.txt", "tools/compat_models_cloud.txt")
 # The repository's files that are not part of the app or its package (installer\build.ps1 also leaves out tests/)
 NOT_APP = re.compile(r"^(docs|benchmarks|installer|\.github)/|^\.")
 PACKAGE_NAME = "localagentbrowser-cleanroom"
