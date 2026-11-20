@@ -125,6 +125,16 @@ def test_after_two_checks_the_server_failed_the_rest_are_not_run():
     assert down.calls == 3  # the split, then one call per failed check
 
 
+# cloud:start
+def test_one_model_stops_the_list_only_when_far_over_its_estimate_and_a_real_share_of_the_budget():
+    assert not compat.overran(0.0145, 0.0069, 2.5)  # Granite 4.2 8B: 2.1 times, but $0.0145
+    assert not compat.overran(0.1138, 0.049, 2.5)  # Tencent HY4: 2.3 times, $0.11 of $2.50
+    assert compat.overran(0.60, 0.26, 2.5)  # 2.3 times and a quarter of the budget
+    assert not compat.overran(0.40, 0.26, 2.5)  # a quarter of the budget, but within twice the estimate
+    assert not compat.overran(0.50, None, 2.5)  # no estimate (a model OpenRouter no longer lists)
+# cloud:end
+
+
 def test_a_model_list_skips_comments_and_blank_lines(tmp_path, monkeypatch):
     listed = tmp_path / "models.txt"
     listed.write_text("# a comment\nmodel-a\n\nmodel-b   # note\n", encoding="utf-8")

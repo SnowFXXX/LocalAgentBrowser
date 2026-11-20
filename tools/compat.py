@@ -27,7 +27,7 @@ per model with its result.json, console.txt and the live task's run.
 # With --cloud, the models are OpenRouter's (tools/compat_models_cloud.txt lists the tested ones), with the key from the
 # OPENROUTER_API_KEY environment variable, never printed or stored. Each model's cost is read from OpenRouter before and
 # after it; the list stops when the budget (--budget, default $5) is spent, or when one model costs more than OVERRUN
-# times its estimate and more than OVERRUN_FLOOR.
+# times its estimate and more than OVERRUN_SHARE of the budget.
 # cloud:end
 import argparse
 import asyncio
@@ -371,9 +371,16 @@ def load_local(key):
 CLOUD_KEY_URL = "https://openrouter.ai/api/v1/key"
 COST_ESTIMATE_TOKENS = (100_000, 6_000)  # Prompt and reply tokens a model is expected to use at most, for its estimate
 OVERRUN = 2.0  # A model costing more than this many times its estimate stops the list...
-# ...when it cost at least this much: a thinking model given room to think uses more than the estimate's replies, and
-# Granite 4.2 8B's $0.0145 (2.1 times its estimate) stopped a rerun with $2.45 of its budget left
-OVERRUN_FLOOR = 0.10
+# ...when it also cost this share of the budget. The check comes after a model, so it cannot limit that model's cost:
+# it keeps a model whose price was misjudged from being followed by more, and the budget limits the total. Without
+# it, thinking models stopped two reruns for costs the budget never felt: Granite 4.2 8B's $0.0145 (2.1 times its
+# estimate) and Tencent HY4's $0.11 (2.3 times), with $2.45 and $2.26 left
+OVERRUN_SHARE = 0.10
+
+
+def overran(cost, estimate, budget):
+    """Whether one model's cost stops the list: far over its estimate, and a real share of the budget."""
+    return bool(estimate) and cost > OVERRUN * estimate and cost > OVERRUN_SHARE * budget
 
 
 def cloud_spent():
@@ -496,8 +503,9 @@ def run_list(models, args):
         # cloud:start
         if args.cloud:
             spent = sum(r.get("cost") or 0 for r in rows)
-            if row.get("estimate") and row.get("cost", 0) > max(OVERRUN * row["estimate"], OVERRUN_FLOOR):
-                print(f"Stopping: {model} cost ${row['cost']:.4f}, over {OVERRUN:g} times its estimate.", flush=True)
+            if overran(row.get("cost") or 0, row.get("estimate"), args.budget):
+                print(f"Stopping: {model} cost ${row['cost']:.4f}, over {OVERRUN:g} times its estimate and over "
+                      f"{OVERRUN_SHARE:.0%} of the budget.", flush=True)
                 break
             if spent >= args.budget:
                 print(f"Stopping: ${spent:.4f} spent, the budget is ${args.budget:g}.", flush=True)
