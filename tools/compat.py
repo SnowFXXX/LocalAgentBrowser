@@ -358,17 +358,17 @@ def cloud_spent():
         return float(json.load(response)["data"]["usage"])
 
 
-def settled_spent(wait=10, most=90):
-    """The key's spending once OpenRouter has added the last calls: it adds each call's cost some time after it, and in
-    the first run a figure read 15 seconds after a model's last call missed some of its cost, counted to the next
-    model. Read until two readings `wait` seconds apart agree, for `most` seconds at most."""
-    last, waited = cloud_spent(), 0
-    while waited < most:
+def settled_spent(wait=15, steady=2, most=180):
+    """The key's spending once OpenRouter has added the last calls: it adds each call's cost some time after it (one
+    diagnosis's $0.0033 was still missing 20 seconds after its last call), so a figure read too soon counted part of
+    one model's cost to the next. Read every `wait` seconds until it holds for `steady` readings in a row, for `most`
+    seconds at most; a model's cost stays approximate, the list's total is exact."""
+    last, held, waited = cloud_spent(), 0, 0
+    while waited < most and held < steady:
         time.sleep(wait)
         waited += wait
         now = cloud_spent()
-        if now == last:
-            return now
+        held = held + 1 if now == last else 0
         last = now
     return last
 
