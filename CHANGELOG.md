@@ -20,6 +20,14 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
 - **The regression suite waits up to 30 seconds for the model list, and tries once more** if it doesn't come.
 
 ### Added
+- **A compatibility test for any model** (`tools/compat.py`), quick and cheap: about ten model calls on a fixed page
+  (split the question, choose an action on search results, record a finding that passes the grounding check, check
+  coverage, write a cited result, write a view, and a reply cut off at its limit retried), then one live task with
+  the browser (the suite's factual question). A model is "compatible" when every check passes and the live task
+  finishes with a cited result; "compatible, with limits" when the live task passes but a quick check failed (named);
+  and "not compatible" on an error, a reply with no valid JSON, no result, a refused retry, or a failed live task. In
+  LM Studio it downloads a model for the test and deletes it after; with `--cloud` it tests OpenRouter models within
+  a budget (`--budget`), reading the cost of each from OpenRouter.
 - **The regression suite counts silent omissions** ([issue #11](https://github.com/SnowFXXX/LocalAgentBrowser/issues/11)):
   an expected part the final result lacks without a sentence saying it was not found. Each is "dropped" when a
   discovery had it (found, then lost while the result was written) or "never found" when none did. It is a problem
@@ -39,6 +47,23 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
   56 saved results asked for steps, it flags those two and no other.
 
 ### Fixed
+- **Models that think before they answer get room to think.** A reply stopped at its length limit with no answer in
+  it is a model that spent the whole limit thinking: Granite 4.2 8B, Nemotron 3.5 Lightning, Mistral Large 4 and
+  Command A+ used all 300 tokens of the checklist split on it, and their tasks failed or lost steps. From the first
+  such reply on, every call gets 4,000 more tokens, so the limit still bounds the answer, not the thinking. In the
+  compatibility test's complete rerun, those four and Qwen3.6 35B and Qwen3.7 Plus (whose final results had come
+  back empty) all finished the live task.
+- **An empty reply is never sent back empty.** Mistral's and Cohere's services refuse a turn with no text ("Assistant
+  message must have either content or tool_calls"): after a thinking model's empty reply, the coverage retry sent it
+  back, and each check failed after about 4 minutes of retries. A short stand-in takes its place. The tests' fake
+  model now refuses a turn with no text, on every path.
+- **A reply object with no reply in it is tried again** like a server error, then ends the task with a clear reason:
+  DeepSeek V3.2's provider answered so while failing, and reading it crashed the task.
+- **A number in underscore emphasis is read whole**: Nemotron 3 Super's "_5,895 m_ (_19,341 ft_)" was read as "895"
+  and "9,341", and both right heights were cut as invented. On the 894 saved final results, none is flagged
+  differently.
+- **Cloud: a model whose only provider takes JSON but not a JSON schema is asked for plain JSON** (Qwen3.7 Flash),
+  which the agent reads the same way. Its live task finished in the compatibility test.
 - **A reply cut off at the length limit no longer ends the task on models whose chat template needs alternating
   turns.** The retry put its correction straight after the prompt, two user messages in a row, and LM Studio
   refused it for Gemma 3 4B (error 400): three of the 1.67.2 Gemma run's tasks ended so. The correction now follows a
