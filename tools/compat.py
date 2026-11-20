@@ -59,6 +59,17 @@ REMOTE_CALL_SECONDS = 300  # Longest wait for one quick-check call to a server t
 # answered 504 to nearly every call, each tried 6 times over about 4 minutes, and the test took 26 minutes to fail
 SERVER_DOWN_CHECKS = 2
 SERVER_FAILURES = (agent.APIConnectionError, agent.InternalServerError, agent.NoReply)
+# cloud:start
+# A provider failing every call may answer 429 (Llama 3.2 3B's) after the agent's own waits for it
+SERVER_FAILURES += (agent.RateLimitError,)
+# cloud:end
+
+
+def server_failed(err):
+    """Whether a check ended on the server failing, not on the model's reply. A 400 "Provider returned error" on
+    every call is one too: Mistral no longer serves Mistral Medium 3.1, and each check took about 4 minutes."""
+    return isinstance(err, SERVER_FAILURES) or (isinstance(err, agent.BadRequestError)
+                                                and "provider returned error" in str(err).lower())
 
 # The fixed task every model gets: the regression suite's factual question, on a page that answers it
 OBJECTIVE = "What is the tallest mountain in Africa? Give its height in meters and in feet."
@@ -234,7 +245,7 @@ async def quick_checks(counted):
                 ok, detail = await check
             except Exception as err:  # A failed check is a result, not the end of the test
                 ok, detail, error = False, f"{type(err).__name__}: {str(err)[:300]}", True
-                server_failures.append(isinstance(err, SERVER_FAILURES))
+                server_failures.append(server_failed(err))
             else:
                 server_failures.append(False)
         results.append({"check": name, "passed": ok, "detail": detail, "error": error,
@@ -266,9 +277,10 @@ def live_task(folder, minutes, model):
     result = next((str(e.get("finding", "")) for e in reversed(journal)
                    if e.get("action") == "FINISH" and not e.get("writing")), "")
     # Compatible means the agent works with the model: it finished with a result of its own, cited. What the result
-    # says (a height missing, a peak named instead of the mountain) is the model's answer, kept as a note
+    # says (a height missing, a peak named instead of the mountain) is the model's answer, kept as a note. A citation
+    # only in the checks' own "Left out, because ..." note is not one: MiniMax M2.7's whole answer was cut into it
     why = ("did not finish" if not score["finished"] else "no result written" if result.startswith(ab.NO_RESULT)
-           else "no citation" if not rg.cited_numbers(result) else "")
+           else "no citation" if not rg.cited_numbers(ab.LEFT_OUT_NOTE.sub("", result)) else "")
     return {"check": "live task", "passed": not why, "minutes": minutes,
             "detail": "; ".join(([why] if why and why != "did not finish" else []) + score["problems"])
             or "finished with both heights, cited",
