@@ -6,7 +6,7 @@ import re
 from .config import COMPOSE_MAX_TOKENS, COMPOSE_RETRY_MAX_TOKENS, JOURNAL_BATCH, MAX_EVIDENCE_CHARS, MAX_JOURNAL_DETAIL_CHARS, MAX_JOURNAL_REASON_CHARS, MAX_THOUGHT_CHARS, MODEL, REPORT_FILE, VIEW_MAX_TOKENS
 from .prompts import (COMPOSE_SYSTEM, NO_RESULT, RESULT_FORMAT, RESULT_REPLY, RESULT_RETRY, RESULT_TOO_LONG, RESULT_UNCITED,
                       RESULT_UNFINISHED, UNFINISHED_NOTE)
-from .text import MISSING_STOPWORDS, NUMBER_WORDS, OPINION_REQUEST, SPELLED_NUMBERS, extract_message_content, plain_words, shorten, was_cut_off, with_digits, without_control_characters, word_pairs
+from .text import MISSING_STOPWORDS, NUMBER_WORDS, OPINION_REQUEST, SPELLED_NUMBERS, extract_message_content, plain_words, reply_turn, shorten, was_cut_off, with_digits, without_control_characters, word_pairs
 from .pages import normalize_url
 from .grounding import code_text, invented_code
 from .checklist import checklist_lines
@@ -773,7 +773,7 @@ async def compose_final_result(client, objective, journal, checklist=None, not_f
     # Asked once more when the reply is not a result: a 3B model "finished" a how-to with its own prompt repeated
     # back (the objective, the checklist and the discoveries), and a result still in JSON is not one either
     if not usable_result(text):
-        retry = messages + [{"role": "assistant", "content": extract_message_content(response)},
+        retry = messages + [reply_turn(extract_message_content(response)),
                             {"role": "user", "content": RESULT_RETRY}]
         response = await client.chat.completions.create(model=MODEL, messages=retry, temperature=0.3,
                                                         max_tokens=COMPOSE_MAX_TOKENS, response_format=RESULT_FORMAT)
@@ -788,7 +788,7 @@ async def compose_final_result(client, objective, journal, checklist=None, not_f
     if text != NO_RESULT and (was_cut_off(response) or ends_mid_sentence(text)):
         ending = shorten(" ".join(text.split()[-8:]), 80)
         ask = RESULT_TOO_LONG if was_cut_off(response) else RESULT_UNFINISHED
-        retry = messages + [{"role": "assistant", "content": extract_message_content(response)},
+        retry = messages + [reply_turn(extract_message_content(response)),
                             {"role": "user", "content": ask.replace("{ending}", ending)}]
         response = await client.chat.completions.create(model=MODEL, messages=retry, temperature=0.3,
                                                         max_tokens=COMPOSE_RETRY_MAX_TOKENS, response_format=RESULT_FORMAT)

@@ -17,7 +17,7 @@ from .config import API_KEY, BASE_URL, CHROMIUM_ARGS, MAX_CHEAP_RETRIES, MAX_CON
 from .config import EXTRA_BODY, EXTRA_HEADERS, RATE_LIMIT_WAITS
 # cloud:end
 from .prompts import CUT_OFF, CUT_OFF_DISCOVER, CUT_OFF_DISCOVER_WORDS, CUT_REPLY, FINAL_RESULT, FIRST_TURN_INSTRUCTION, GIVE_UP_RULE, READ_FIRST, RESPONSE_FORMAT, SYSTEM_PROMPT, TURN_INSTRUCTIONS
-from .text import extract_message_content, was_cut_off, without_control_characters
+from .text import extract_message_content, reply_turn, was_cut_off, without_control_characters
 from .pages import build_environment, count_search_results, determine_url, is_search_page, load_page, normalize_url, read_more_target, render_part, search_query, section_heading, where_you_are, with_inner_headings, mark_refusing, site_of, site_refusal
 from .checklist import after_discovery_advice, check_parts, checklist_lines, link_discovery, split_objective
 from .coverage import amounts_not_found, coverage_refusal, not_found_items, record_install_line, remember_install_lines
@@ -196,7 +196,7 @@ async def request_decision(client, messages, journal, tried, page_state, current
                                   if cut_action(raw_content) == "DISCOVER" else CUT_OFF.format(limit=TURN_MAX_TOKENS))
                     messages += [{"role": "assistant", "content": CUT_REPLY}, {"role": "user", "content": correction}]
                     continue
-                messages += [{"role": "assistant", "content": original_content},
+                messages += [reply_turn(original_content),
                              {"role": "user", "content": f"That reply was not a valid JSON object ({parse_err}). Reply with only the JSON object in the mandatory format."}]
                 continue
 
@@ -207,7 +207,7 @@ async def request_decision(client, messages, journal, tried, page_state, current
         if not refusal or len(refused) >= MAX_CHEAP_RETRIES:
             usage = getattr(response, "usage", None)
             tokens = (getattr(usage, "prompt_tokens", 0) or 0) + (getattr(usage, "completion_tokens", 0) or 0)
-            return action_decision, refused, messages + [{"role": "assistant", "content": original_content}], tokens
+            return action_decision, refused, messages + [reply_turn(original_content)], tokens
 
         refused.append({"action": action, "parameter": parameter, "journal_action": refusal[0], "reason": refusal[1]})
         print(f"Cheap retry {len(refused)}/{MAX_CHEAP_RETRIES}: [{action}] refused. {refusal[1]}")
@@ -222,7 +222,7 @@ async def request_decision(client, messages, journal, tried, page_state, current
             correction = f"REFUSED: {refusal[1]} Reply with only the JSON object."
         elif len(refused) >= 2:
             correction = escalation_message(len(refused), action, refusal[1], page_state, current_url) + "\nReply with only the JSON object."
-        messages += [{"role": "assistant", "content": original_content}, {"role": "user", "content": correction}]
+        messages += [reply_turn(original_content), {"role": "user", "content": correction}]
 
 # cloud:start
 class ModelRefused(Exception):

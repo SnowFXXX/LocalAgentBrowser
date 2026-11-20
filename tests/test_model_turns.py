@@ -65,6 +65,21 @@ class TestCheapRetries:
         decision, _ = turn(client)
         assert decision["action"] == "DISCOVER" and "not a valid JSON object" in model.calls[1][-1]["content"]
 
+    def test_an_empty_reply_is_sent_back_as_a_stand_in_not_as_nothing(self, scrapes):
+        # Mistral's and Cohere's services refuse a turn with no text (the fake does too)
+        client, model = fake_client(["", reply("DISCOVER", "a new fact")])
+        decision, _ = turn(client)
+        assert decision["action"] == "DISCOVER" and model.calls[1][-2]["content"] == ab.EMPTY_REPLY
+
+    def test_an_empty_coverage_or_result_reply_is_asked_again_with_a_stand_in(self):
+        verdict = '{"answered": true, "evidence": "5,895 m", "things": [], "missing": []}'
+        client, model = fake_client(["", verdict])
+        asyncio.run(ab.coverage_reply(client, [{"role": "system", "content": "s"}, {"role": "user", "content": "check"}]))
+        assert model.calls[1][-2]["content"] == ab.EMPTY_REPLY
+        client, model = fake_client(["", '{"result": "Kilimanjaro is 5,895 m high [1]."}'])
+        text = asyncio.run(ab.compose_final_result(client, "the height", discoveries("Kilimanjaro is 5,895 m high.")))
+        assert "5,895" in text and model.calls[1][-2]["content"] == ab.EMPTY_REPLY
+
     def test_cut_off_reply_asks_for_a_short_thought_process_without_repeating_it(self, scrapes):
         cut = '{"thought_process": "' + "long reasoning " * 40
         client, model = fake_client([(cut, "length"), reply("DISCOVER", "a new fact")])

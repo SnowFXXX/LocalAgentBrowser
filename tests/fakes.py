@@ -31,6 +31,19 @@ def roles_alternate(messages):
         raise RolesDoNotAlternate(f"Conversation roles must alternate user/assistant/user/assistant/...: {roles}")
 
 
+class EmptyTurn(Exception):
+    """What Mistral's and Cohere's services answer to a turn with no text (400 "Assistant message must have either
+    content or tool_calls")."""
+
+
+def no_empty_turns(messages):
+    """Refuses a request with a turn that has no text, as Mistral's and Cohere's services do: the coverage retry sent
+    a thinking model's empty reply back, and every such check failed. Checked on every fake call, like the roles."""
+    empty = [m["role"] for m in messages if not str(m.get("content") or "").strip()]
+    if empty:
+        raise EmptyTurn(f"a turn with no text: {empty}")
+
+
 class FakeCompletions:
     """Scripted replacement for client.chat.completions: returns the given replies in order and records
     the full message list of every call."""
@@ -41,6 +54,7 @@ class FakeCompletions:
 
     async def create(self, **kwargs):
         roles_alternate(kwargs["messages"])
+        no_empty_turns(kwargs["messages"])
         self.calls.append([dict(m) for m in kwargs["messages"]])
         self.limits.append(kwargs.get("max_tokens"))
         if self.prompt_tokens is None:  # Estimate from the prompt size, like a real server would report

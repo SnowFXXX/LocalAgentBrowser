@@ -7,7 +7,7 @@ from .config import (COVERAGE_MAX_TOKENS, COVERAGE_RETRY_MAX_TOKENS, MAX_CONDITI
                      MAX_THING_NAME_WORDS, MODEL)
 from .prompts import (CITED_FORMAT, CITED_QUESTION, COVERAGE_FORMAT, COVERAGE_ITEM_CHECK, COVERAGE_QUOTE, COVERAGE_SHORTER,
                       SYSTEM_PROMPT)
-from .text import MISSING_STOPWORDS, OPINION_REQUEST, asked_count, extract_message_content, plain_words, word_pairs
+from .text import MISSING_STOPWORDS, OPINION_REQUEST, asked_count, extract_message_content, plain_words, reply_turn, word_pairs
 from .pages import ITEM_VERBS
 from .dates import SPAN_QUESTION, dates_in
 
@@ -176,7 +176,7 @@ async def coverage_reply(client, messages):
         return response, json.loads(text)
     except ValueError:
         print(COVERAGE_RETRY_LINE)
-    retry = messages + [{"role": "assistant", "content": text}, {"role": "user", "content": COVERAGE_SHORTER}]
+    retry = messages + [reply_turn(text), {"role": "user", "content": COVERAGE_SHORTER}]
     response = await client.chat.completions.create(
         model=MODEL, temperature=0.2, max_tokens=COVERAGE_RETRY_MAX_TOKENS, response_format=COVERAGE_FORMAT,
         messages=retry)
@@ -218,7 +218,7 @@ async def coverage_gaps(client, objective, checklist, journal, only=None, eviden
             # it must give words that are in the discoveries, or the item counts as unanswered.
             if is_bare_citation(verdict.get("evidence", "")):
                 bare = str(verdict["evidence"])
-                messages += [{"role": "assistant", "content": extract_message_content(response)},
+                messages += [reply_turn(extract_message_content(response)),
                              {"role": "user", "content": COVERAGE_QUOTE.format(n=n)}]
                 response, verdict = await coverage_reply(client, messages)
                 cited = [found[int(c) - 1]["extracted_data"] for c in re.findall(r"\[(\d+)\]", bare)

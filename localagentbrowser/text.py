@@ -1,6 +1,8 @@
 """Small text helpers shared by the checks: words, word pairs, counts asked for, shortening, and reading a model reply."""
 import re
 
+from .prompts import EMPTY_REPLY
+
 OPINION_REQUEST = re.compile(r"\b(opinion|your (own )?view|recommend\w*|what do you think)\b", re.I)
 
 def word_pairs(text):
@@ -77,6 +79,12 @@ def extract_message_content(response):
         return msg.get("content", "").strip() if isinstance(msg, dict) else msg.content.strip()
     # A reply with no choice in it (a failing provider's answer): no text, not a crash
     return first_choice.get("message", {}).get("content", "").strip() if isinstance(first_choice, dict) else ""
+
+def reply_turn(content):
+    """A model's reply, sent back to it as an assistant turn before a correction: never empty (EMPTY_REPLY stands in).
+    Mistral Large 4 and Command A+ spent a whole reply limit thinking and answered nothing; the coverage retry sent
+    that empty reply back, their services refused it, and each item's check failed after about 4 minutes of waits."""
+    return {"role": "assistant", "content": content or EMPTY_REPLY}
 
 def was_cut_off(response):
     """True when the reply stopped at its max_tokens limit instead of ending by itself."""

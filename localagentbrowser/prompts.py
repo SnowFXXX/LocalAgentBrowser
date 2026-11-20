@@ -145,6 +145,9 @@ CUT_OFF_DISCOVER_WORDS = 150
 # alternate: a correction straight after the prompt made two user messages in a row, which Gemma's chat template
 # refuses ("Conversation roles must alternate"), and every Gemma task that hit it ended
 CUT_REPLY = "(My reply was cut off at the length limit.)"
+# An empty reply is not sent back as it was: Mistral's and Cohere's services refuse an assistant turn with no text
+# ("Assistant message must have either content or tool_calls"), and every retry after an empty reply failed
+EMPTY_REPLY = "(My reply was empty.)"
 # The 7B's photosynthesis result ended "...from the light-dependent reactions to", by itself, with two parts unwritten
 RESULT_UNFINISHED = ("That result stops partway through a sentence (\"{ending}\"). Write the complete final result "
                      "again, following the rules above: finish every sentence and cover every part. " + RESULT_REPLY)
