@@ -20,6 +20,11 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
 - **The regression suite waits up to 30 seconds for the model list, and tries once more** if it doesn't come.
 
 ### Added
+- **A timer counts the seconds of a long model call** on the console ("Waiting for the model: 42 s"), so a run on a
+  CPU no longer looks frozen. It shows after 3 seconds, on one line that clears when the reply comes, and only in a
+  console window: a run whose output goes to a file gets no timer lines.
+- **A dialog when LM Studio isn't running**: the Windows shortcut shows what to do, with Retry (check again) and
+  Cancel, instead of a console message and closing.
 - **A result asked for steps that gives none is flagged** in the report's "Checked by the code" section, and the
   regression suite lists it as a problem ("asked for steps, gives none"). Llama 3.1 8B's cold brew results on 1.66
   and 1.67 gave what is needed and how long it keeps, but no step, without saying the steps were not found. On the

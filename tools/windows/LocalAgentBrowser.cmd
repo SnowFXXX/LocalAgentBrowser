@@ -41,13 +41,14 @@ if defined LAB_CLOUD (
   goto server_ready
 )
 rem cloud:end
+rem Until LM Studio answers: a dialog says what to do, with Retry (check again) and Cancel (close)
+:check_server
 powershell -NoProfile -Command "try { Invoke-RestMethod -TimeoutSec 5 http://localhost:1234/v1/models | Out-Null; exit 0 } catch { exit 1 }"
 if errorlevel 1 (
   echo LM Studio is not answering at http://localhost:1234.
-  echo Start LM Studio, load a model, and start its local server, then open LocalAgentBrowser again.
-  echo.
-  pause
-  exit /b 1
+  powershell -NoProfile -Command "Add-Type -AssemblyName System.Windows.Forms; $n = [Environment]::NewLine; $r = [System.Windows.Forms.MessageBox]::Show('LM Studio is not answering at http://localhost:1234.' + $n + $n + 'Open LM Studio, load a model, and start its local server (the Developer tab, Status: Running). Then click Retry.', '%LAB_TITLE%', 'RetryCancel', 'Warning'); if ($r -eq 'Retry') { exit 0 } else { exit 1 }"
+  if errorlevel 1 exit /b 1
+  goto check_server
 )
 :server_ready
 rem Windows' own Documents folder (it may be in OneDrive), the same one the installer's "Past reports" shortcut opens

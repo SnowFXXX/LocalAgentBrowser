@@ -412,3 +412,48 @@ class TestCloudFailures:
         monkeypatch.setattr(agent, "BASE_URL", "http://localhost:1234/v1")
         assert "LM Studio" in agent.failure_advice(RuntimeError("x"))
 # cloud:end
+
+
+class TestTimer:
+    """A timer counts a long model call's seconds on a person's console, and nowhere else."""
+
+    class Console:
+        def __init__(self, tty):
+            self.tty, self.written = tty, []
+
+        def isatty(self):
+            return self.tty
+
+        def write(self, text):
+            self.written.append(text)
+
+        def flush(self):
+            pass
+
+    def run(self, monkeypatch, tty, seconds):
+        console = self.Console(tty)
+        monkeypatch.setattr(agent.sys, "stdout", console)
+        monkeypatch.setattr(agent, "TIMER_TICK_SECONDS", 0.01)
+        monkeypatch.setattr(agent, "TIMER_AFTER_SECONDS", 0)
+
+        async def call():
+            await asyncio.sleep(seconds)
+            return "reply"
+        assert asyncio.run(agent.ticking(call())) == "reply"
+        return "".join(console.written)
+
+    def test_a_long_call_shows_its_seconds_and_clears_the_line(self, monkeypatch):
+        shown = self.run(monkeypatch, tty=True, seconds=0.1)
+        assert "\r   Waiting for the model: 0 s" in shown and shown.endswith("\r" + " " * 40 + "\r")
+
+    def test_output_to_a_file_gets_no_timer(self, monkeypatch):
+        assert self.run(monkeypatch, tty=False, seconds=0.1) == ""
+
+    def test_a_failed_call_still_raises(self, monkeypatch):
+        monkeypatch.setattr(agent.sys, "stdout", self.Console(True))
+        monkeypatch.setattr(agent, "TIMER_TICK_SECONDS", 0.01)
+
+        async def call():
+            raise ValueError("server down")
+        with pytest.raises(ValueError):
+            asyncio.run(agent.ticking(call()))

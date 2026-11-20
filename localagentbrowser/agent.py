@@ -4,6 +4,8 @@ import ipaddress
 import json
 import re
 import socket
+import sys
+import time
 import urllib.parse
 from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, BadRequestError, InternalServerError
 # cloud:start
@@ -280,6 +282,31 @@ def cloud_failure_advice(err):
 UNSUPPORTED_PARAMETERS = set()
 # cloud:end
 
+TIMER_AFTER_SECONDS = 3  # A call that answers sooner shows no timer (no flicker for quick replies)
+TIMER_TICK_SECONDS = 1
+
+async def ticking(call):
+    """The model call, with a timer counting its seconds on one console line while it runs. On a CPU a call can take
+    minutes, and a console showing nothing looked frozen. Only in a person's console window: a run whose output goes
+    to a file (the regression suite's console.txt) gets no timer lines."""
+    if not sys.stdout.isatty():
+        return await call
+    task = asyncio.ensure_future(call)
+    started, shown = time.monotonic(), False
+    try:
+        while not (await asyncio.wait({task}, timeout=TIMER_TICK_SECONDS))[0]:
+            waited = int(time.monotonic() - started)
+            if waited >= TIMER_AFTER_SECONDS:
+                print(f"\r   Waiting for the model: {waited} s", end="", flush=True)
+                shown = True
+    except BaseException:
+        task.cancel()
+        raise
+    finally:
+        if shown:
+            print("\r" + " " * 40 + "\r", end="", flush=True)
+    return task.result()
+
 def with_retries(client):
     """The client, with each model call tried again when the server fails it (no connection, or a server error).
 
@@ -318,7 +345,7 @@ def with_retries(client):
                 kwargs.pop(name, None)
             # cloud:end
             try:
-                response = await create(*args, **kwargs)
+                response = await ticking(create(*args, **kwargs))
             # cloud:start
             except RateLimitError as err:
                 wait = next(rate_waits, None)
