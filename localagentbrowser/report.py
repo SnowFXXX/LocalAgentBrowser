@@ -154,6 +154,23 @@ def amounts_in(text):
     for match in AMOUNT.finditer(text):
         yield match.group(1), UNIT_OF[" ".join(match.group(2).lower().split())]
 
+ASKS_FOR_STEPS = re.compile(r"\bsteps?\b|step-by-step|\bin order\b", re.I)
+# A numbered or bulleted list, "Step 1", or steps written out in a sentence ("The steps in order are: ...")
+GIVES_STEPS = re.compile(r"(?m)^\s*(?:#+\s*)?(?:[*_]{1,2})?(?:\d+[.)]|[-*•]\s|step\s*\d+)|"
+                         r"\bsteps?\b[^.\n]{0,40}?\b(?:are|is)\b", re.I)
+ORDER_WORDS = re.compile(r"\b(?:first|then|next|afterwards|finally)\b", re.I)
+
+def steps_missing(objective, text):
+    """True when the objective asks for steps and the result gives none: Llama 3.1 8B's cold brew results (1.66 and
+    1.67) gave what is needed and how long it keeps, and no step, without saying the steps were not found."""
+    if not ASKS_FOR_STEPS.search(str(objective)):
+        return False
+    text = LEFT_OUT_NOTE.sub("", str(text))
+    # The bullets of a "Not found in the pages read:" list are not steps
+    text = re.sub(r"(?im)^.*\bnot found\b[^\n]*:[ \t]*\n(?:[ \t]*[-*•][^\n]*\n?)*", "", text)
+    return not (GIVES_STEPS.search(text) or len(ORDER_WORDS.findall(text)) >= 2
+                or re.search(r"\bsteps?\b[^.\n]{0,60}\bnot (?:been )?(?:found|given|shown)", text, re.I))
+
 DURATION = re.compile(r"(?<![A-Za-z_])(\d+(?:[.,/]\d+)*)((?:\s*(?:-|–|to|or|and)\s*\d+(?:[.,/]\d+)*)*)\s*"
                       r"(minute|min|hour|hr|day|week|wk|month|year|yr)s?\b", re.I)
 # A page's "steep for 10 mins" is the result's "10 minutes": the short forms are the same unit
@@ -592,6 +609,9 @@ def write_report(objective, journal, checklist=None, stop_reason=None):
         if code:
             warnings.append(f"> ⚠️ Commands not found in the recorded discoveries: {', '.join(f'`{c}`' for c in code)}. "
                             "Check them before running them.")
+        if steps_missing(objective, final):
+            warnings.append("> ⚠️ The objective asks for steps, and this result gives none and does not say they were "
+                            "not found. See the discoveries below.")
         if notes or warnings:
             answer += "\n\n" + CHECKED_POINTER
         lines += [f"**Status:** finished by the agent on turn {finish.get('turn')}", "", "## Final result", "", answer]

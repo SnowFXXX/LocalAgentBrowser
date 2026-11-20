@@ -19,6 +19,12 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
   build record names.
 - **The regression suite waits up to 30 seconds for the model list, and tries once more** if it doesn't come.
 
+### Added
+- **A result asked for steps that gives none is flagged** in the report's "Checked by the code" section, and the
+  regression suite lists it as a problem ("asked for steps, gives none"). Llama 3.1 8B's cold brew results on 1.66
+  and 1.67 gave what is needed and how long it keeps, but no step, without saying the steps were not found. On the
+  56 saved results asked for steps, it flags those two and no other.
+
 ### Fixed
 - **A finding the page states that starts with "When", "Where" or "How" is no longer refused as "only asks
   questions"** (the 1.67 7B's "When used from within a virtual environment, ... pip will install ..."). A sentence

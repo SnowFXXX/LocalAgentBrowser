@@ -278,6 +278,7 @@ def score_run(task, journal, console="", checklist=None):
         off = [h for h in (host(e.get("source")) for e in found) if not re.search(task["source"], h)]
         score["off_source_discoveries"] = len(off)
     score["view_missing"] = bool(finish and ab.OPINION_REQUEST.search(task["objective"]) and "my view:" not in low)
+    score["steps_missing"] = bool(finish and ab.steps_missing(task["objective"], result))
 
     problems = []
     if not finish:
@@ -289,6 +290,8 @@ def score_run(task, journal, console="", checklist=None):
             problems.append("condition missed: " + ", ".join(score["forbidden"]))
         if score["view_missing"]:
             problems.append("no 'My view:' paragraph")
+        if score["steps_missing"]:
+            problems.append("asked for steps, gives none")
         if score["bad_citations"]:
             problems.append("cites missing discoveries " + ", ".join(map(str, score["bad_citations"])))
         if score["unverified_numbers"]:

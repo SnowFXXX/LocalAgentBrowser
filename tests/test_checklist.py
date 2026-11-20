@@ -510,6 +510,16 @@ def test_a_result_the_checks_left_alone_has_no_extra_section(tmp_path, monkeypat
     assert "Checked by the code" not in report and ab.CHECKED_POINTER not in report
 
 
+def test_a_result_asked_for_steps_that_gives_none_is_flagged_in_the_report(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    journal = [{"action": "DISCOVER", "turn": 1, "extracted_data": "Stir the coffee into the water. Keep it two weeks."},
+               {"action": "FINISH", "turn": 2, "finding": "You need coffee and water [1]. It keeps two weeks [1]."}]
+    ab.write_report("How do I make cold brew? Give the steps in order.", journal)
+    report = (tmp_path / ab.REPORT_FILE).read_text(encoding="utf-8")
+    assert "## Checked by the code" in report and "asks for steps, and this result gives none" in report
+    assert ab.CHECKED_POINTER in report
+
+
 def test_items_asking_for_amounts_with_none_recorded_are_reported_by_the_code():
     items = checklist("List what I need with the quantities", "Say how long it keeps in the fridge")
     journal = discoveries("You need coffee beans, water, and a strainer.", "It keeps in the fridge for two weeks.")

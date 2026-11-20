@@ -101,6 +101,21 @@ class TestScoreRun:
         score = rg.score_run(task, journal("Use venv [1].", "venv ...", source="https://realpython.com/venv"))
         assert score["off_source_discoveries"] == 1 and score["view_missing"]
 
+    def test_a_result_asked_for_steps_that_gives_none(self):
+        task = next(t for t in rg.TASKS if t["id"] == "howto-coldbrew")
+        # Llama 3.1 8B's 1.67 result: what is needed and how long it keeps, no step
+        bare = ("To make cold brew coffee, you only need coffee and water, plus a Mason jar [1].\n\nKeep it in the "
+                "refrigerator, where it'll stay good for up to two weeks [1].\n\nNot found in the pages read:\n"
+                "- List what I need with the quantities: the amounts it asks for")
+        score = rg.score_run(task, journal(bare, "coffee and water ..."))
+        assert score["steps_missing"] and "asked for steps, gives none" in score["problems"]
+        for steps in ("1. Grind the coffee [1].\n2. Stir in the water [1].",
+                      "- Grind the coffee [1].\n- Stir in the water [1].",
+                      "The steps in order are: grind the coffee, stir in the water, and refrigerate [1].",
+                      "First grind the coffee [1]. Then stir in the water [1].",
+                      "The steps were not found in the pages read."):
+            assert not rg.score_run(task, journal(steps, "coffee ..."))["steps_missing"], steps
+
 
 def test_load_run_and_summary(tmp_path):
     entries = journal("LibreOffice [1]; OnlyOffice [1].", "LibreOffice and OnlyOffice ...")
