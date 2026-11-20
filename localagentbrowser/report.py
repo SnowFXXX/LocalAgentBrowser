@@ -299,9 +299,29 @@ SENTENCE_OPENERS = {"the", "this", "these", "that", "those", "its", "it's", "bot
                     "however", "use", "using", "all", "some", "most", "one", "two", "three", "step", "note"}
 
 SECTION_START = re.compile(r"\s*(?:#+\s|\d+[.)]\s|\*\*\d)")
-SECTION_SHARE = 0.8  # Share of a line's content words that must be in one discovery its section cites
+# Share of a line's content words that must be in one discovery its section cites. Replayed on 326 saved raw results
+# (headings, questions, views and not-found lines skipped): lines at 0.75-0.8 lacked only joining words ("offer",
+# "while", "including"); lines at 0.70-0.75 added claims of their own ("SQL92", "absorbed by pigments")
+SECTION_SHARE = 0.75
 SECTION_STOPWORDS = {"this", "that", "these", "which", "into", "used", "uses", "also", "such", "process", "details",
                      "inputs", "outputs", "main", "strengths", "supporting", "discovery", "discoveries"}
+
+# Not "not shown": the code's own caveat ("(not shown in the pages read to be free)") sits on a real, cited claim
+NOT_FOUND_LINE = re.compile(r"\bnot (?:been )?(?:found|mentioned|given|stated|specified|provided)\b|\bno (?:information|"
+                            r"mention)\b", re.I)
+
+def heading_like(line, opens_section=False):
+    """A line that heads or asks rather than states, so the code never cites it: a line all in bold ("**3. Compare
+    SQLite and PostgreSQL ...: features**"), a question ("How do I make cold brew coffee at home?", the objective's
+    own), or a numbered title without a full stop over lines of its own ("2. **Activating a Virtual Environment on
+    Windows**"). Replayed on 326 saved results, such lines got citations whichever SECTION_SHARE was tried."""
+    bare = re.sub(r"^\s*(?:#+\s*|\d+[.)]\s*|[-*]\s+)", "", line).strip()
+    if re.fullmatch(r"(?:\*\*|__)[^*_].*?(?:\*\*|__):?", bare) or bare.rstrip("*_ ").endswith("?"):
+        return True
+    # Nor the model's own view, nor a line saying something was not found: neither comes from a discovery
+    if re.match(r"\W*my view\b", bare, re.I) or NOT_FOUND_LINE.search(bare):
+        return True
+    return opens_section and SECTION_START.match(line) is not None and not re.search(r"[.!]\W*$", bare)
 
 def section_words(text):
     return {w.rstrip("s") for w in plain_words(text) if len(w) > 2 and not w.isdigit()} - MISSING_STOPWORDS - SECTION_STOPWORDS
@@ -322,6 +342,8 @@ def with_section_citations(text, discoveries):
         for i in range(begin, end) if cited else ():
             line = lines[i]
             if CITATION.search(line) or line.strip().rstrip("*_ ").endswith(":") or line.lstrip().startswith("#"):
+                continue
+            if heading_like(line, opens_section=i == begin and any(x.strip() for x in lines[i + 1:end])):
                 continue
             words = section_words(line)
             if len(words) < 3:

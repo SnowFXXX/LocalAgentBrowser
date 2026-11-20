@@ -636,6 +636,22 @@ def test_lines_are_cited_to_the_discovery_their_section_cites_when_its_words_are
     out = ab.with_section_citations(text, found)
     assert "Useful for basic editing tasks. [1]" in out
     assert "faster than any other painting program.\n" in out, "words not in the discovery stay uncited"
+    assert out.startswith("2. **Krita**\n"), "a numbered title over its section is not cited"
+
+
+def test_headings_questions_views_and_not_found_lines_are_never_cited_by_section():
+    found = [{"extracted_data": "How do I make cold brew coffee at home? Steep coarse coffee in cold water overnight. "
+                                "Cold brew coffee ratio and the ratio of coffee to water are not given on this page."}]
+    text = ("How do I make cold brew coffee at home?\n**Making cold brew coffee at home**\n"
+            "- Steep coarse coffee in cold water overnight.\n- Coffee to water ratio (specific ratio not found)\n"
+            "My view: steep coarse coffee in cold water overnight at home.\nSupporting discovery: [1]")
+    out = ab.with_section_citations(text, found).split("\n")
+    assert out[2].endswith("overnight. [1]")
+    assert [line for line in out if line.endswith("[1]") and not line.startswith("Supporting")] == [out[2]]
+    # A plain numbered step is still a statement and can be cited
+    assert ab.heading_like("1. Steep coarse coffee in cold water overnight", opens_section=False) is False
+    assert ab.heading_like("2. **Activating a Virtual Environment on Windows**", opens_section=True) is True
+    assert ab.heading_like("- Open-source app that opens .pptx files (not shown to be free).") is False
 
 
 class TestSiteSearchPages:

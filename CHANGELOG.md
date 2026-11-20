@@ -48,7 +48,9 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
 - **A cut-off DISCOVER is asked for a shorter DISCOVER, and a cut-off FINISH stands.** In the saved runs, 34 of 74
   turn replies cut off at the limit were cut off again after the general "reply again, shorter" note. Opus 5.5 copied
   long passages into DISCOVER, and wrote whole answers into FINISH's parameter, which is never used (the final result
-  is written from the discoveries in its own step).
+  is written from the discoveries in its own step). Checked live on Gemma 3 4B, with the turn limit forced down to
+  200 tokens so its first DISCOVER on an owl page was cut off: answered with the general note, it left the page and
+  searched again 4 times of 4; with the DISCOVER note, it recorded a shorter DISCOVER (56 to 71 words) 4 times of 4.
 - **A finding the page states that starts with "When", "Where" or "How" is no longer refused as "only asks
   questions"** (the 1.67 7B's "When used from within a virtual environment, ... pip will install ..."). A sentence
   copied from the page shown, of six words or more and not ending in "?", is the page's statement.
@@ -64,6 +66,11 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
 - **A result that opens with one of the objective's own sentences has it left out**, as a question or a heading,
   with a citation stuck to it: Gemma 3 4B's cold brew results began "How do I make cold brew coffee at home? [2]".
   Kept when nothing of substance follows. 8 of 972 saved results change.
+- **The code no longer cites headings, questions, the model's view or "not found" lines to a discovery**, and its
+  threshold for citing a line by its section is 0.75 instead of 0.8. Replayed on 326 saved raw results against the
+  old code: 12 citations go, every one on a heading or a question ("How do I make cold brew coffee at home? [1]");
+  11 are added, every one a line whose words are in the discovery but for joining words ("offer", "while"). Lines
+  between 0.70 and 0.75 added claims of their own ("SQL92"), so the threshold stops there.
 - **The model's recommendation is labelled "My view:" in more of the ways it heads it**: a numbered heading ("#### 4.
   Recommendation ...", Phi-4 on 1.66), and a list under the heading with the advice in a paragraph after it (Phi-4 on
   1.67). A paragraph already starting "My view:" under such a heading no longer becomes "My view: My view:" (11 of
