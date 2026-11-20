@@ -345,7 +345,7 @@ class TestNotFound:
         client, _ = fake_client([said])
         items = checklist("Find the start date of his tenure as the Chief Justice of India",
                           "Find the end date of his tenure as the Chief Justice of India", "Find his birthplace")
-        found = discoveries("From 12 July 1985 until his retirement on 20 December 1986.")
+        found = discoveries("The 17th Chief Justice of India, from 12 July 1985 until his retirement on 20 December 1986.")
         text = asyncio.run(ab.compose_final_result(client, "objective", found, items, [1, 2, 3]))
         assert text == said + "\n\nNot found in the pages read:\n- Find his birthplace"
         # A cited sentence that says the thing was not found answers nothing
