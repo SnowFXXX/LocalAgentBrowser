@@ -70,9 +70,13 @@ def read_research_log(path="research_log.txt"):
         checklist = json.loads(line.removeprefix("CHECKLIST: "))
     return objective.removeprefix("OBJECTIVE: "), checklist, json.loads(rest) if rest.strip() else []
 
-# Not a digit in a name ("sqlite3", "H2O", "CO2", "IPv6"): cutting invented numbers, a comparison result lost its
-# sentence naming the `sqlite3` tool, reported as the number "3"
-NUMBER_PATTERN = re.compile(r"(?<![A-Za-z_])\d+(?:[.,/]\d+)*")
+# Not a digit in a name ("sqlite3", "H2O", "CO2", "IPv6", "utf_8"): cutting invented numbers, a comparison result
+# lost its sentence naming the `sqlite3` tool, reported as the number "3". An underscore that opens markdown emphasis
+# is not part of a name: Nemotron 3 Super's "_5,895 m_ (_19,341 ft_)" was read as "895" and "9,341", and both heights
+# were cut as invented. (The digits after a name's first one are still read: a page's "S02E09" gives the 2 of a
+# right "Season 2", in Phi-4's SimpleQA answer to q136)
+NUMBER_START = r"(?<![A-Za-z])(?<![A-Za-z0-9]_)"
+NUMBER_PATTERN = re.compile(NUMBER_START + r"\d+(?:[.,/]\d+)*")
 NAME_PART_BEFORE = re.compile(r"[A-Za-z]{2,}-$")
 NAME_PART_AFTER = re.compile(r"-[A-Za-z]{2,}")
 
@@ -145,7 +149,7 @@ UNIT_SPELLINGS = {"°C": ("°c", "° c", "degrees c", "degree c", "degrees celsi
 UNIT_KINDS = {"°C": "temperature", "°F": "temperature", "km": "length", "m": "length", "ft": "length", "mi": "length",
               "kg": "mass", "g": "mass", "lb": "mass", "oz": "mass"}
 UNIT_OF = {spelling: unit for unit, spellings in UNIT_SPELLINGS.items() for spelling in spellings}
-AMOUNT = re.compile(r"(?<![A-Za-z_\d.,])(\d+(?:[.,]\d+)*)\s*(°\s*[CF]|degrees?\s+(?:celsius|fahrenheit|C|F)|"
+AMOUNT = re.compile(NUMBER_START + r"(?<![\d.,])(\d+(?:[.,]\d+)*)\s*(°\s*[CF]|degrees?\s+(?:celsius|fahrenheit|C|F)|"
                     r"celsius|fahrenheit|kilomet(?:er|re)s?|km|met(?:er|re)s?|m|feet|foot|ft|miles?|mi|"
                     r"kilograms?|kg|grams?|g|pounds?|lbs?|ounces?|oz)(?![A-Za-z])", re.I)
 
@@ -171,7 +175,7 @@ def steps_missing(objective, text):
     return not (GIVES_STEPS.search(text) or len(ORDER_WORDS.findall(text)) >= 2
                 or re.search(r"\bsteps?\b[^.\n]{0,60}\bnot (?:been )?(?:found|given|shown)", text, re.I))
 
-DURATION = re.compile(r"(?<![A-Za-z_])(\d+(?:[.,/]\d+)*)((?:\s*(?:-|–|to|or|and)\s*\d+(?:[.,/]\d+)*)*)\s*"
+DURATION = re.compile(NUMBER_START + r"(\d+(?:[.,/]\d+)*)((?:\s*(?:-|–|to|or|and)\s*\d+(?:[.,/]\d+)*)*)\s*"
                       r"(minute|min|hour|hr|day|week|wk|month|year|yr)s?\b", re.I)
 # A page's "steep for 10 mins" is the result's "10 minutes": the short forms are the same unit
 SHORT_UNITS = {"min": "minute", "hr": "hour", "wk": "week", "yr": "year"}

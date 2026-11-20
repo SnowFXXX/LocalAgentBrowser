@@ -815,6 +815,18 @@ def test_digits_in_names_and_code_are_not_numbers_to_check():
     assert ab.unverified_numbers(text, found) == []
     assert ab.without_invented_numbers(text, found) == text
     assert ab.unverified_numbers("Steep 40g for 12 hours.", found) == ["40", "12"]
+    assert ab.unverified_numbers("Encode it as utf_8 [1].", found) == []
+
+
+def test_a_number_in_underscore_emphasis_is_read_whole():
+    # Nemotron 3 Super's "_5,895 m_" was read as "895", "__19,341 ft__" as "9,341", and both heights were cut
+    found = discoveries("It is 5,895 m (19,341 ft) above sea level, and it took 10 minutes.")
+    text = "Kilimanjaro is _5,895 m_ (__19,341 ft__) high, reached in _10 minutes_ [1]."
+    assert ab.unverified_numbers(text, found) == []
+    assert ab.without_invented_numbers(text, found) == text
+    assert ab.unverified_numbers("It is _6,000 m_ high [1].", found) == ["6,000"]
+    # A season in an episode code still confirms the season (Phi-4's right "Season 2" from a page's "S02E09")
+    assert ab.unverified_numbers("They found it in Season 2 [1].", discoveries("Party Pete: S02E09.")) == []
 
 
 class TestUncitedResults:
