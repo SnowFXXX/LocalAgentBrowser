@@ -25,6 +25,9 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
   copied from the page shown, of six words or more and not ending in "?", is the page's statement.
 - **"10 mins" in a finding is the same time as "10 minutes" in the result** (also "hrs", "wks", "yrs"). Opus 5.5's
   cold brew result had its right "10 minutes" cut, from a recipe card's "Prep Time: 10 mins".
+- **A number given with another unit than its discovery's is checked like an invented one** (temperature, length,
+  weight): Gemma 3 4B gave a page's "173.8 °F" as "173.8 °C". No saved suite result or SimpleQA answer (968 in all)
+  is flagged by it.
 - **The checks' own "Left out, because ..." notes no longer count as numbers missing from the discoveries.** On the
   saved suite runs, 9 of 400 results had the numbers their note named as cut flagged a second time.
 - **Control characters are taken out of findings and the final result** (tabs and line breaks stay): a reply's

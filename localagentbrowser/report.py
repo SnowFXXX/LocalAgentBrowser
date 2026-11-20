@@ -121,7 +121,38 @@ def unverified_numbers(text, discoveries, objective=""):
         if number.replace(",", "") in known and (number.replace(",", ""), unit) not in durations \
                 and amount not in unverified:
             unverified.append(amount)
+    # A number keeps its unit: Gemma 3 4B's result gave a page's "173.8 °F" as "173.8 °C". Only a unit of the same
+    # kind that the discoveries give with that number counts against it; a number given there without a unit does not
+    measured = {(n.replace(",", ""), unit) for t in sources for n, unit in amounts_in(with_digits(t))}
+    for number, unit in amounts_in(with_digits(text)):
+        given = {u for n, u in measured if n == number.replace(",", "") and UNIT_KINDS[u] == UNIT_KINDS[unit]}
+        amount = f"{number} {unit}"
+        if given and unit not in given and amount not in unverified:
+            unverified.append(amount)
     return unverified
+
+# Units of the same kind that one number can be mistaken between, each spelling to its symbol
+UNIT_SPELLINGS = {"°C": ("°c", "° c", "degrees c", "degree c", "degrees celsius", "degree celsius", "celsius"),
+                  "°F": ("°f", "° f", "degrees f", "degree f", "degrees fahrenheit", "degree fahrenheit", "fahrenheit"),
+                  "km": ("km", "kilometer", "kilometers", "kilometre", "kilometres"),
+                  "m": ("m", "meter", "meters", "metre", "metres"),
+                  "ft": ("ft", "feet", "foot"),
+                  "mi": ("mi", "mile", "miles"),
+                  "kg": ("kg", "kilogram", "kilograms"),
+                  "g": ("g", "gram", "grams"),
+                  "lb": ("lb", "lbs", "pound", "pounds"),
+                  "oz": ("oz", "ounce", "ounces")}
+UNIT_KINDS = {"°C": "temperature", "°F": "temperature", "km": "length", "m": "length", "ft": "length", "mi": "length",
+              "kg": "mass", "g": "mass", "lb": "mass", "oz": "mass"}
+UNIT_OF = {spelling: unit for unit, spellings in UNIT_SPELLINGS.items() for spelling in spellings}
+AMOUNT = re.compile(r"(?<![A-Za-z_\d.,])(\d+(?:[.,]\d+)*)\s*(°\s*[CF]|degrees?\s+(?:celsius|fahrenheit|C|F)|"
+                    r"celsius|fahrenheit|kilomet(?:er|re)s?|km|met(?:er|re)s?|m|feet|foot|ft|miles?|mi|"
+                    r"kilograms?|kg|grams?|g|pounds?|lbs?|ounces?|oz)(?![A-Za-z])", re.I)
+
+def amounts_in(text):
+    """(number, unit symbol) for each temperature, length or weight given: "173.8 °F" gives ("173.8", "°F")."""
+    for match in AMOUNT.finditer(text):
+        yield match.group(1), UNIT_OF[" ".join(match.group(2).lower().split())]
 
 DURATION = re.compile(r"(?<![A-Za-z_])(\d+(?:[.,/]\d+)*)((?:\s*(?:-|–|to|or|and)\s*\d+(?:[.,/]\d+)*)*)\s*"
                       r"(minute|min|hour|hr|day|week|wk|month|year|yr)s?\b", re.I)

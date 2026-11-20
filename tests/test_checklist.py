@@ -911,6 +911,19 @@ def test_a_short_unit_is_the_same_time():
     assert ab.unverified_numbers("Steep for 10 hours [1].", discoveries("A minimum of 10 hours.")) == []
 
 
+def test_a_number_keeps_the_unit_its_discovery_gives():
+    # Gemma 3 4B gave a page's "173.8 °F" as "173.8 °C"
+    found = discoveries("Ethanol boils at 173.8 °F. Kilimanjaro is 5,895 m (19,341 ft) tall. Use 40 g of coffee.")
+    assert ab.unverified_numbers("Ethanol boils at 173.8 °C [1].", found) == ["173.8 °C"]
+    assert ab.unverified_numbers("It is 5,895 feet tall [1].", found) == ["5,895 ft"]
+    assert ab.unverified_numbers("Use 40 ounces of coffee [1].", found) == ["40 oz"]
+    # The same unit in other words, the other figure the page gives, and units of another kind are all fine
+    assert ab.unverified_numbers("It boils at 173.8 degrees Fahrenheit [1]. It is 19,341 feet, 5,895 metres "
+                                 "tall [1]. Use 40 grams [1].", found) == []
+    # A number the discoveries give without a unit is not held to one
+    assert ab.unverified_numbers("It is 5,895 feet tall [1].", discoveries("Kilimanjaro: 5,895.")) == []
+
+
 def test_the_checks_own_left_out_notes_are_not_numbers_missing_from_the_discoveries():
     found = discoveries("Steep for 12 hours.")
     text = ("Steep for 12 hours [1].\n\nLeft out, because no discovery gives these numbers (the pages read may still "
