@@ -27,7 +27,7 @@ per model with its result.json, console.txt and the live task's run.
 # With --cloud, the models are OpenRouter's (tools/compat_models_cloud.txt lists the tested ones), with the key from the
 # OPENROUTER_API_KEY environment variable, never printed or stored. Each model's cost is read from OpenRouter before and
 # after it; the list stops when the budget (--budget, default $5) is spent, or when one model costs more than OVERRUN
-# times its estimate.
+# times its estimate and more than OVERRUN_FLOOR.
 # cloud:end
 import argparse
 import asyncio
@@ -55,6 +55,10 @@ LMS_MODELS = os.path.expanduser(r"~\.lmstudio\models")
 LIVE_MINUTES = 30
 CUT_OFF_TOKENS = 40  # The forced cut-off check's reply limit
 REMOTE_CALL_SECONDS = 300  # Longest wait for one quick-check call to a server that is not on this PC
+# The server failing every call: after this many checks in a row ended so, the rest are not run. LFM 2.5's provider
+# answered 504 to nearly every call, each tried 6 times over about 4 minutes, and the test took 26 minutes to fail
+SERVER_DOWN_CHECKS = 2
+SERVER_FAILURES = (agent.APIConnectionError, agent.InternalServerError, agent.NoReply)
 
 # The fixed task every model gets: the regression suite's factual question, on a page that answers it
 OBJECTIVE = "What is the tallest mountain in Africa? Give its height in meters and in feet."
@@ -161,13 +165,22 @@ async def check_discover(client, checklist):
     return ok, f"[{action}] {parameter[:120]}{why}" + (f"; {len(refused)} refused first" if refused else "")
 
 
+# A gap the agent's own code makes when two items were given the same words (coverage.shared_gap), not the model's
+SHARED_WORDS_GAP = ab.shared_gap(0, "").split(": ", 1)[1].split(",")[0]
+
+
 async def check_coverage(client, checklist):
+    """Every item checked, and judged answered by the model: the one discovery answers the whole objective. A model
+    that called it unanswered (DeepSeek V3.2: "Its height in meters: nothing ... answers it") would keep the agent
+    searching for what it has. A gap made by the agent's shared-words rule is noted, not counted against the model."""
     journal = [discovery(FOUND, list(range(1, len(checklist) + 1)))]
     for item in checklist:
         item["discoveries"] = [1]
     unchecked = set()
     gaps = await ab.coverage_gaps(client, OBJECTIVE, checklist, journal, evidence={}, unchecked=unchecked)
-    return not unchecked, f"{len(checklist)} item(s) checked; gaps {gaps or 'none'}; unchecked {sorted(unchecked) or 'none'}"
+    judged_unanswered = [g for g in gaps[0] if SHARED_WORDS_GAP not in g]
+    return (not unchecked and not judged_unanswered,
+            f"{len(checklist)} item(s) checked; gaps {gaps or 'none'}; unchecked {sorted(unchecked) or 'none'}")
 
 
 async def check_result(client, checklist):
@@ -209,12 +222,21 @@ async def check_cut_off(client, checklist):
 async def quick_checks(counted):
     client, results = counted.client, []
 
+    server_failures = []  # Whether each check ended on the server failing (after the agent's own retries)
+
     async def run(name, check):
         calls, started, error = counted.calls, time.time(), False
-        try:
-            ok, detail = await check
-        except Exception as err:  # A failed check is a result, not the end of the test
-            ok, detail, error = False, f"{type(err).__name__}: {str(err)[:300]}", True
+        if server_failures[-SERVER_DOWN_CHECKS:] == [True] * SERVER_DOWN_CHECKS:
+            check.close()
+            ok, detail, error = False, f"not run: the server failed the {SERVER_DOWN_CHECKS} checks before", True
+        else:
+            try:
+                ok, detail = await check
+            except Exception as err:  # A failed check is a result, not the end of the test
+                ok, detail, error = False, f"{type(err).__name__}: {str(err)[:300]}", True
+                server_failures.append(isinstance(err, SERVER_FAILURES))
+            else:
+                server_failures.append(False)
         results.append({"check": name, "passed": ok, "detail": detail, "error": error,
                         "calls": counted.calls - calls, "seconds": round(time.time() - started, 1)})
         print(f"   {'PASS' if ok else 'FAIL'} {name}: {detail}", flush=True)
@@ -348,7 +370,10 @@ def load_local(key):
 # cloud:start
 CLOUD_KEY_URL = "https://openrouter.ai/api/v1/key"
 COST_ESTIMATE_TOKENS = (100_000, 6_000)  # Prompt and reply tokens a model is expected to use at most, for its estimate
-OVERRUN = 2.0  # A model costing more than this many times its estimate stops the list
+OVERRUN = 2.0  # A model costing more than this many times its estimate stops the list...
+# ...when it cost at least this much: a thinking model given room to think uses more than the estimate's replies, and
+# Granite 4.2 8B's $0.0145 (2.1 times its estimate) stopped a rerun with $2.45 of its budget left
+OVERRUN_FLOOR = 0.10
 
 
 def cloud_spent():
@@ -471,7 +496,7 @@ def run_list(models, args):
         # cloud:start
         if args.cloud:
             spent = sum(r.get("cost") or 0 for r in rows)
-            if row.get("estimate") and row.get("cost", 0) > OVERRUN * row["estimate"]:
+            if row.get("estimate") and row.get("cost", 0) > max(OVERRUN * row["estimate"], OVERRUN_FLOOR):
                 print(f"Stopping: {model} cost ${row['cost']:.4f}, over {OVERRUN:g} times its estimate.", flush=True)
                 break
             if spent >= args.budget:

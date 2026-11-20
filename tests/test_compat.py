@@ -3,6 +3,7 @@ import asyncio
 import importlib.util
 import json
 import os
+import types
 
 from conftest import TESTS_DIR
 from fakes import fake_client
@@ -90,6 +91,38 @@ def test_the_live_task_passes_on_a_cited_result_and_notes_what_it_lacks(tmp_path
     uncited = live("Kilimanjaro is 5,895 m (19,341 ft) high.")
     assert not uncited["passed"] and uncited["detail"].startswith("no citation")
     assert not live(compat.ab.NO_RESULT + "\n\n[1] " + compat.FOUND)["passed"]
+
+
+def test_the_coverage_check_wants_the_item_judged_answered_but_not_the_shared_words_rule(monkeypatch):
+    item = "Item 1 (the height): "
+    for gaps, passed in ((([], [], []), True), (([item + "nothing in DISCOVERIES SO FAR answers it"], [1], []), False),
+                         (([compat.ab.shared_gap(1, "the height")], [1], []), True)):
+        async def coverage_gaps(*args, gaps=gaps, **kwargs):
+            return gaps
+        monkeypatch.setattr(compat.ab, "coverage_gaps", coverage_gaps)
+        ok, _ = asyncio.run(compat.check_coverage(None, [{"text": "the height", "discoveries": []}]))
+        assert ok == passed, gaps
+
+
+def test_after_two_checks_the_server_failed_the_rest_are_not_run():
+    class Down:
+        def __init__(self):
+            self.calls = 0
+            self.client = types.SimpleNamespace(chat=types.SimpleNamespace(completions=self))
+            self.prompt_tokens = self.completion_tokens = 0
+
+        async def create(self, **kwargs):
+            self.calls += 1
+            if kwargs.get("response_format", {}).get("json_schema", {}).get("name") == "checklist":
+                return types.SimpleNamespace(usage=None, choices=[types.SimpleNamespace(
+                    message=types.SimpleNamespace(content='{"parts": ["the height"]}'), finish_reason="stop")])
+            raise compat.agent.NoReply("no reply in it")
+    down = Down()
+    results = asyncio.run(compat.quick_checks(down))
+    after = [r for r in results if r["detail"].startswith("not run")]
+    assert [r["check"] for r in results][:3] == ["split", "search page", "discover"]
+    assert len(after) == len(results) - 3 and all(r["error"] for r in after)
+    assert down.calls == 3  # the split, then one call per failed check
 
 
 def test_a_model_list_skips_comments_and_blank_lines(tmp_path, monkeypatch):
