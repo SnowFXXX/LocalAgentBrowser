@@ -543,3 +543,23 @@ class TestTimer:
             raise ValueError("server down")
         with pytest.raises(ValueError):
             asyncio.run(agent.ticking(call()))
+
+
+class TestFencedReplies:
+    """MiniMax M2.7 wrapped every JSON reply in a markdown code fence: its checklist split could not be read, and its
+    final result kept the whole reply as text, which the code check then cut to nothing."""
+
+    def test_a_json_reply_in_a_code_fence_is_read_without_the_fence(self):
+        fenced = types.SimpleNamespace(choices=[types.SimpleNamespace(message=types.SimpleNamespace(
+            content='```json\n{"parts": ["the height"]}\n```'))])
+        assert ab.extract_message_content(fenced) == '{"parts": ["the height"]}'
+        assert ab.without_json_fence('```\n{"result": "cut off at the li') == '{"result": "cut off at the li'
+        command = "```bash\npip install requests\n```"
+        assert ab.without_json_fence(command) == command
+
+    def test_the_split_and_the_final_result_read_a_fenced_reply(self):
+        client, _ = fake_client(['```json\n{"parts": ["the mountain", "its height"]}\n```'])
+        assert [i["text"] for i in asyncio.run(ab.split_objective(client, "objective"))] == ["the mountain", "its height"]
+        client, _ = fake_client(['```json\n{"result": "Kilimanjaro is 5,895 m high [1]."}\n```'])
+        text = asyncio.run(ab.compose_final_result(client, "the height", discoveries("Kilimanjaro is 5,895 m high.")))
+        assert text == "Kilimanjaro is 5,895 m high [1]."

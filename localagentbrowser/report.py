@@ -77,6 +77,8 @@ def read_research_log(path="research_log.txt"):
 # right "Season 2", in Phi-4's SimpleQA answer to q136)
 NUMBER_START = r"(?<![A-Za-z])(?<![A-Za-z0-9]_)"
 NUMBER_PATTERN = re.compile(NUMBER_START + r"\d+(?:[.,/]\d+)*")
+# A list item's number after the end of the item before it on the same line ("... [1]. 2. Height"), not a claim
+INLINE_LIST_LABEL = re.compile(r"([.!?\]]\s+)\d{1,2}[.)]\s+(?=[A-Z*_#\"'(])")
 NAME_PART_BEFORE = re.compile(r"[A-Za-z]{2,}-$")
 NAME_PART_AFTER = re.compile(r"-[A-Za-z]{2,}")
 
@@ -89,6 +91,9 @@ def unverified_numbers(text, discoveries, objective=""):
     flagged again as numbers missing from the discoveries.
     """
     text = LEFT_OUT_NOTE.sub("", str(text))
+    # A numbered list written on one line: Gemini 3.8 Flash's "1. Tallest mountain ...: Mount Kilimanjaro [1]. 2.
+    # Height in meters: ..." had its "2" and "3" cut as invented, with a note that no discovery gives them
+    text = INLINE_LIST_LABEL.sub(r"\1 ", text)
     text = re.sub(r"\[\d+(?:\s*[-–,;]\s*\d+)*\]", " ", text)  # Citation markers: [2], [4, 5], [1-4]
     # Numbered list items and headings ("#### 1. Setup"), bold ones too: "**1. Explain what goes into
     # photosynthesis:**" had its "1" taken for an invented number and cut, mangling the label

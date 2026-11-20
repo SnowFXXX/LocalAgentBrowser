@@ -829,6 +829,17 @@ def test_a_number_in_underscore_emphasis_is_read_whole():
     assert ab.unverified_numbers("They found it in Season 2 [1].", discoveries("Party Pete: S02E09.")) == []
 
 
+def test_a_numbered_list_written_on_one_line_keeps_its_item_numbers():
+    # Gemini 3.8 Flash's "2" and "3" were cut as invented, with a note that no discovery gives them
+    found = discoveries("It is 5,895 m (19,341 ft) above sea level.")
+    text = ("1. Tallest mountain in Africa: Mount Kilimanjaro [1]. 2. Height in meters: 5,895 m [1]. "
+            "3. Height in feet: 19,341 ft [1].")
+    assert ab.unverified_numbers(text, found) == []
+    assert ab.without_invented_numbers(text, found) == text
+    # A number at the end of a sentence, or one that starts a sentence without a list item after it, is still checked
+    assert ab.unverified_numbers("It rose 3. 4 more were found [1].", found) == ["3", "4"]
+
+
 class TestUncitedResults:
     FOUND = discoveries("SQLite needs no server and no administration: the database is a single file.",
                         "PostgreSQL supports JSON columns, window functions and full-text search.")
