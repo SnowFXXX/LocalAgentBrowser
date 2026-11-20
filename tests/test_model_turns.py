@@ -260,8 +260,41 @@ class TestServerFailures:
             waits.append(seconds)
 
         monkeypatch.setattr(agent.asyncio, "sleep", fake_sleep)
+        monkeypatch.setattr(agent, "THINKING_ROOM", {"tokens": 0})
         client = types.SimpleNamespace(chat=types.SimpleNamespace(completions=types.SimpleNamespace(create=create)))
         return agent.with_retries(client), calls, waits
+
+    @staticmethod
+    def answer(content, finish_reason="stop"):
+        message = types.SimpleNamespace(content=content)
+        return types.SimpleNamespace(choices=[types.SimpleNamespace(message=message, finish_reason=finish_reason)])
+
+    def test_a_reply_with_no_reply_in_it_is_tried_again(self, monkeypatch):
+        # DeepSeek V3.2's failing provider answered so, and reading it crashed the task
+        client, calls, waits = self.client([types.SimpleNamespace(choices=[]), "reply"], monkeypatch)
+        assert asyncio.run(client.chat.completions.create(model="m", messages=[])) == "reply"
+        assert len(calls) == 2 and waits == [ab.MODEL_RETRY_WAITS[0]]
+        assert ab.extract_message_content(types.SimpleNamespace(choices=[])) == ""
+        empty = [types.SimpleNamespace(choices=None)] * (len(ab.MODEL_RETRY_WAITS) + 1)
+        client, calls, waits = self.client(empty, monkeypatch)
+        with pytest.raises(agent.NoReply):
+            asyncio.run(client.chat.completions.create(model="m", messages=[]))
+
+    def test_a_reply_spent_on_thinking_gets_room_to_think_from_then_on(self, monkeypatch):
+        # Granite 4.2 8B and Nemotron 3.5 Lightning spent all 300 tokens thinking, and answered given 4,000
+        thought = self.answer("", "length")
+        client, calls, waits = self.client([thought, "reply", "reply"], monkeypatch)
+        create = client.chat.completions.create
+        assert asyncio.run(create(model="m", messages=[], max_tokens=300)) == "reply"
+        assert asyncio.run(create(model="m", messages=[], max_tokens=600)) == "reply"
+        assert [c["max_tokens"] for c in calls] == [300, 300 + ab.THINKING_ALLOWANCE, 600 + ab.THINKING_ALLOWANCE]
+        assert waits == []
+
+    def test_a_cut_off_reply_with_text_is_not_taken_for_thinking(self, monkeypatch):
+        cut = self.answer('{"thought_process": "a long', "length")
+        client, calls, waits = self.client([cut], monkeypatch)
+        assert asyncio.run(client.chat.completions.create(model="m", messages=[], max_tokens=300)) is cut
+        assert agent.THINKING_ROOM["tokens"] == 0 and len(calls) == 1
 
     def test_a_server_failure_is_tried_again_after_a_wait(self, monkeypatch):
         client, calls, waits = self.client(["down", "500", "reply"], monkeypatch)
@@ -357,6 +390,7 @@ class TestCloudFailures:
         monkeypatch.setattr(agent.asyncio, "sleep", fake_sleep)
         monkeypatch.setattr(agent, "BASE_URL", "https://openrouter.ai/api/v1" if cloud else "http://localhost:1234/v1")
         monkeypatch.setattr(agent, "UNSUPPORTED_PARAMETERS", set())
+        monkeypatch.setattr(agent, "THINKING_ROOM", {"tokens": 0})
         client = types.SimpleNamespace(chat=types.SimpleNamespace(completions=types.SimpleNamespace(create=create)))
         return agent.with_retries(client), calls, waits
 
@@ -395,6 +429,25 @@ class TestCloudFailures:
         assert asyncio.run(create(model="m", messages=[], temperature=0.3)) == "reply"
         assert "temperature" in calls[0] and "temperature" not in calls[1] and "temperature" not in calls[2]
         assert waits == []
+
+    def test_a_json_schema_no_provider_takes_falls_back_to_plain_json(self, monkeypatch):
+        # Qwen3.7 Flash's only provider takes JSON replies but not a JSON schema
+        schema = {"type": "json_schema", "json_schema": {"name": "x", "schema": {}}}
+        client, calls, waits = self.client(["404-params", "404-params", "reply", "reply"], monkeypatch)
+        create = client.chat.completions.create
+        assert asyncio.run(create(model="m", messages=[], temperature=0.2, response_format=schema)) == "reply"
+        assert asyncio.run(create(model="m", messages=[], temperature=0.2, response_format=schema)) == "reply"
+        assert calls[0]["response_format"] == schema and "temperature" not in calls[1]
+        assert calls[2]["response_format"] == {"type": "json_object"} == calls[3]["response_format"]
+
+    def test_a_404_that_dropping_parameters_does_not_cure_still_raises(self, monkeypatch):
+        import openai
+
+        client, calls, waits = self.client(["404-params"] * 3, monkeypatch)
+        with pytest.raises(openai.NotFoundError):
+            asyncio.run(client.chat.completions.create(model="m", messages=[], temperature=0.2,
+                                                        response_format={"type": "json_schema", "json_schema": {}}))
+        assert len(calls) == 3
 
     def test_a_404_on_lm_studio_is_not_taken_for_a_parameter_problem(self, monkeypatch):
         import openai

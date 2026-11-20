@@ -75,7 +75,8 @@ def extract_message_content(response):
     elif isinstance(first_choice, dict) and "message" in first_choice:
         msg = first_choice["message"]
         return msg.get("content", "").strip() if isinstance(msg, dict) else msg.content.strip()
-    return first_choice.get("message", {}).get("content", "").strip()
+    # A reply with no choice in it (a failing provider's answer): no text, not a crash
+    return first_choice.get("message", {}).get("content", "").strip() if isinstance(first_choice, dict) else ""
 
 def was_cut_off(response):
     """True when the reply stopped at its max_tokens limit instead of ending by itself."""

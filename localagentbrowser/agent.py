@@ -12,7 +12,7 @@ from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, BadRequestE
 from openai import NotFoundError, RateLimitError
 # cloud:end
 from playwright.async_api import async_playwright
-from .config import API_KEY, BASE_URL, CHROMIUM_ARGS, MAX_CHEAP_RETRIES, MAX_CONVERSATION_TOKENS, MAX_DISCOVERY_PROMPT_CHARS, MAX_FOLLOWUPS, MAX_JSON_RETRIES, MAX_QUERY_WORDS, MAX_VISITS_PER_URL, MODEL, MODEL_RETRY_WAITS, MODEL_TIMEOUT_SECONDS, TURN_MAX_TOKENS, OBJECTIVE_CHECK_EVERY, REPORT_FILE, STALL_TURNS, TURN_PAUSE_SECONDS
+from .config import API_KEY, BASE_URL, CHROMIUM_ARGS, MAX_CHEAP_RETRIES, MAX_CONVERSATION_TOKENS, MAX_DISCOVERY_PROMPT_CHARS, MAX_FOLLOWUPS, MAX_JSON_RETRIES, MAX_QUERY_WORDS, MAX_VISITS_PER_URL, MODEL, MODEL_RETRY_WAITS, MODEL_TIMEOUT_SECONDS, TURN_MAX_TOKENS, OBJECTIVE_CHECK_EVERY, REPORT_FILE, STALL_TURNS, THINKING_ALLOWANCE, TURN_PAUSE_SECONDS
 # cloud:start
 from .config import EXTRA_BODY, EXTRA_HEADERS, RATE_LIMIT_WAITS
 # cloud:end
@@ -299,6 +299,12 @@ def cloud_failure_advice(err):
 UNSUPPORTED_PARAMETERS = set()
 # cloud:end
 
+# Set once a thinking model has spent a whole reply on thinking (see with_retries), for the rest of the run
+THINKING_ROOM = {"tokens": 0}
+
+class NoReply(Exception):
+    """The model server kept answering with no reply in it."""
+
 TIMER_AFTER_SECONDS = 3  # A call that answers sooner shows no timer (no flicker for quick replies)
 TIMER_TICK_SECONDS = 1
 
@@ -347,19 +353,32 @@ def with_retries(client):
     # - An empty reply stopped by the content filter: Opus 5.5 got 18 of them, each read as invalid JSON, retried and
     #   billed. The same prompt gets the same answer, so it is not retried: ModelRefused ends the run with that reason.
     # cloud:end
+    # Found by the compatibility test (tools/compat.py) on 43 models, and handled the same way for every model:
+    # - A reply object with no reply in it: DeepSeek V3.2's provider answered so while failing, and reading it crashed
+    #   the task. It is tried again like a server error.
+    # - An empty reply stopped at its length limit: a thinking model spent the whole limit thinking (Granite 4.2 8B and
+    #   Nemotron 3.5 Lightning used 300 of 300 tokens on it, and answered given 4,000). Every call of the run gets
+    #   THINKING_ALLOWANCE more tokens from then on, so the limit still bounds the answer, not the thinking.
     create = client.chat.completions.create
 
     async def create_with_retries(*args, **kwargs):
         server_waits = iter(MODEL_RETRY_WAITS)
+        limit = kwargs.get("max_tokens")
         # cloud:start
         if EXTRA_BODY:
             kwargs["extra_body"] = {**EXTRA_BODY, **(kwargs.get("extra_body") or {})}
         rate_waits = iter(RATE_LIMIT_WAITS)
         # cloud:end
         while True:
+            if limit:
+                kwargs["max_tokens"] = limit + THINKING_ROOM["tokens"]
             # cloud:start
             for name in UNSUPPORTED_PARAMETERS:
-                kwargs.pop(name, None)
+                if name == "json_schema":
+                    if (kwargs.get("response_format") or {}).get("type") == "json_schema":
+                        kwargs["response_format"] = {"type": "json_object"}
+                else:
+                    kwargs.pop(name, None)
             # cloud:end
             try:
                 response = await ticking(create(*args, **kwargs))
@@ -373,10 +392,19 @@ def with_retries(client):
                 await asyncio.sleep(wait)
                 continue
             except NotFoundError as err:
-                if "temperature" in kwargs and not is_local_server() and re.search(r"requested parameters", str(err), re.I):
+                if is_local_server() or not re.search(r"requested parameters", str(err), re.I):
+                    raise
+                if "temperature" in kwargs:
                     UNSUPPORTED_PARAMETERS.add("temperature")
                     print(f"Warning: No provider of '{MODEL}' takes a temperature setting; sending calls without it from now on "
                           "(the model's own default is used).")
+                    continue
+                # Qwen3.7 Flash's only provider takes JSON replies but not a JSON schema: plain JSON mode, which the
+                # agent reads the same way (its prompts give the format, and a reply that is not valid is asked again)
+                if (kwargs.get("response_format") or {}).get("type") == "json_schema" and "json_schema" not in UNSUPPORTED_PARAMETERS:
+                    UNSUPPORTED_PARAMETERS.add("json_schema")
+                    print(f"Warning: No provider of '{MODEL}' takes a JSON schema for its replies; asking for plain JSON from "
+                          "now on.")
                     continue
                 raise
             # cloud:end
@@ -396,9 +424,22 @@ def with_retries(client):
                 print(f"Warning: The model server failed the call ({type(err).__name__}: {err}). Trying again in {wait} s; {hint}")
                 await asyncio.sleep(wait)
                 continue
+            if hasattr(response, "choices") and not response.choices:
+                wait = next(server_waits, None)
+                if wait is None:
+                    raise NoReply("the model server answered with no reply in it, every time it was asked")
+                print(f"Warning: The model server answered with no reply in it. Trying again in {wait} s.")
+                await asyncio.sleep(wait)
+                continue
+            first = (getattr(response, "choices", None) or [None])[0]
+            if limit and not THINKING_ROOM["tokens"] and getattr(first, "finish_reason", None) == "length" \
+                    and not extract_message_content(response):
+                THINKING_ROOM["tokens"] = THINKING_ALLOWANCE
+                print(f"Warning: The model spent its whole reply on thinking ({limit} tokens, no answer); giving every call "
+                      f"{THINKING_ALLOWANCE} more tokens from now on.")
+                continue
             # cloud:start
-            choice = (getattr(response, "choices", None) or [None])[0]
-            if getattr(choice, "finish_reason", None) == "content_filter" and not extract_message_content(response):
+            if getattr(first, "finish_reason", None) == "content_filter" and not extract_message_content(response):
                 raise ModelRefused(f"the content filter of {getattr(response, 'provider', None) or 'the provider'} "
                                    f"stopped the reply (empty, finish reason content_filter)")
             # cloud:end
