@@ -11,6 +11,18 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
 - **The regression suite gives every task 90 minutes by default** (`--minutes` still sets another limit), and each
   run records its limit in run_info.json, summary.json and the summary's first line. The tasks' own limits of 25 to
   60 minutes are gone: a 1.67 run started without `--minutes 90` by mistake was cut short by them.
+- **The console shows plain text instead of emoji**, which some Windows consoles draw as boxes. Problems start with
+  "Warning:" or "Error:". The prompts the model reads and the report are unchanged.
+- **Clean Room's console window is titled "LocalAgentBrowser Clean Room"**, so the two editions are told apart.
+- **Setup says when the model may still be downloading** in LM Studio, on its last page.
+- **`installer\build.ps1` stops if the code has uncommitted changes**, so a setup file always matches the commit its
+  build record names.
+- **The regression suite waits up to 30 seconds for the model list, and tries once more** if it doesn't come.
+
+### Fixed
+- **A finding the page states that starts with "When", "Where" or "How" is no longer refused as "only asks
+  questions"** (the 1.67 7B's "When used from within a virtual environment, ... pip will install ..."). A sentence
+  copied from the page shown, of six words or more and not ending in "?", is the page's statement.
 
 ## [1.67.2] - 2026-11-18
 ### Fixed

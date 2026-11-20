@@ -429,6 +429,8 @@ def write_run_info(folder, meta):
 # have all been measured at 90.
 DEFAULT_MINUTES = 90
 FAILURE_PAUSE_SECONDS = 60  # Wait after a task ended by a failed model call, so a rate limit can clear
+MODEL_LIST_TIMEOUT = 30  # LM Studio can be slow to list its models while it starts or loads one
+MODEL_LIST_RETRY_WAIT = 10
 # cloud:start
 CLOUD_URL = "https://openrouter.ai/api/v1"
 # Only providers that honour the JSON format the agent asks for, and none that store or train on prompts
@@ -477,11 +479,24 @@ def lmstudio_model(model):
         return None
 
 
+def model_list():
+    """The model server's model ids, with a longer wait than other calls and one more try if the list does not come."""
+    url = ab.BASE_URL.rstrip("/") + "/models"
+    try:
+        listed = get_json(url, timeout=MODEL_LIST_TIMEOUT)
+    except OSError as err:
+        print(f"The model server did not list its models ({err}); trying once more in {MODEL_LIST_RETRY_WAIT} s.",
+              flush=True)
+        time.sleep(MODEL_LIST_RETRY_WAIT)
+        listed = get_json(url, timeout=MODEL_LIST_TIMEOUT)
+    return [m["id"] for m in listed.get("data", [])]
+
+
 def prepare_model(model):
     """Checks the model is available, loads it, and returns {"quantization", "context"}; exits with the reason if
     it cannot be used. LM Studio loads a model on the first request that names it, with that model's own default
     context length, which can differ from the one every other run used; a run under other conditions is refused."""
-    available = [m["id"] for m in get_json(ab.BASE_URL.rstrip("/") + "/models").get("data", [])]
+    available = model_list()
     if model not in available:
         sys.exit(f"The model server has no model '{model}'. It has: {', '.join(available)}")
     print(f"Loading {model} (if it is not loaded yet)...", flush=True)

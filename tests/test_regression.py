@@ -166,6 +166,27 @@ class TestPrepareModel:
         self.serve(monkeypatch, {"loaded_context_length": 8192, "quantization": "Q4_K_M"})
         assert rg.prepare_model("qwen2.5-3b-instruct") == {"quantization": "Q4_K_M", "context": 8192}
 
+    def test_the_model_list_gets_a_longer_wait_and_one_more_try(self, monkeypatch):
+        calls = []
+
+        def get_json(url, data=None, timeout=10):
+            calls.append(timeout)
+            if len(calls) == 1:
+                raise TimeoutError("timed out")
+            return {"data": [{"id": "qwen2.5-3b-instruct"}]}
+        monkeypatch.setattr(rg, "get_json", get_json)
+        monkeypatch.setattr(rg.time, "sleep", lambda s: None)
+        assert rg.model_list() == ["qwen2.5-3b-instruct"]
+        assert calls == [rg.MODEL_LIST_TIMEOUT, rg.MODEL_LIST_TIMEOUT]
+
+    def test_a_model_list_that_fails_twice_ends_the_run(self, monkeypatch):
+        def get_json(url, data=None, timeout=10):
+            raise TimeoutError("timed out")
+        monkeypatch.setattr(rg, "get_json", get_json)
+        monkeypatch.setattr(rg.time, "sleep", lambda s: None)
+        with pytest.raises(TimeoutError):
+            rg.model_list()
+
 
 class TestHonesty:
     RESULT = ("1. **LibreOffice** (not shown in the pages read to be free and open-source) [1]\n"

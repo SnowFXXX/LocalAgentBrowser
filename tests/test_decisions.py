@@ -614,6 +614,22 @@ def test_a_discovery_that_only_asks_questions_is_refused_but_a_question_with_its
     assert not ab.is_question_discovery("Steep 1 cup of coffee in 4 cups of water for 16 hours.")
 
 
+def test_a_page_statement_that_starts_with_when_is_not_refused_as_a_question():
+    said = ("When used from within a virtual environment, common installation tools such as pip will install Python "
+            "packages into a virtual environment without needing to be told to do so explicitly.")
+    page = recorded_page(DOCS, ["Creating virtual environments\n" + said + " It is a directory tree."])
+    tried = {"queries": [], "urls": []}
+    assert not ab.is_question_discovery(said, page)
+    refusal = ab.check_decision("DISCOVER", said, [], tried, page, DOCS)
+    assert refusal is None or refusal[0] != "BLOCKED_DISCOVER_QUESTION", refusal
+    # The same words not on the page, or asked with "?" even if they are, are still only a question
+    assert ab.is_question_discovery(said, recorded_page(DOCS, ["Something else entirely, said at length here."]))
+    asked = "How long does cold brew keep in the fridge?"
+    assert ab.is_question_discovery(asked, recorded_page(GUIDE, [asked + " It keeps for two weeks."]))
+    # Short lines that start like questions are headings or menu items, even on the page
+    assert ab.is_question_discovery("How it works", recorded_page(GUIDE, ["How it works\nSteep it overnight."]))
+
+
 def test_steps_that_start_like_questions_are_not_refused_as_questions():
     for step in ("Do not grind the coffee too fine", "Can be kept in the fridge for up to two weeks",
                  "Is best served over ice with milk"):
