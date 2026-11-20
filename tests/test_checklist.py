@@ -30,6 +30,20 @@ class TestSplitObjective:
         checklist, _ = split(json.dumps({"parts": [f"part {n}" for n in range(20)]}))
         assert len(checklist) == ab.MAX_CHECKLIST_ITEMS
 
+    def test_a_fragment_that_only_continues_a_part_is_joined_back_to_it(self):
+        checklist, _ = split(json.dumps({"parts": ["What is the boiling point of water?", "at the summit of Mount Everest",
+                                                   "Give it in degrees Fahrenheit"]}))
+        assert [i["text"] for i in checklist] == ["What is the boiling point of water at the summit of Mount Everest?",
+                                                  "Give it in degrees Fahrenheit"]
+        # Llama's SimpleQA split, three parts of one question
+        assert ab.with_fragments_joined(["Who won the gold medal", "in men's foil",
+                                         "at the first European Fencing Championships"]) == \
+            ["Who won the gold medal in men's foil at the first European Fencing Championships"]
+        # A part that asks something of its own stays, even when it starts with such a word
+        assert ab.with_fragments_joined(["Name three tools", "In which year was each released?"]) == \
+            ["Name three tools", "In which year was each released?"]
+        assert ab.with_fragments_joined(["at the summit"]) == ["at the summit"]
+
 
 def checklist(*texts):
     return [{"text": t, "discoveries": []} for t in texts]
