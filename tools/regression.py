@@ -602,7 +602,7 @@ def main():
         # One rate-limited task used to end every task after it on its first call (GPT-4o lost 3, Opus 5.5 lost 6):
         # after a task ended by a failed model call, the next one waits for the limit to clear
         with open(os.path.join(folder, task["id"], "console.txt"), encoding="utf-8", errors="replace") as console:
-            if "❌ The model call failed" in console.read() and number < len(tasks):
+            if "The model call failed" in console.read() and number < len(tasks):
                 print(f"The model call failed in this task; waiting {FAILURE_PAUSE_SECONDS} s before the next one.", flush=True)
                 time.sleep(FAILURE_PAUSE_SECONDS)
     print("\n" + summary_markdown(meta, scores, baseline))

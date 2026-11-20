@@ -229,17 +229,21 @@ begin
 #endif
 end;
 
-procedure CurPageChanged(CurPageID: Integer);
-begin
-  if (CurPageID = ModelPage.ID) and not Prefilled then
-    PrefillFromEarlierInstall;
-end;
-
 function WantsModelDownload: Boolean;
 begin
   { Never in a silent install: a model is several GB, and silent installs are for testing or for admins }
   { Whatever else is chosen: the LocalAgentBrowser shortcut always uses LM Studio }
   Result := (ChosenModel < ModelCount) and FileExists(LmsPath('')) and (not WizardSilent);
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if (CurPageID = ModelPage.ID) and not Prefilled then
+    PrefillFromEarlierInstall;
+  { LM Studio may go on downloading the model after setup hands it over }
+  if (CurPageID = wpFinished) and WantsModelDownload then
+    WizardForm.FinishedLabel.Caption := WizardForm.FinishedLabel.Caption + #13#10#13#10 +
+      'The model may still be downloading in LM Studio. If it is, let the download finish there before your first run.';
 end;
 
 #ifndef CleanRoom

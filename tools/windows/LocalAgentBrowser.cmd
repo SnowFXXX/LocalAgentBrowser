@@ -2,7 +2,12 @@
 rem LocalAgentBrowser launcher for Windows: checks that the model server is ready, then runs the agent in this window.
 rem Each run gets its own folder under Documents\LocalAgentBrowser runs, so nothing in the program's folder is touched.
 rem Used by the Start menu and desktop shortcuts: from the installer, or from a clone (tools\windows\make_shortcuts.ps1).
-title LocalAgentBrowser
+rem The window's title names the edition: Clean Room's build leaves out the region below, so its title keeps "Clean Room"
+set "LAB_TITLE=LocalAgentBrowser Clean Room"
+rem cloud:start
+set "LAB_TITLE=LocalAgentBrowser"
+rem cloud:end
+title %LAB_TITLE%
 rem The program folder, as a plain full path (no "..\.." in messages)
 for %%i in ("%~dp0..\..") do set "APP=%%~fi"
 rem The model chosen in setup

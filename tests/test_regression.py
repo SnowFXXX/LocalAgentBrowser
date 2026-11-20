@@ -78,7 +78,7 @@ class TestScoreRun:
         assert len(score["problems"]) == 3
 
     def test_unfinished_run_and_model_time(self):
-        console = "   (model call 60.0s, prompt=1 tok, completion=1 tok)\n   (model call 30.0s, ...)\n⏹️ TEST TIME LIMIT REACHED"
+        console = "   (model call 60.0s, prompt=1 tok, completion=1 tok)\n   (model call 30.0s, ...)\nTEST TIME LIMIT REACHED"
         score = rg.score_run(TASK, journal(None, "LibreOffice ..."), console)
         assert not score["finished"] and score["model_minutes"] == 1.5 and score["model_calls"] == 2
         assert score["problems"] == ["did not finish (time limit)"]
@@ -86,7 +86,7 @@ class TestScoreRun:
     def test_a_run_stopped_while_writing_the_final_result_is_not_a_finish(self):
         entries = journal("LibreOffice is best for documents [1].", "LibreOffice ...")
         entries[-1]["writing"] = True
-        score = rg.score_run(TASK, entries, "⏹️ TEST TIME LIMIT REACHED")
+        score = rg.score_run(TASK, entries, "TEST TIME LIMIT REACHED")
         assert not score["finished"]
 
     def test_named_source_and_missing_view(self):
@@ -638,10 +638,10 @@ def test_test_runs_never_move_windows(monkeypatch):
 
 class TestCoverageNotChecked:
     def test_items_whose_coverage_check_failed_are_counted_and_listed_as_a_problem(self):
-        console = ("⚠️ Coverage check of item 1 failed (Unterminated string); not checked (not counted as covered).\n"
+        console = ("Warning: Coverage check of item 1 failed (Unterminated string); not checked (not counted as covered).\n"
                    f"{ab.COVERAGE_RETRY_LINE}\n"
-                   "⚠️ Coverage check of item 3 failed (Unterminated string); not checked (not counted as covered).\n"
-                   "⚠️ Coverage check of item 3 failed (Unterminated string); not checked (not counted as covered).\n")
+                   "Warning: Coverage check of item 3 failed (Unterminated string); not checked (not counted as covered).\n"
+                   "Warning: Coverage check of item 3 failed (Unterminated string); not checked (not counted as covered).\n")
         score = rg.score_run(TASK, journal("LibreOffice [1].", "LibreOffice ..."), console)
         assert score["coverage_unchecked"] == 2 and score["coverage_retries"] == 1
         assert "2 checklist item(s) not checked (coverage reply failed)" in score["problems"]

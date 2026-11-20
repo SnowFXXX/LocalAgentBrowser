@@ -43,7 +43,7 @@ async def run_agent_turn(client, page, objective, journal, current_url, tried, p
             and conversation["followups"] < MAX_FOLLOWUPS
             and estimated_tokens < MAX_CONVERSATION_TOKENS):
         conversation["followups"] += 1
-        print(f"⚡ Continuing the conversation (follow-up {conversation['followups']}/{MAX_FOLLOWUPS}, ~{estimated_tokens} tokens)")
+        print(f"Continuing the conversation (follow-up {conversation['followups']}/{MAX_FOLLOWUPS}, ~{estimated_tokens} tokens)")
         messages = conversation["messages"] + [{"role": "user", "content": f"{note}{warning_prompt}\n\n{TURN_INSTRUCTIONS}"}]
     else:
         conversation.update(followups=0, shown_links=set())
@@ -55,7 +55,7 @@ async def run_agent_turn(client, page, objective, journal, current_url, tried, p
     return decision, refused
 
 async def build_full_prompt(page, objective, journal, current_url, tried, page_state, warning_prompt, shown_links=None):
-    print("🔍 Scraping and preparing current environment text layout...")
+    print("Scraping and preparing current environment text layout...")
     environment = await build_environment(page, current_url, page_state, {normalize_url(u) for u in tried["urls"]}, shown_links)
 
     # Shortened in the prompt (the full text is in the log and the report, and duplicates are checked against
@@ -165,10 +165,10 @@ async def request_decision(client, messages, journal, tried, page_state, current
             # start is a usable decision, which the checks below judge like any other
             action_decision = cut_decision(raw_content, is_search_page(current_url)) if was_cut_off(response) else None
             if action_decision:
-                print(f"✂️ The reply was cut off inside its parameter; going on with its start: [{action_decision['action']}] {action_decision['parameter'][:120]}")
+                print(f"The reply was cut off inside its parameter; going on with its start: [{action_decision['action']}] {action_decision['parameter'][:120]}")
             else:
                 json_failures += 1
-                print(f"⚠️ Model returned invalid JSON (attempt {json_failures}/{MAX_JSON_RETRIES}): {raw_content[:200]}")
+                print(f"Warning: Model returned invalid JSON (attempt {json_failures}/{MAX_JSON_RETRIES}): {raw_content[:200]}")
                 if json_failures >= MAX_JSON_RETRIES:
                     raise ValueError(f"No valid JSON decision after {MAX_JSON_RETRIES} attempts.") from parse_err
                 if was_cut_off(response):
@@ -191,7 +191,7 @@ async def request_decision(client, messages, journal, tried, page_state, current
             return action_decision, refused, messages + [{"role": "assistant", "content": original_content}], tokens
 
         refused.append({"action": action, "parameter": parameter, "journal_action": refusal[0], "reason": refusal[1]})
-        print(f"♻️ Cheap retry {len(refused)}/{MAX_CHEAP_RETRIES}: [{action}] refused. {refusal[1]}")
+        print(f"Cheap retry {len(refused)}/{MAX_CHEAP_RETRIES}: [{action}] refused. {refusal[1]}")
         correction = refusal_correction(action, refusal[1], page_state, current_url)
         if refusal[0].startswith("CONFIRM_"):
             # Not a true refusal: repeating the action is an allowed answer, so no "do not repeat" wording
@@ -325,13 +325,13 @@ def with_retries(client):
                 if wait is None:
                     raise
                 wait = retry_after(err) or wait
-                print(f"⏳ Rate limited by the model service ({err}). Waiting {wait:g} s before trying again.")
+                print(f"Rate limited by the model service ({err}). Waiting {wait:g} s before trying again.")
                 await asyncio.sleep(wait)
                 continue
             except NotFoundError as err:
                 if "temperature" in kwargs and not is_local_server() and re.search(r"requested parameters", str(err), re.I):
                     UNSUPPORTED_PARAMETERS.add("temperature")
-                    print(f"⚠️ No provider of '{MODEL}' takes a temperature setting; sending calls without it from now on "
+                    print(f"Warning: No provider of '{MODEL}' takes a temperature setting; sending calls without it from now on "
                           "(the model's own default is used).")
                     continue
                 raise
@@ -349,7 +349,7 @@ def with_retries(client):
                 if not is_local_server():
                     hint = "The provider may answer the next call."
                 # cloud:end
-                print(f"⚠️ The model server failed the call ({type(err).__name__}: {err}). Trying again in {wait} s; {hint}")
+                print(f"Warning: The model server failed the call ({type(err).__name__}: {err}). Trying again in {wait} s; {hint}")
                 await asyncio.sleep(wait)
                 continue
             # cloud:start
@@ -365,7 +365,7 @@ def with_retries(client):
 
 async def main():
     if not server_allowed():
-        print(f"❌ The model server {BASE_URL} is not on this PC or your local network, and this edition only uses one "
+        print(f"Error: The model server {BASE_URL} is not on this PC or your local network, and this edition only uses one "
               "that is. Set LMSTUDIO_BASE_URL to LM Studio's address (default http://localhost:1234/v1).")
         return
     # The client's own silent retries are off (its default retried a timed-out runaway reply twice); with_retries
@@ -382,11 +382,11 @@ async def main():
 
     # A person's run (not a test run): the console full size until the browser opens beside it
     windows.maximize_console()
-    print("🤖 ==================================================== 🤖")
-    print("🚀 Initializing Autonomous Discovery Agent Setup...")
-    objective = input("🎯 Define the Agent's High-Level Objective: ").strip()
+    print("=" * 56)
+    print("Initializing Autonomous Discovery Agent Setup...")
+    objective = input("Define the Agent's High-Level Objective: ").strip()
     if not objective:
-        print("⚠️ Objective cannot be empty.")
+        print("The objective cannot be empty.")
         return
 
     journal = []
@@ -396,9 +396,9 @@ async def main():
     tried = {"queries": [], "urls": [], "objective": objective}
     # The first model call reads the whole prompt with nothing cached yet: on a CPU it takes a minute or two, and a
     # silent console looked frozen to a first-time user
-    print("📋 Splitting the objective into a checklist... (the first step takes a minute or two on a CPU)")
+    print("Splitting the objective into a checklist... (the first step takes a minute or two on a CPU)")
     tried["checklist"] = await split_objective(client, objective)
-    print("📋 Objective checklist:\n" + checklist_lines(tried["checklist"]))
+    print("Objective checklist:\n" + checklist_lines(tried["checklist"]))
     page_state = {"url": None, "parts": [], "index": 0}
     conversation = new_conversation()
     loop_msg = None
@@ -421,7 +421,7 @@ async def main():
 
         try:
             while turn_counter <= max_turns:
-                print(f"\n🧠 [TURN {turn_counter}/{max_turns}] Active reasoning cycle executing...")
+                print(f"\n[TURN {turn_counter}/{max_turns}] Active reasoning cycle executing...")
                 tried["finish_confirmed"] = False  # The finish check runs once per turn
                 remember_install_lines(tried, page_state)
 
@@ -432,13 +432,13 @@ async def main():
                     parameter = str(decision.get("parameter", "")).strip()
                     loop_msg = None
                 except ValueError as parse_err:
-                    print(f"⚠️ {parse_err} Skipping turn.")
+                    print(f"Warning: {parse_err} Skipping turn.")
                     journal.append({"turn": turn_counter, "action": "INVALID_OUTPUT", "error": str(parse_err)})
                     turn_counter += 1
                     continue
                 except Exception as err:
-                    print(f"❌ The model call failed: {err}")
-                    print(f"💡 {failure_advice(err)}")
+                    print(f"Error: The model call failed: {err}")
+                    print(failure_advice(err))
                     stop_reason = f"the model call failed ({str(err)[:300]})"
                     break
 
@@ -448,15 +448,15 @@ async def main():
                     journal.append({"turn": turn_counter, "action": "REFUSED_IN_TURN", "requested": f"{r['action']} {r['parameter'][:120]}", "reason": r["reason"],
                                     "check": r["journal_action"]})
 
-                print(f"💡 Agent Thoughts: {thought}")
-                print(f"🎬 Chosen Action: [{action}] -> Parameter: {parameter}")
+                print(f"Agent Thoughts: {thought}")
+                print(f"Chosen Action: [{action}] -> Parameter: {parameter}")
 
                 refusal = check_decision(action, parameter, journal, tried, page_state, current_url, thought)
                 if not refusal and action == "FINISH":
                     refusal = await coverage_refusal(client, objective, tried, journal)
                 if refusal:
                     # Only reached once this turn's cheap retries are used up
-                    print(f"⚠️ Action refused: {refusal[1]}")
+                    print(f"Action refused: {refusal[1]}")
                     journal.append({"turn": turn_counter, "thought": thought, "action": refusal[0], "requested": parameter, "reason": refusal[1]})
                     loop_msg = f"Your {action} was refused. {refusal[1]}"
                     set_note(conversation, f"RESULT: Nothing changed. {where_you_are(page_state, current_url)}", current_url)
@@ -466,7 +466,7 @@ async def main():
                         conversation["messages"] = None
 
                 elif action == "FINISH":
-                    print("\n🎯 Agent has signaled mission complete. Writing the final result...")
+                    print("\nAgent has signaled mission complete. Writing the final result...")
                     # "writing" is cleared only once the final result is written: stopped during the checks before it
                     # (a 14B model ran into the test's time limit there), the report said "finished" over the model's
                     # unchecked FINISH text
@@ -475,7 +475,7 @@ async def main():
                     remember_install_lines(tried, page_state)
                     added = record_install_line(tried, journal, turn_counter)
                     if added:
-                        print(f"📝 Recorded by the code: the install command the page gives ({added['source']}): "
+                        print(f"Recorded by the code: the install command the page gives ({added['source']}): "
                               f"{added['extracted_data'][:120]}")
                     journal.append(finish_entry)
                     try:
@@ -487,13 +487,13 @@ async def main():
                         if final:
                             finish_entry.update(draft=parameter, finding=final)
                     except Exception as err:
-                        print(f"⚠️ Could not write the final result separately ({err}); keeping the agent's FINISH text.")
+                        print(f"Warning: Could not write the final result separately ({err}); keeping the agent's FINISH text.")
                     finish_entry.pop("writing", None)
                     break
 
                 elif action in ["SEARCH", "NAVIGATE"]:
                     target_url = determine_url(action, parameter)
-                    print(f"🌐 Driving Playwright to cross-domain target: {target_url}")
+                    print(f"Driving Playwright to cross-domain target: {target_url}")
                     try:
                         response = await load_page(page, target_url)
                         current_url = page.url
@@ -502,12 +502,12 @@ async def main():
                         if action == "SEARCH":
                             # The search engine sometimes returns an error page; reload once before giving up
                             if await count_search_results(page) == 0:
-                                print("⚠️ Search returned no results. Retrying once...")
+                                print("Search returned no results. Retrying once...")
                                 await asyncio.sleep(3)
                                 await load_page(page)
                                 current_url = page.url
                             if await count_search_results(page) == 0:
-                                print("❌ Search still returned no results.")
+                                print("Error: Search still returned no results.")
                                 journal.append({"turn": turn_counter, "thought": thought, "action": "FAILED_SEARCH", "requested": parameter,
                                                 "error": "No results (search engine error or no matches). This query may be tried again."})
                             else:
@@ -524,21 +524,21 @@ async def main():
                                 # went back to alternativeto.net six times after its first 403, each a lost turn
                                 mark_refusing(current_url, refused)
                                 mark_refusing(target_url, refused)
-                                print(f"⛔ {site_of(target_url)} refused the visit ({refused}); it is blocked for the rest of this run.")
+                                print(f"{site_of(target_url)} refused the visit ({refused}); it is blocked for the rest of this run.")
                                 journal.append({"turn": turn_counter, "thought": thought, "action": "FAILED_NAVIGATE", "requested": parameter,
                                                 "error": f"The site refused the visit ({refused}). It will refuse again, so "
                                                          f"{site_of(target_url)} is blocked for the rest of this run: use another site."})
                             elif status >= 400:
                                 # Often a guessed URL; reported as a failure so the model does not treat the
                                 # error page as content (and is not asked to record something from it)
-                                print(f"❌ The page returned HTTP {status}.")
+                                print(f"Error: The page returned HTTP {status}.")
                                 journal.append({"turn": turn_counter, "thought": thought, "action": "FAILED_NAVIGATE", "requested": parameter,
                                                 "error": f"The page returned HTTP {status} (for example 404: not found). "
                                                          "Use a link shown on a page or in search results instead of guessing URLs."})
                             else:
                                 journal.append({"turn": turn_counter, "thought": thought, "action": action, "requested": parameter, "destination": current_url})
                     except Exception as b_err:
-                        print(f"❌ Failed to reach target destination: {b_err}")
+                        print(f"Error: Failed to reach target destination: {b_err}")
                         if action == "NAVIGATE":
                             tried["urls"].append(target_url)
                         journal.append({"turn": turn_counter, "thought": thought, "action": f"FAILED_{action}", "requested": parameter, "error": str(b_err)})
@@ -563,14 +563,14 @@ async def main():
                     target = read_more_target(parameter, page_state)
                     page_state["index"] = target
                     page_state.setdefault("seen_parts", {0}).add(target)
-                    print(f"📖 Showing part {target + 1} of {len(page_state['parts'])} of the current page.")
+                    print(f"Showing part {target + 1} of {len(page_state['parts'])} of the current page.")
                     journal.append({"turn": turn_counter, "thought": thought, "action": "READ_MORE", "part": f"{target + 1} of {len(page_state['parts'])}"})
                     set_note(conversation, f"RESULT: READ_MORE done. {where_you_are(page_state, current_url)} "
                                            f"The CURRENT ENVIRONMENT now shows:\n{render_part(page_state)}\n"
                                            f"The links listed earlier for this page still apply.", current_url)
 
                 elif action == "DISCOVER":
-                    print(f"📝 Logging critical discovery element: {parameter}")
+                    print(f"Logging critical discovery element: {parameter}")
                     number = sum(1 for e in journal if e.get("action") == "DISCOVER") + 1
                     linked = link_discovery(tried["checklist"], decision.get("checklist_items"), number)
                     # Recorded with its section's heading when the copied text does not name it (the heading is page
@@ -600,7 +600,7 @@ async def main():
                 if last_entry.startswith(("BLOCKED_", "UNKNOWN_")) or last_entry == "DUPLICATE_DISCOVER":
                     consecutive_refusals += 1
                     if consecutive_refusals >= 2:
-                        print(f"⚠️ {consecutive_refusals} refused actions in a row. Escalating loop warning.")
+                        print(f"{consecutive_refusals} refused actions in a row. Escalating loop warning.")
                         loop_msg = escalation_message(consecutive_refusals, action, journal[-1].get("reason", ""), page_state, current_url)
                 else:
                     consecutive_refusals = 0
@@ -614,7 +614,7 @@ async def main():
                 # Fires every STALL_TURNS stalled turns rather than every turn: repeated each turn it crowded out
                 # the current page and pushed the model to navigate away without reading what was in front of it
                 if turns_without_discovery and turns_without_discovery % STALL_TURNS == 0:
-                    print(f"⚠️ No new discoveries in {turns_without_discovery} turns. Adding progress check.")
+                    print(f"No new discoveries in {turns_without_discovery} turns. Adding progress check.")
                     progress = (f"PROGRESS CHECK: no new discoveries in the last {turns_without_discovery} turns."
                                 f"{numbered_discoveries(journal)} {READ_FIRST} "
                                 f"Then {check_parts(tried)} If every part is covered, choose FINISH with {FINAL_RESULT} in the "
@@ -629,7 +629,7 @@ async def main():
                     if turns_since_objective_check >= OBJECTIVE_CHECK_EVERY:
                         turns_since_objective_check = 0
                         count = sum(1 for e in journal if e.get("action") == "DISCOVER")
-                        print(f"🧭 Objective check after {turn_counter} turns ({count} discoveries).")
+                        print(f"Objective check after {turn_counter} turns ({count} discoveries).")
                         check = (f"OBJECTIVE CHECK: you have recorded {count} discoveries in {turn_counter} turns."
                                  f"{numbered_discoveries(journal)} "
                              f"{source_note(journal)} {READ_FIRST} "
@@ -643,14 +643,14 @@ async def main():
                 write_report(objective, journal, tried.get("checklist"))
 
                 turn_counter += 1
-                print("\n⏱️ Cycle pacing check complete. Refreshing navigation loop pipeline...")
+                print("\nCycle pacing check complete. Refreshing navigation loop pipeline...")
                 await asyncio.sleep(TURN_PAUSE_SECONDS)
         finally:
             # Always saved, however the run ends: FINISH, the turn limit, Ctrl+C or an outside time limit
             write_research_log(objective, journal, tried.get("checklist"))
             write_report(objective, journal, tried.get("checklist"), stop_reason)
 
-        print(f"\n🔒 Shutting down browser instance. Report: {REPORT_FILE}; full journal: research_log.txt.")
+        print(f"\nShutting down browser instance. Report: {REPORT_FILE}; full journal: research_log.txt.")
         await browser.close()
 
 def run():
@@ -658,4 +658,4 @@ def run():
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n⏹️ Stopped. Findings so far are in research_log.txt.")
+        print("\nStopped. Findings so far are in research_log.txt.")

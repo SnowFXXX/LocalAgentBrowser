@@ -24,7 +24,7 @@ async def split_objective(client, objective):
         parts = json.loads(extract_message_content(response)).get("parts")
         items = [shorten(p, MAX_CHECKLIST_ITEM_CHARS) for p in parts if isinstance(p, str) and p.strip()] if isinstance(parts, list) else []
     except Exception as err:  # A malformed reply or a server problem: the run still works with one item
-        print(f"⚠️ Could not split the objective into a checklist ({err}); using the whole objective.")
+        print(f"Warning: Could not split the objective into a checklist ({err}); using the whole objective.")
         items = []
     return [{"text": text, "discoveries": []} for text in items[:MAX_CHECKLIST_ITEMS]] or [{"text": objective, "discoveries": []}]
 
