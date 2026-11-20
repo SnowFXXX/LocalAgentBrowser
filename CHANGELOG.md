@@ -38,6 +38,10 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
   Phi-4's SimpleQA result gave a judge's tenure "from 12 July 1985 until his retirement on 20 December 1986 [1]" and
   then listed the start and end dates as not found. A cited sentence with most of the item's words, that does not
   itself say something was not found, counts as the answer: 14 of 69 such lines in the saved results.
+- **The model's recommendation is labelled "My view:" in more of the ways it heads it**: a numbered heading ("#### 4.
+  Recommendation ...", Phi-4 on 1.66), and a list under the heading with the advice in a paragraph after it (Phi-4 on
+  1.67). A paragraph already starting "My view:" under such a heading no longer becomes "My view: My view:" (11 of
+  the saved results would have). On the saved results, 7 more recommendations are labelled, each the advice itself.
 - **"10 mins" in a finding is the same time as "10 minutes" in the result** (also "hrs", "wks", "yrs"). Opus 5.5's
   cold brew result had its right "10 minutes" cut, from a recipe card's "Prep Time: 10 mins".
 - **A number given with another unit than its discovery's is checked like an invented one** (temperature, length,

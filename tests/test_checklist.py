@@ -917,6 +917,16 @@ def test_a_recommendation_section_is_labelled_as_the_models_view():
     assert with_view_labelled(text) == "#### Features\n- Small [1]\n\nMy view: PostgreSQL is recommended.\n"
     assert with_view_labelled("### Recommendation\n- **PostgreSQL**: best") == "### Recommendation\n- **PostgreSQL**: best"
     assert with_view_labelled("No heading here.") == "No heading here."
+    # Numbered (Phi-4, 1.66), and a list first with the advice after it (Phi-4, 1.67)
+    assert with_view_labelled("#### 4. Recommendation for a Hobby Project\n\nSQLite is recommended [3].") == \
+        "My view: SQLite is recommended [3]."
+    listed = ("### Recommendation for a Hobby Project\n- **SQLite**: simple [3].\n- **PostgreSQL**: scales [1].\n\n"
+              "Given the requirements, **PostgreSQL** is recommended [1, 3].\n\n## Next\nOther text.")
+    assert with_view_labelled(listed) == listed.replace("Given the", "My view: Given the")
+    # Not a paragraph past the section's end, nor one already labelled
+    assert with_view_labelled("### Recommendation\n- a\n- b\n\n## Next\nOther text.") == "### Recommendation\n- a\n- b\n\n## Next\nOther text."
+    labelled = "### Recommendation\n- a\n\nMy view: b."
+    assert with_view_labelled(labelled) == labelled
 
 
 def test_a_time_needs_the_same_number_given_as_a_time():

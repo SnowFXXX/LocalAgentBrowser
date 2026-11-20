@@ -859,20 +859,36 @@ FILLED_GAP = re.compile(r"((?:not (?:\w+ )?(?:been )?(?:specified|mentioned|stat
                         r"(?:specify|say|mention|state))[^.\n]{0,100}?),?\s+but\b[^\n]*?(?:\.(?=\s+[A-Z]|\s*$)|(?=\n)|$)",
                         re.I)  # The sentence ends at a period before a capital or the end ("e.g., 1 cup" stays inside it)
 
-VIEW_HEADING = re.compile(r"^[ \t]*#+[ \t]*[*_]*[ \t]*(?:my\s+)?(?:recommendation|opinion|view|verdict|conclusion)\b[^\n]*\n+",
-                          re.I | re.M)
+# Numbered too: Phi-4's 1.66 comparison headed its advice "#### 4. Recommendation for a Hobby Project ..."
+VIEW_HEADING = re.compile(r"^[ \t]*#+[ \t]*[*_]*[ \t]*(?:\d+[.)][ \t]*)?(?:my\s+)?(?:recommendation|opinion|view|verdict|"
+                          r"conclusion)\b[^\n]*\n+", re.I | re.M)
+LIST_OR_TABLE = re.compile(r"\s*(?:[-*|#]|\d+[.)]\s)")
 
 def with_view_labelled(text):
     """The result with a section headed as a recommendation or opinion labelled 'My view:' in place of its heading:
     a comparison put "### Recommendation for a Hobby Project" ahead of its uncited advice, and the view paragraph
-    then asked for repeated it and was left out, so the advice stayed unlabelled as the model's own."""
+    then asked for repeated it and was left out, so the advice stayed unlabelled as the model's own. When the
+    heading opens a list, the section's first plain paragraph after it is the view: Phi-4's 1.67 comparison listed
+    both databases and then wrote "Given the requirements ..., PostgreSQL is recommended" under no label."""
     heading = VIEW_HEADING.search(str(text))
     if not heading:
         return text
     rest = text[heading.end():]
-    if not rest.strip() or rest.lstrip().startswith(("#", "-", "*", "|")):
+    if not rest.strip():
         return text
-    return text[:heading.start()] + "My view: " + rest.lstrip()
+    if not LIST_OR_TABLE.match(rest):
+        # A paragraph already labelled keeps its own label ("My view: My view: ..." in five 1.63 results)
+        body = rest.lstrip()
+        return text[:heading.start()] + ("" if re.match(r"\W*my view\b", body, re.I) else "My view: ") + body
+    if re.search(r"(?im)^\W*my view\b", rest):
+        return text
+    section_end = re.search(r"(?m)^[ \t]*#", rest)
+    section = rest[:section_end.start()] if section_end else rest
+    for block in re.finditer(r"[^\n]+(?:\n[^\n]+)*", section):
+        if block.group().strip() and not LIST_OR_TABLE.match(block.group()):
+            at = heading.end() + block.start() + len(block.group()) - len(block.group().lstrip())
+            return text[:at] + "My view: " + text[at:]
+    return text
 
 def without_filled_gaps(text):
     """The final result with what follows "not stated ..., but" cut: the gap stays reported, the filling goes."""
