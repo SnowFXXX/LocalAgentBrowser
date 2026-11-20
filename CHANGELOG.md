@@ -62,6 +62,11 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
 - **A number in underscore emphasis is read whole**: Nemotron 3 Super's "_5,895 m_ (_19,341 ft_)" was read as "895"
   and "9,341", and both right heights were cut as invented. On the 894 saved final results, none is flagged
   differently.
+- **A JSON reply wrapped in a code fence is read** ("```json ... ```"): MiniMax M2.7 wrapped every reply so, its
+  checklist split could not be read, and its final result was cut to nothing. A fence around anything else is kept.
+- **A numbered list written on one line keeps its item numbers**: Gemini 3.8 Flash's "... [1]. 2. Height in
+  meters: ..." had its "2" and "3" cut as invented numbers. On the 929 saved final results, none is flagged
+  differently.
 - **Cloud: a model whose only provider takes JSON but not a JSON schema is asked for plain JSON** (Qwen3.7 Flash),
   which the agent reads the same way. Its live task finished in the compatibility test.
 - **A reply cut off at the length limit no longer ends the task on models whose chat template needs alternating
