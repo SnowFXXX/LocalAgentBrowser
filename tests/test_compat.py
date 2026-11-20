@@ -13,21 +13,35 @@ compat = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(compat)
 
 
-def check(name, passed):
-    return {"check": name, "passed": passed, "optional": name in compat.OPTIONAL}
+def check(name, passed, detail="", error=False):
+    return {"check": name, "passed": passed, "detail": detail, "error": error}
 
 
 class TestVerdict:
     def test_every_check_passed_is_compatible(self):
         assert compat.verdict([check("split", True), check("discover", True), check("live task", True)]) == "compatible"
 
-    def test_only_checks_the_agent_goes_on_without_failed_is_compatible_with_limits(self):
-        assert compat.verdict([check("split", False), check("view", False), check("discover", True)]) == \
-            "compatible, with limits (split, view failed)"
+    def test_a_quick_check_chosen_differently_with_the_live_task_passed_is_compatible_with_limits(self):
+        # Mistral Small went straight to FINISH on the page shown, then finished the live task
+        assert compat.verdict([check("split", False), check("discover", False, "[FINISH] Kilimanjaro; not a DISCOVER"),
+                               check("live task", True)]) == "compatible, with limits (split, discover failed)"
 
-    def test_a_check_the_agent_needs_failed_is_not_compatible_and_named(self):
-        assert compat.verdict([check("split", False), check("discover", False), check("live task", True)]) == \
+    def test_an_error_is_not_compatible_and_named(self):
+        assert compat.verdict([check("split", True), check("discover", False, "NoReply: no reply", error=True)]) == \
             "not compatible (discover failed)"
+
+    def test_the_live_task_failed_is_not_compatible(self):
+        assert compat.verdict([check("view", False), check("live task", False, "did not finish")]) == \
+            "not compatible (live task failed)"
+
+    def test_hard_failures_are_errors_invalid_json_no_result_and_a_refused_retry(self):
+        assert compat.is_hard(check("discover", False, "ValueError: x", error=True))
+        assert compat.is_hard(check("search page", False, "No valid JSON in the reply"))
+        assert compat.is_hard(check("final result", False, "The model did not ... (no result, no citation)"))
+        assert compat.is_hard(check("cut-off retry", False, "BadRequestError: roles must alternate"))
+        assert not compat.is_hard(check("final result", False, "Kilimanjaro is 5,895 m [1] (a height missing)"))
+        assert not compat.is_hard(check("discover", False, "[FINISH] ...; not a DISCOVER"))
+        assert not compat.is_hard(check("cut-off retry", True))
 
 
 def test_the_summary_lists_each_model_with_its_checks_live_task_and_cost():
@@ -59,6 +73,23 @@ def test_the_final_result_check_wants_both_heights_cited_and_none_cut():
     client, _ = fake_client([missing])
     ok, detail = asyncio.run(compat.check_result(client, [{"text": "the height", "discoveries": [1]}]))
     assert not ok and "a height missing" in detail
+
+
+def test_the_live_task_passes_on_a_cited_result_and_notes_what_it_lacks(tmp_path, monkeypatch):
+    found = {"turn": 2, "action": "DISCOVER", "source": compat.PAGE_URL, "extracted_data": compat.FOUND}
+
+    def live(result):
+        journal = [found, {"turn": 3, "action": "FINISH", "finding": result}]
+        monkeypatch.setattr(compat.rg, "run_task", lambda *args: None)
+        monkeypatch.setattr(compat.rg, "load_run", lambda folder: ("", journal, "", None))
+        return compat.live_task(str(tmp_path), 1, "model")
+    # GPT-5.4 nano named the summit cone: the model's answer, a note, not a failure of the agent with the model
+    kibo = live("Kibo is the highest peak, at 5,895 m [1].")
+    assert kibo["passed"] and "result lacks" in kibo["detail"]
+    assert live("Kilimanjaro is 5,895 m (19,341 ft) high [1].")["detail"] == "finished with both heights, cited"
+    uncited = live("Kilimanjaro is 5,895 m (19,341 ft) high.")
+    assert not uncited["passed"] and uncited["detail"].startswith("no citation")
+    assert not live(compat.ab.NO_RESULT + "\n\n[1] " + compat.FOUND)["passed"]
 
 
 def test_a_model_list_skips_comments_and_blank_lines(tmp_path, monkeypatch):

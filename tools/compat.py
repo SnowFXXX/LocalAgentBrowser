@@ -15,9 +15,11 @@ Each model is tested in a process of its own, with the agent's own code, in two 
    accept every request).
 2. One live task with the browser: the regression suite's factual task (Mount Kilimanjaro's height in metres and feet).
 
-The result is "compatible" when every check passes and the live task finishes with both heights; "compatible, with
-limits" when only the checklist split, the coverage check or the view failed (the agent goes on without them); and
-otherwise "not compatible", with the failing check named. Results go to LAB_COMPAT_DIR (default
+Only a hard failure ends the test before the live task: an error, a reply with no valid JSON, no final result, or a
+refused retry. The result is "compatible" when every check passes and the live task finishes with a cited result of
+the model's own; "compatible, with limits" when the live task passes but a quick check failed (it is named: the agent
+works, with that step weaker); and "not compatible" when a hard failure happened or the live task did not pass, with
+that named. What the live result says (a height missing) is a note in its detail, not a failure. Results go to LAB_COMPAT_DIR (default
 C:\\LocalAgentBrowser-compat-runs), a new folder per test run: summary.md and results.json for the list, and a folder
 per model with its result.json, console.txt and the live task's run.
 """
@@ -51,8 +53,8 @@ RESULTS_DIR = os.environ.get("LAB_COMPAT_DIR", r"C:\LocalAgentBrowser-compat-run
 LMS = next((p for p in (os.path.expanduser(r"~\.lmstudio\bin\lms.exe"), shutil.which("lms") or "") if p and os.path.exists(p)), "lms")
 LMS_MODELS = os.path.expanduser(r"~\.lmstudio\models")
 LIVE_MINUTES = 30
-OPTIONAL = ("split", "coverage", "view")  # The agent goes on without these when they fail
 CUT_OFF_TOKENS = 40  # The forced cut-off check's reply limit
+REMOTE_CALL_SECONDS = 300  # Longest wait for one quick-check call to a server that is not on this PC
 
 # The fixed task every model gets: the regression suite's factual question, on a page that answers it
 OBJECTIVE = "What is the tallest mountain in Africa? Give its height in meters and in feet."
@@ -208,19 +210,19 @@ async def quick_checks(counted):
     client, results = counted.client, []
 
     async def run(name, check):
-        calls, started = counted.calls, time.time()
+        calls, started, error = counted.calls, time.time(), False
         try:
             ok, detail = await check
         except Exception as err:  # A failed check is a result, not the end of the test
-            ok, detail = False, f"{type(err).__name__}: {str(err)[:300]}"
-        results.append({"check": name, "passed": ok, "optional": name in OPTIONAL, "detail": detail,
+            ok, detail, error = False, f"{type(err).__name__}: {str(err)[:300]}", True
+        results.append({"check": name, "passed": ok, "detail": detail, "error": error,
                         "calls": counted.calls - calls, "seconds": round(time.time() - started, 1)})
         print(f"   {'PASS' if ok else 'FAIL'} {name}: {detail}", flush=True)
 
     started = time.time()
     checklist = await ab.split_objective(client, OBJECTIVE)
     texts = [i["text"] for i in checklist]
-    results.append({"check": "split", "passed": texts != [OBJECTIVE], "optional": True, "calls": counted.calls,
+    results.append({"check": "split", "passed": texts != [OBJECTIVE], "calls": counted.calls,
                     "seconds": round(time.time() - started, 1),
                     "detail": f"{len(texts)} item(s): " + " | ".join(t[:80] for t in texts)})
     print(f"   {'PASS' if results[0]['passed'] else 'FAIL'} split: {results[0]['detail']}", flush=True)
@@ -239,27 +241,47 @@ def live_task(folder, minutes, model):
     rg.run_task(task, folder, minutes, model)
     _, journal, console, checklist = rg.load_run(folder)
     score = rg.score_run(task, journal, console, checklist)
-    passed = bool(score["finished"] and not score["missing"])
-    return {"check": "live task", "passed": passed, "optional": False, "minutes": minutes,
-            "detail": "; ".join(score["problems"]) or "finished with both heights",
+    result = next((str(e.get("finding", "")) for e in reversed(journal)
+                   if e.get("action") == "FINISH" and not e.get("writing")), "")
+    # Compatible means the agent works with the model: it finished with a result of its own, cited. What the result
+    # says (a height missing, a peak named instead of the mountain) is the model's answer, kept as a note
+    why = ("did not finish" if not score["finished"] else "no result written" if result.startswith(ab.NO_RESULT)
+           else "no citation" if not rg.cited_numbers(result) else "")
+    return {"check": "live task", "passed": not why, "minutes": minutes,
+            "detail": "; ".join(([why] if why and why != "did not finish" else []) + score["problems"])
+            or "finished with both heights, cited",
             "model_minutes": score["model_minutes"], "model_calls": score["model_calls"]}
 
 
+def is_hard(result):
+    """A failure that means the model or its server does not work with the agent: an error, no valid JSON, no final
+    result, or a retry refused. These end the test before the live task; a model that only chose differently in a
+    quick check (a FINISH where the check expected a DISCOVER) still gets the live task, which decides."""
+    detail = str(result.get("detail", ""))
+    return not result["passed"] and (result.get("error") or "No valid JSON" in detail
+                                     or result["check"] == "cut-off retry"
+                                     or (result["check"] == "final result" and "(no result" in detail))
+
+
 def verdict(results):
-    failed = [r["check"] for r in results if not r["passed"]]
+    failed = [r for r in results if not r["passed"]]
     if not failed:
         return "compatible"
-    if all(r["optional"] for r in results if not r["passed"]):
-        return "compatible, with limits (" + ", ".join(failed) + " failed)"
-    return "not compatible (" + ", ".join(f for f in failed if f not in OPTIONAL) + " failed)"
+    hard = [r["check"] for r in failed if is_hard(r) or r["check"] == "live task"]
+    if hard:
+        return "not compatible (" + ", ".join(hard) + " failed)"
+    return "compatible, with limits (" + ", ".join(r["check"] for r in failed) + " failed)"
 
 
 def test_one(model, folder, live, minutes):
     """Runs in its own process, with LMSTUDIO_MODEL and the server's settings set before the agent was imported."""
     os.makedirs(folder, exist_ok=True)
     started = time.time()
+    # A server not on this PC answers a quick check within minutes, or is hung: LFM 2.5's test waited 45 minutes with
+    # nothing spent. On this PC a big model on a slow CPU may need the agent's full wait
+    timeout = ab.MODEL_TIMEOUT_SECONDS if agent.is_local_server() else REMOTE_CALL_SECONDS
     counted = Counted(ab.with_retries(ab.AsyncOpenAI(base_url=ab.BASE_URL, api_key=ab.API_KEY, max_retries=0,
-                                                     timeout=ab.MODEL_TIMEOUT_SECONDS,
+                                                     timeout=timeout,
                                                      # cloud:start
                                                      default_headers=ab.EXTRA_HEADERS or None,
                                                      # cloud:end
@@ -272,7 +294,7 @@ def test_one(model, folder, live, minutes):
     # cloud:end
     quick = {"calls": counted.calls, "prompt_tokens": counted.prompt_tokens, "completion_tokens": counted.completion_tokens,
              "minutes": round((time.time() - started) / 60, 1)}
-    if live and all(r["passed"] or r["optional"] for r in results):
+    if live and not any(is_hard(r) for r in results):
         print(f"Live task ({minutes:g} minutes at most):", flush=True)
         results.append(live_task(os.path.join(folder, "factual"), minutes, model))
         print(f"   {'PASS' if results[-1]['passed'] else 'FAIL'} live task: {results[-1]['detail']}", flush=True)
@@ -334,6 +356,21 @@ def cloud_spent():
     request = urllib.request.Request(CLOUD_KEY_URL, headers={"Authorization": f"Bearer {os.environ['OPENROUTER_API_KEY']}"})
     with urllib.request.urlopen(request, timeout=30) as response:
         return float(json.load(response)["data"]["usage"])
+
+
+def settled_spent(wait=10, most=90):
+    """The key's spending once OpenRouter has added the last calls: it adds each call's cost some time after it, and in
+    the first run a figure read 15 seconds after a model's last call missed some of its cost, counted to the next
+    model. Read until two readings `wait` seconds apart agree, for `most` seconds at most."""
+    last, waited = cloud_spent(), 0
+    while waited < most:
+        time.sleep(wait)
+        waited += wait
+        now = cloud_spent()
+        if now == last:
+            return now
+        last = now
+    return last
 
 
 def cloud_estimates():
@@ -403,6 +440,7 @@ def run_list(models, args):
                 for text in process.stdout:
                     print(text, end="", flush=True)
                     console.write(text)
+                    console.flush()  # The log can be watched while the model is tested
                 process.wait()
             result_file = os.path.join(out, "result.json")
             if os.path.exists(result_file):
@@ -412,8 +450,7 @@ def run_list(models, args):
                 row["verdict"] = "not compatible (the test stopped: see console.txt)"
             # cloud:start
             if args.cloud:
-                time.sleep(15)  # OpenRouter adds a call's cost to the key's usage a few seconds after it
-                row["cost"] = round(cloud_spent() - spent_before, 5)
+                row["cost"] = round(settled_spent() - spent_before, 5)
                 row["estimate"] = round(estimates.get(model, 0), 4)
                 print(f"Cost: ${row['cost']:.4f} (estimate ${row['estimate']:.4f})", flush=True)
             # cloud:end
