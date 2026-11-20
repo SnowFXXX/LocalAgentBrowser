@@ -125,6 +125,29 @@ def test_after_two_checks_the_server_failed_the_rest_are_not_run():
     assert down.calls == 3  # the split, then one call per failed check
 
 
+def test_a_listed_download_already_on_the_pc_is_tested_and_kept(monkeypatch, tmp_path):
+    on_pc = {"qwen3.5-9b": {"modelKey": "qwen3.5-9b", "path": "lmstudio-community/Qwen3.5-9B-GGUF/Qwen3.5-9B-Q4_K_M.gguf"}}
+    downloads = []
+    monkeypatch.setattr(compat, "local_models", lambda: on_pc)
+    monkeypatch.setattr(compat, "lms", lambda *args, **kwargs: downloads.append(args))
+    line = "https://huggingface.co/lmstudio-community/Qwen3.5-9B-GGUF@Q4_K_M"
+    assert compat.prepare_local(line) == ("qwen3.5-9b", None)  # nothing to delete after the test
+    assert downloads == []
+    # One not on the PC is downloaded, and its folder is the one deleted after the test
+    folder = tmp_path / "lmstudio-community" / "Gemma-GGUF"
+    folder.mkdir(parents=True)
+    monkeypatch.setattr(compat, "LMS_MODELS", str(tmp_path))
+    got = {}
+
+    def lms(*args, **kwargs):
+        got["gemma"] = {"modelKey": "gemma", "path": "lmstudio-community/Gemma-GGUF/gemma.gguf"}
+        return types.SimpleNamespace(returncode=0, stdout="", stderr="")
+    monkeypatch.setattr(compat, "local_models", lambda: got)
+    monkeypatch.setattr(compat, "lms", lms)
+    assert compat.prepare_local("https://huggingface.co/lmstudio-community/Gemma-GGUF@Q4_K_M") == \
+        ("gemma", os.path.realpath(folder))
+
+
 # cloud:start
 def test_one_model_stops_the_list_only_when_far_over_its_estimate_and_a_real_share_of_the_budget():
     assert not compat.overran(0.0145, 0.0069, 2.5)  # Granite 4.2 8B: 2.1 times, but $0.0145

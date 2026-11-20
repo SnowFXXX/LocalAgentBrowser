@@ -361,11 +361,12 @@ def prepare_local(line):
 
     def found():
         return [m for m in local_models().values() if m["path"].replace("\\", "/").lower().startswith(repo.lower())]
-    if not found():
-        print(f"Downloading {line} ...", flush=True)
-        done = lms("get", line, "-y", timeout=4 * 3600)
-        if done.returncode != 0 or not found():
-            raise RuntimeError(f"download failed: {(done.stdout + done.stderr)[-300:]}")
+    if found():  # Already on the PC: tested and kept
+        return found()[0]["modelKey"], None
+    print(f"Downloading {line} ...", flush=True)
+    done = lms("get", line, "-y", timeout=4 * 3600)
+    if done.returncode != 0 or not found():
+        raise RuntimeError(f"download failed: {(done.stdout + done.stderr)[-300:]}")
     folder = os.path.realpath(os.path.join(LMS_MODELS, *repo.split("/")))
     if not folder.startswith(os.path.realpath(LMS_MODELS) + os.sep) or not os.path.isdir(folder):
         raise RuntimeError(f"unexpected model folder {folder}")
