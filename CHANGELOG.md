@@ -38,6 +38,9 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
   Phi-4's SimpleQA result gave a judge's tenure "from 12 July 1985 until his retirement on 20 December 1986 [1]" and
   then listed the start and end dates as not found. A cited sentence with most of the item's words, that does not
   itself say something was not found, counts as the answer: 14 of 69 such lines in the saved results.
+- **A result that opens with one of the objective's own sentences has it left out**, as a question or a heading,
+  with a citation stuck to it: Gemma 3 4B's cold brew results began "How do I make cold brew coffee at home? [2]".
+  Kept when nothing of substance follows. 8 of 972 saved results change.
 - **The model's recommendation is labelled "My view:" in more of the ways it heads it**: a numbered heading ("#### 4.
   Recommendation ...", Phi-4 on 1.66), and a list under the heading with the advice in a paragraph after it (Phi-4 on
   1.67). A paragraph already starting "My view:" under such a heading no longer becomes "My view: My view:" (11 of

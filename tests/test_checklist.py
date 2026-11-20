@@ -593,6 +593,19 @@ class TestUnfinishedResults:
         assert ab.without_echoed_objective("Explain it.\n\nIt works [1].", "explain  it") == "It works [1]."
         assert ab.without_echoed_objective("Explain it.", "Explain it.") == "Explain it."
 
+    def test_an_opening_sentence_of_the_objective_is_left_out(self):
+        goal = "How do I make cold brew coffee at home? List what I need with the quantities."
+        # Gemma's cold brew results: the objective's question first, a citation stuck to it
+        assert ab.without_echoed_objective("How do I make cold brew coffee at home? [2] The steps: grind the coffee "
+                                           "coarsely [2].", goal) == "The steps: grind the coffee coarsely [2]."
+        assert ab.without_echoed_objective("# How do I make cold brew coffee at home?\nGrind the coffee coarsely and "
+                                           "steep it [1].", goal) == "Grind the coffee coarsely and steep it [1]."
+        # Nothing of substance after it: left as it is; another opening question is not the objective's
+        assert ab.without_echoed_objective("How do I make cold brew coffee at home? [1]", goal) == \
+            "How do I make cold brew coffee at home? [1]"
+        other = "Why cold brew? It is smoother and keeps longer in the fridge [1]."
+        assert ab.without_echoed_objective(other, goal) == other
+
     def test_an_unfinished_result_is_written_again(self):
         client, model = fake_client([self.CUT, "It takes in water and gives out glucose [1]."])
         text = asyncio.run(ab.compose_final_result(client, "objective", discoveries("x")))

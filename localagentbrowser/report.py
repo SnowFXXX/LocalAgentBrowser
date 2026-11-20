@@ -1081,7 +1081,24 @@ def without_echoed_objective(text, objective):
     line = " ".join(first.split())
     if goal and line.lower().startswith(goal.lower()) and len(line) > len(goal) + 40:
         return (line[len(goal):].lstrip(" .:?") + ("\n" + rest if rest.strip() else "")).strip()
+    # One sentence of the objective as the opening, as a question or a heading, with a citation stuck to it: Gemma's
+    # cold brew results began "How do I make cold brew coffee at home? [2]" (7 of 972 saved results did so)
+    asked = {echo_words(s) for s in re.split(r"(?<=[.!?])\s+", str(objective)) if s.strip()}
+    lead = ECHOED_SENTENCE.match(str(text))
+    if lead and echo_words(lead.group("sentence")) in asked - {""}:
+        after = str(text)[lead.end():].strip()
+        if len(after) >= MIN_ANSWER_AFTER_ECHO:
+            return after
     return text
+
+# A result's first sentence (up to ".", "!" or "?" before a space, or the line's end), a heading mark before it and a
+# citation after it
+ECHOED_SENTENCE = re.compile(r"\s*(?:#+[ \t]*)?(?P<sentence>[^\n]*?[.!?](?=\s|$)|[^\n]+)"
+                             r"(?:[ \t]*\[\d+(?:\s*[-–,;]\s*\d+)*\])?")
+MIN_ANSWER_AFTER_ECHO = 20  # Less is no answer: SimpleQA's "What EP did Rosalía release in 2019? [1]" stays as it was
+
+def echo_words(sentence):
+    return " ".join(re.sub(r"[*_#]", " ", str(sentence)).lower().split()).strip(" .:?")
 
 # "X is not specified", "X was not found": the result saying the discoveries lack something
 # "These reactions do not specify a particular location" slipped past the passive form only
