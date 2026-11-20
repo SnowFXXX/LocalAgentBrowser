@@ -90,7 +90,10 @@ TASKS = [
     {"id": "docs", "kind": "Documentation research", "core": True,
      "objective": "Using the official Python documentation, find out how to create a virtual environment with venv, how "
                   "to activate it on Windows and on macOS or Linux, and how to install packages into it.",
-     "expect": [["python -m venv", "python3 -m venv", "py -m venv"], ["activate"], ["pip install"]],
+     # The Windows command too: "activate" alone was met by the macOS and Linux one, and 25 of 55 saved results gave
+     # no Windows command (issue #11's first case)
+     "expect": [["python -m venv", "python3 -m venv", "py -m venv"], ["activate"], ["pip install"],
+                ["scripts\\activate", "scripts/activate", "activate.bat", "activate.ps1"]],
      "source": r"(^|\.)python\.org$"},
     {"id": "docs-strict", "kind": "Documentation research", "core": False,
      "objective": "Locate, analyze, and map out the exact implementation guidelines, parameter schemas, and terminal setup "
@@ -152,7 +155,8 @@ def honesty(score):
     return {"said not found": len(score["gap_statements"]), "caveats": score["caveats"],
             "outside knowledge": len(score["outside_knowledge"]), "numbers not in discoveries": len(score["unverified_numbers"]),
             "commands not in discoveries": len(score.get("unverified_code", [])),
-            "uncited lines": len(score["uncited_lines"]), "cites missing discoveries": len(score["bad_citations"])}
+            "uncited lines": len(score["uncited_lines"]), "cites missing discoveries": len(score["bad_citations"]),
+            "left out without a word": len(score.get("silent_omissions", []))}
 
 
 def cited_numbers(text):
@@ -279,6 +283,7 @@ def score_run(task, journal, console="", checklist=None):
         score["off_source_discoveries"] = len(off)
     score["view_missing"] = bool(finish and ab.OPINION_REQUEST.search(task["objective"]) and "my view:" not in low)
     score["steps_missing"] = bool(finish and ab.steps_missing(task["objective"], result))
+    score["silent_omissions"] = silent_omissions(task, result, found) if finish else []
 
     problems = []
     if not finish:
@@ -286,6 +291,9 @@ def score_run(task, journal, console="", checklist=None):
     else:
         if score["missing"]:
             problems.append("result lacks " + ", ".join(score["missing"]))
+        if score["silent_omissions"]:
+            problems.append("left out without a word: " + ", ".join(
+                f"{s['words']} ({'a discovery had it' if s['dropped'] else 'never found'})" for s in score["silent_omissions"]))
         if score["forbidden"]:
             problems.append("condition missed: " + ", ".join(score["forbidden"]))
         if score["view_missing"]:
@@ -308,6 +316,31 @@ def score_run(task, journal, console="", checklist=None):
         problems.append(f"{score['off_source_discoveries']} of {len(found)} discoveries outside the named source")
     score["problems"] = problems
     return score
+
+
+# Words a "not found" statement about an expected part may use instead of the part's own words
+EXPECT_TOPICS = {"scripts\\activate": ("windows",)}
+
+
+def silent_omissions(task, result, found):
+    """Issue #11's silent omissions, counted: the expected parts the final result lacks without a sentence saying
+    they were not found. Each is "dropped" when a discovery had it (found, then lost while the result was written,
+    as Gemma 3 4B's 1.67.2 explanation lost oxygen) or "never found" when none did. In 395 saved results, 20 expected
+    words were dropped this way; on the docs task, 22 of 55 results lacked the Windows activation command without
+    saying so."""
+    low = ab.LEFT_OUT_NOTE.sub("", str(result)).lower()
+    said = [s for s in re.split(r"(?<=[.!?])\s+|\n", low) if GAP_STATEMENT.search(s)]
+    found_text = " ".join(str(e.get("extracted_data", "")) for e in found).lower()
+    omitted = []
+    for group in task.get("expect", []):
+        if any(says(word, low) for word in group):
+            continue
+        topics = [w.replace(r"\b", "") for w in group] + list(EXPECT_TOPICS.get(group[0], ()))
+        if any(t in s for t in topics for s in said):
+            continue
+        omitted.append({"words": "/".join(w.replace(r"\b", "") for w in group[:3]),
+                        "dropped": any(says(word, found_text) for word in group)})
+    return omitted
 
 
 def progress(score):

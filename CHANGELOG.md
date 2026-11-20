@@ -20,6 +20,14 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
 - **The regression suite waits up to 30 seconds for the model list, and tries once more** if it doesn't come.
 
 ### Added
+- **The regression suite counts silent omissions** ([issue #11](https://github.com/SnowFXXX/LocalAgentBrowser/issues/11)):
+  an expected part the final result lacks without a sentence saying it was not found. Each is "dropped" when a
+  discovery had it (found, then lost while the result was written) or "never found" when none did. It is a problem
+  line ("left out without a word: ...") and a column of the honesty table. On the 395 saved finished suite results:
+  103 silent omissions in 78 results, 23 dropped and 80 never found; the most common are the Windows activation
+  command (22), "pip install" (13) and the steeping time in hours (11).
+- **The docs task expects the Windows activation command** (`Scripts\activate`), not only "activate", which the
+  macOS and Linux command met: 25 of its 55 saved results gave no Windows command (issue #11's first case).
 - **A timer counts the seconds of a long model call** on the console ("Waiting for the model: 42 s"), so a run on a
   CPU no longer looks frozen. It shows after 3 seconds, on one line that clears when the reply comes, and only in a
   console window: a run whose output goes to a file gets no timer lines.

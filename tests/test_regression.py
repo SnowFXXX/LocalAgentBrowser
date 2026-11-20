@@ -75,7 +75,8 @@ class TestScoreRun:
         assert score["forbidden"] == ["freeoffice"]
         assert score["missing"] == ["onlyoffice/openoffice"]
         assert score["bad_citations"] == [3]
-        assert len(score["problems"]) == 3
+        assert "left out without a word: onlyoffice/openoffice (never found)" in score["problems"]
+        assert len(score["problems"]) == 4
 
     def test_oxygen_can_be_given_as_its_formula_but_not_found_inside_co2(self):
         task = next(t for t in rg.TASKS if t["id"] == "explanation")
@@ -225,15 +226,44 @@ class TestHonesty:
         score = rg.score_run(TASK, journal(self.RESULT, "LibreOffice ...", "WPS Office ..."))
         assert rg.honesty(score) == {"said not found": 1, "caveats": 1, "outside knowledge": 1,
                                      "numbers not in discoveries": 2, "commands not in discoveries": 0,
-                                     "uncited lines": 1, "cites missing discoveries": 0}
+                                     "uncited lines": 1, "cites missing discoveries": 0, "left out without a word": 0}
         assert "1 gap(s) filled from the model's own knowledge" in score["problems"]
         meta = {"name": "n", "version": "1.62", "commit": "c", "started": "s"}
         text = rg.summary_markdown(meta, [score])
         assert "| Task | Said not found | Caveats | Outside knowledge |" in text
-        assert "| list | 1 | 1 | 1 | 2 | 0 | 1 | 0 |" in text and "| **All** | **1** | **1** | **1** |" in text
+        assert "| list | 1 | 1 | 1 | 2 | 0 | 1 | 0 | 0 |" in text and "| **All** | **1** | **1** | **1** |" in text
 
     def test_runs_scored_before_the_measures_existed_have_none(self):
         assert rg.honesty({"gap_statements": []}) is None
+
+
+class TestSilentOmissions:
+    """Issue #11: an expected part the result lacks without saying it was not found."""
+
+    TASK = {"id": "explanation", "kind": "k", "objective": "Explain photosynthesis.",
+            "expect": [["carbon dioxide", "co2"], ["oxygen", r"\bo2\b"], ["glucose", "sugar"]]}
+
+    def test_dropped_never_found_and_said(self):
+        # Oxygen in a discovery but not in the result (Gemma 3 4B, 1.67.2); glucose in neither; CO2 in the result
+        found = ("It takes in carbon dioxide and water.", "It gives off oxygen.")
+        score = rg.score_run(self.TASK, journal("It takes in carbon dioxide and water [1].", *found))
+        assert score["silent_omissions"] == [{"words": "oxygen/o2", "dropped": True},
+                                             {"words": "glucose/sugar", "dropped": False}]
+        assert "left out without a word: oxygen/o2 (a discovery had it), glucose/sugar (never found)" in score["problems"]
+        # Said to be not found: not silent
+        said = rg.score_run(self.TASK, journal("It takes in carbon dioxide [1]. The sugar it makes was not found.", *found))
+        assert [s["words"] for s in said["silent_omissions"]] == ["oxygen/o2"]
+
+    def test_the_docs_task_wants_the_windows_command_and_a_not_found_note_about_windows_counts(self):
+        task = next(t for t in rg.TASKS if t["id"] == "docs")
+        base = "Run python -m venv env [1]. Then source env/bin/activate [1] and pip install requests [1]."
+        found = ("python -m venv env; source env/bin/activate; pip install; on Windows env" + chr(92) + "Scripts" + chr(92) + "activate",)
+        assert rg.score_run(task, journal(base, *found))["silent_omissions"] == [
+            {"words": "scripts" + chr(92) + "activate/scripts/activate/activate.bat", "dropped": True}]
+        windows = base + " On Windows, run env" + chr(92) + "Scripts" + chr(92) + "activate [1]."
+        assert rg.score_run(task, journal(windows, *found))["silent_omissions"] == []
+        marked = base + " The Windows activation command was not found in the pages read."
+        assert rg.score_run(task, journal(marked, *found))["silent_omissions"] == []
 
 
 def test_a_bold_label_is_not_an_uncited_paragraph():
