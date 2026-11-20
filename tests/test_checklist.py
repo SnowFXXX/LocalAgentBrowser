@@ -567,6 +567,28 @@ def test_a_view_paragraph_repeating_the_whole_result_is_left_out():
     assert len(model.calls) == 2 and text.count("I recommend SQLite") == 1 and "My view:" not in text
 
 
+def test_a_short_view_sharing_the_objectives_words_is_kept():
+    # GPT-4o-mini's and the 7B's views shared "for a hobby project with a few hundred users" with their results and
+    # were dropped as repeats, leaving no view; the objective's own words don't count
+    goal = "Compare SQLite and PostgreSQL, then recommend one for a hobby project with a few hundred users."
+    result = "SQLite is a file; PostgreSQL is a server with MVCC for many writers [1]."
+    view = "My view: For a hobby project with a few hundred users, PostgreSQL is the better choice for its many writers."
+    client, _ = fake_client([result, view])
+    text = asyncio.run(ab.compose_final_result(client, goal, discoveries("SQLite is a file. PostgreSQL is a server "
+                                                                         "with MVCC for many writers.")))
+    assert text.endswith(view)
+
+
+def test_a_view_copied_from_a_later_paragraph_labels_that_paragraph():
+    goal = "Compare SQLite and PostgreSQL, then recommend one."
+    advice = "PostgreSQL is recommended because its MVCC lets many app servers write at once [1]."
+    result = "SQLite is a file; PostgreSQL is a server [1].\n\n" + advice
+    client, _ = fake_client([result, "My view: " + advice])
+    text = asyncio.run(ab.compose_final_result(client, goal, discoveries("SQLite is a file. PostgreSQL is a server; "
+                                                                         "its MVCC lets many app servers write at once.")))
+    assert text.count("PostgreSQL is recommended") == 1 and "\n\nMy view: PostgreSQL is recommended" in text
+
+
 def test_a_caveat_finds_the_thing_by_its_distinctive_word():
     text = "1. LibreOffice is the fullest suite [1].\n2. ONLYOFFICE is best at collaboration [2]."
     marked = ab.with_caveats(text, [("ONLYOFFICE Docs", "free")])

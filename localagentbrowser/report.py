@@ -306,6 +306,21 @@ SECTION_SHARE = 0.75
 SECTION_STOPWORDS = {"this", "that", "these", "which", "into", "used", "uses", "also", "such", "process", "details",
                      "inputs", "outputs", "main", "strengths", "supporting", "discovery", "discoveries"}
 
+VIEW_REPEAT_SHARE = 0.9  # Share of a view paragraph's word pairs (the objective's left out) already in the result
+
+def with_repeated_view_labelled(text, view_pairs):
+    """The result with "My view: " before the plain paragraph holding most of a view the model copied from it
+    (on 1.63 the 7B's view repeated its result's own recommendation word for word, which then stayed unlabelled)."""
+    paragraphs = str(text).split("\n\n")
+    shares = [len(view_pairs & word_pairs(p.lower())) / len(view_pairs) if view_pairs else 0 for p in paragraphs]
+    best = max(range(len(paragraphs)), key=shares.__getitem__) if paragraphs else None
+    # Not the first paragraph: that holds the findings, and labelling a one-paragraph result would mark them as opinion
+    if not best or shares[best] < VIEW_REPEAT_SHARE or LIST_OR_TABLE.match(paragraphs[best]) \
+            or re.match(r"\W*my view\b", paragraphs[best], re.I):
+        return text
+    paragraphs[best] = "My view: " + paragraphs[best].lstrip()
+    return "\n\n".join(paragraphs)
+
 # Not "not shown": the code's own caveat ("(not shown in the pages read to be free)") sits on a real, cited claim
 NOT_FOUND_LINE = re.compile(r"\bnot (?:been )?(?:found|mentioned|given|stated|specified|provided)\b|\bno (?:information|"
                             r"mention)\b", re.I)
@@ -825,11 +840,19 @@ async def compose_final_result(client, objective, journal, checklist=None, not_f
         if at > 0:
             paragraph = paragraph[at:].strip()
         # Asked for its view after a result that already recommended SQLite ("I recommend using SQLite"), Llama
-        # wrote the whole result again under "My view:"; a paragraph mostly repeating the result is left out
-        mine = word_pairs(paragraph.lower()) if paragraph else set()
-        repeated = bool(mine) and len(mine & word_pairs(text.lower())) >= 0.5 * len(mine)
+        # wrote the whole result again under "My view:"; a paragraph repeating the result is left out. The
+        # objective's own words don't count: real views share them with the result ("for a hobby project with a
+        # few hundred users"), and at 0.5 with them counted, 2 of 34 saved views were dropped and their results
+        # ended with no view at all (Gemma 3 4B's owls on 1.66, the 7B's comparison on 1.67). Repeats score 0.95+.
+        # Nor does the "My view:" label itself, which a short copied paragraph would otherwise be told apart by
+        said = re.sub(r"^\W*my view\W*", "", paragraph, flags=re.I) if paragraph else ""
+        mine = (word_pairs(said.lower()) - word_pairs(objective.lower())) if said else set()
+        repeated = bool(mine) and len(mine & word_pairs(text.lower())) >= VIEW_REPEAT_SHARE * len(mine)
         if paragraph and usable_result(paragraph) and not repeated:
             text += "\n\n" + (paragraph if paragraph.lower().startswith("my view:") else f"My view: {paragraph}")
+        elif repeated:
+            # A view copied from one paragraph of the result says which paragraph is the view: label it there
+            text = with_repeated_view_labelled(text, mine)
     # Before the code's own notes are added: a checklist item's text may hold a number ("Name 5 tools")
     # After the filled gaps are cut, so "does not specify how long it keeps, but ... within 1-2 weeks" keeps its gap
     if text != NO_RESULT:

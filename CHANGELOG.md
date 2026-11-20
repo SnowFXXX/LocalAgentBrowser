@@ -66,6 +66,11 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
 - **A result that opens with one of the objective's own sentences has it left out**, as a question or a heading,
   with a citation stuck to it: Gemma 3 4B's cold brew results began "How do I make cold brew coffee at home? [2]".
   Kept when nothing of substance follows. 8 of 972 saved results change.
+- **A view asked for after the result is kept unless it repeats the result** (0.9 of its word pairs, not 0.5, and
+  not counting the objective's own words or the "My view:" label). At 0.5, real views that shared the objective's
+  wording ("for a hobby project with a few hundred users") were dropped, and their results ended with no view at all:
+  6 of 34 saved views, among them Gemma 3 4B's owls on 1.66 and the 7B's comparison on 1.67. The 7 views that copied
+  the whole result are still left out. A view copied from a later paragraph of the result labels that paragraph.
 - **The code no longer cites headings, questions, the model's view or "not found" lines to a discovery**, and its
   threshold for citing a line by its section is 0.75 instead of 0.8. Replayed on 326 saved raw results against the
   old code: 12 citations go, every one on a heading or a question ("How do I make cold brew coffee at home? [1]");
