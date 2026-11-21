@@ -10,7 +10,7 @@ A = "https://en.wikipedia.org/wiki/Mount_Kilimanjaro"
 SETUP = {"edition": "LocalAgentBrowser", "ready": True, "models": ["qwen2.5-7b-instruct", "gemma-3-4b-it"],
          "note": "", "model": "gemma-3-4b-it", "minutes": 30, "folder": "C:\\Runs", "remote": None,
          "remote_chosen": False, "recent": [{"folder": "C:\\Runs\\2026-11-20_090000", "objective": "Owls",
-                                             "when": "2026-11-20 090000"}]}
+                                             "when": "2026-11-20 09:00"}]}
 CHECKLIST = [{"text": "the tallest mountain", "discoveries": []}, {"text": "its height", "discoveries": []}]
 RUN = [
     ("started", {"objective": "What is the tallest mountain in Africa?", "folder": "C:\\Runs\\x", "model": "gemma-3-4b-it"}),

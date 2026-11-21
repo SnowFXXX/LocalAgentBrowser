@@ -110,7 +110,8 @@ class TestRuns:
         (tmp_path / "2026-11-20_100000").mkdir()  # No report: left out
         recent = winui.recent_reports(str(tmp_path))
         assert [r["objective"] for r in recent] == ["Kilimanjaro", "Owls"]
-        assert recent[0]["when"] == "2026-11-20 090000"
+        assert recent[0]["when"] == "2026-11-20 09:00"
+        assert winui.run_time("2026-11-21_092449_2") == "2026-11-21 09:24" and winui.run_time("notes") == "notes"
 
     def test_a_report_is_shown_and_saved_as_a_page(self, tmp_path):
         assert winui.report_page_for(str(tmp_path)) is None

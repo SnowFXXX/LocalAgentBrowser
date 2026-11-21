@@ -73,11 +73,17 @@ def recent_reports(folder, limit=RECENT_REPORTS):
                         break
         except OSError:
             pass
-        found.append({"folder": os.path.join(folder, name), "objective": objective or name,
-                      "when": name.replace("_", " ")})
+        found.append({"folder": os.path.join(folder, name), "objective": objective or name, "when": run_time(name)})
         if len(found) >= limit:
             break
     return found
+
+
+def run_time(name):
+    """A run folder's name (2026-11-21_092449, maybe with _2 after it) as a time to read: 2026-11-21 09:24. Other
+    names are shown as they are."""
+    match = re.match(r"(\d{4}-\d{2}-\d{2})_(\d{2})(\d{2})\d{2}(?:_\d+)?$", name)
+    return f"{match.group(1)} {match.group(2)}:{match.group(3)}" if match else name.replace("_", " ")
 
 
 def new_run_folder(folder):
