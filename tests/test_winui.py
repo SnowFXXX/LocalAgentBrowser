@@ -262,10 +262,41 @@ def test_the_window_opens_in_app_mode_on_the_ui_page():
 
 
 # cloud:start
+class TestCloudModels:
+    def test_recommended_models_come_first_then_the_others_tested_each_with_a_note(self):
+        models = winui.cloud_models()
+        ids = [m["id"] for m in models]
+        assert ids[0] == "microsoft/phi-4" and models[0]["group"] == "Recommended"
+        groups = [m["group"] for m in models]
+        assert groups == sorted(groups, key=lambda g: g != "Recommended")  # Recommended ones first, together
+        assert len(ids) == len(set(ids)) and len(ids) > 20
+        assert all(winui.CLOUD_MODEL_ID.match(m["id"]) and m["note"] for m in models)
+
+    def test_the_model_picked_is_kept_but_never_the_tick(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(settings, "settings_folder", lambda: str(tmp_path / "settings"))
+        monkeypatch.setattr(settings, "setup_choices", lambda name: {"LMSTUDIO_MODEL": "microsoft/phi-4"}
+                            if name == "cloud.cmd" else {})
+        assert winui.remote_option()["model"] == "microsoft/phi-4"  # Setup's, until one is picked
+        assert winui.remote_option("openai/gpt-4o-mini")["model"] == "openai/gpt-4o-mini"
+        settings.save(remote_model="openai/gpt-4o-mini")
+        assert settings.load()["remote_model"] == "openai/gpt-4o-mini" and "remote" not in settings.load()
+
+    def test_a_run_uses_the_model_picked_or_setup_s_if_the_id_is_not_one(self, monkeypatch):
+        monkeypatch.setattr(settings, "setup_choices", lambda name: {"LMSTUDIO_MODEL": "microsoft/phi-4"}
+                            if name == "cloud.cmd" else {"LMSTUDIO_MODEL": "qwen2.5-7b-instruct"})
+        env = winui.run_environment({"remote": True, "remote_model": "openai/gpt-4o-mini"}, "stop")
+        assert env["LMSTUDIO_MODEL"] == "openai/gpt-4o-mini"
+        env = winui.run_environment({"remote": True, "remote_model": "not a model; del x"}, "stop")
+        assert env["LMSTUDIO_MODEL"] == "microsoft/phi-4"
+        env = winui.run_environment({"remote": False, "remote_model": "openai/gpt-4o-mini"}, "stop")
+        assert env["LMSTUDIO_MODEL"] == "qwen2.5-7b-instruct"  # Not ticked: LM Studio's
+
+
 def test_a_cloud_run_names_its_own_model_not_the_one_in_lm_studio_s_list(monkeypatch, tmp_path):
     """Seen live (Nov 21): the START card said "with <the model picked in LM Studio's list>" on a cloud run."""
     monkeypatch.setattr(settings, "settings_folder", lambda: str(tmp_path / "settings"))
-    monkeypatch.setattr(winui, "remote_option", lambda: {"model": "microsoft/phi-4", "ready": True})
+    monkeypatch.setattr(settings, "setup_choices", lambda name: {"LMSTUDIO_MODEL": "microsoft/phi-4"}
+                        if name == "cloud.cmd" else {})
     monkeypatch.setattr(winui, "place_window", lambda side: None)
 
     class Stdin:
@@ -294,10 +325,12 @@ def test_a_cloud_run_names_its_own_model_not_the_one_in_lm_studio_s_list(monkeyp
         pass
     monkeypatch.setattr(app, "send", send)
     monkeypatch.setattr(app, "follow", follow)
-    for remote, model in ((True, "microsoft/phi-4"), (False, "qwen2.5-7b-instruct")):
+    for remote, picked, model in ((True, None, "microsoft/phi-4"), (True, "openai/gpt-4o-mini", "openai/gpt-4o-mini"),
+                                  (False, None, "qwen2.5-7b-instruct")):
         app.run = None
         asyncio.run(app.start({"objective": "How tall is Kilimanjaro?", "model": "qwen2.5-7b-instruct",
-                               "folder": str(tmp_path / "runs"), "remote": remote}))
+                               "folder": str(tmp_path / "runs"), "remote": remote, "remote_model": picked}))
         assert sent[-1] == ("started", {"objective": "How tall is Kilimanjaro?", "folder": app.run.folder,
                                         "model": model})
+    assert settings.load()["remote_model"] == "openai/gpt-4o-mini"  # Kept for the next time
 # cloud:end

@@ -24,10 +24,11 @@ def settings_folder():
 
 def defaults():
     # The Windows UI where it runs; everywhere else (pip install on Linux or macOS) the console, which is all there is
-    # The second kind of model is never kept: only its own shortcut ticks it, so nothing leaves the PC unless that
-    # shortcut was the one opened, as with the console launcher
+    # The second kind of model is never kept ticked: only its own shortcut ticks it, so nothing leaves the PC unless
+    # that shortcut was the one opened, as with the console launcher. Which of those models was picked is kept
+    # ("remote_model"): it sends nothing by itself
     return {"ui": "windows" if sys.platform == "win32" else "classic", "model": None, "minutes": 0,
-            "folder": runs_folder()}
+            "folder": runs_folder(), "remote_model": None}
 
 
 def load():

@@ -90,7 +90,8 @@ def test_the_page_draws_the_start_screen_and_a_whole_run():
     assert state["model"] == "gemma-3-4b-it"  # The saved choice
     assert state["start_disabled_empty"] and not state["start_disabled_typed"]
     assert state["start"] == {"type": "start", "objective": "What is the tallest mountain in Africa?",
-                              "model": "gemma-3-4b-it", "minutes": 30, "folder": "C:\\Runs", "remote": False}
+                              "model": "gemma-3-4b-it", "minutes": 30, "folder": "C:\\Runs", "remote": False,
+                              "remote_model": ""}
     assert "Owls" in state["recent"] and state["retry_shown"]
     assert state["labels"] == ["START", "SEARCH", "NAVIGATE", "READ MORE", "ASKED AGAIN", "DISCOVER", "NAVIGATE",
                                "REFUSED", "FINISH", "CHECKING", "WRITING", "RESULT"]
@@ -185,6 +186,54 @@ async def watch_mode():
                      state=await page.inner_text("#state"))
         await browser.close()
         return state
+
+
+REMOTE = {"label": "Use the second kind of model", "model": "openai/gpt-4o-mini", "ready": True, "note": "",
+          "warning": "The prompts go out.", "other_hint": "vendor/model", "other_note": "Not tested.",
+          "models": [{"id": "microsoft/phi-4", "group": "Recommended", "note": "The default."},
+                     {"id": "openai/gpt-4o-mini", "group": "Recommended", "note": "All 7 tasks."},
+                     {"id": "qwen/qwen3-32b", "group": "Passed the compatibility test", "note": "Every check."}]}
+
+
+async def remote_picker():
+    from playwright.async_api import async_playwright
+    async with async_playwright() as p:
+        try:
+            browser = await p.chromium.launch()
+        except Exception as err:
+            pytest.skip(f"no Chromium for Playwright ({str(err)[:80]})")
+        page = await browser.new_page()
+        sent = []
+        await page.expose_binding("labSend", lambda source, message: sent.append(message))
+        with open(winui.PAGE_FILE, encoding="utf-8") as f:
+            await page.set_content(f.read())
+        await page.evaluate("e => lab.receive(e)", {"kind": "setup", **dict(SETUP, remote=REMOTE, remote_chosen=True)})
+        await page.fill("#objective", "How tall is Kilimanjaro?")
+        state = {"shown": await page.is_visible("#remote-pick"), "picked": await page.input_value("#remote-model"),
+                 "note": await page.inner_text("#remote-model-note"),
+                 "groups": await page.eval_on_selector_all("#remote-model optgroup", "gs => gs.map(g => g.label)"),
+                 "lm_studio_off": await page.is_disabled("#model")}
+        await page.select_option("#remote-model", "__other__")
+        state["other_shown"] = await page.is_visible("#remote-other")
+        await page.fill("#remote-other", "not a model")
+        state["bad_blocks"] = await page.is_disabled("#go")
+        await page.fill("#remote-other", "mistralai/mistral-small-2603")
+        state["good_allows"] = not await page.is_disabled("#go")
+        await page.click("#go")
+        state["start"] = sent[-1]
+        await page.uncheck("#remote")
+        state["hidden_unticked"] = not await page.is_visible("#remote-pick")
+        await browser.close()
+        return state
+
+
+def test_the_second_kind_of_model_is_picked_from_our_list_or_typed_in():
+    state = asyncio.run(remote_picker())
+    assert state["shown"] and state["picked"] == "openai/gpt-4o-mini" and state["note"] == "All 7 tasks."
+    assert state["groups"] == ["Recommended", "Passed the compatibility test"] and state["lm_studio_off"]
+    assert state["other_shown"] and state["bad_blocks"] and state["good_allows"]
+    assert state["start"]["remote"] and state["start"]["remote_model"] == "mistralai/mistral-small-2603"
+    assert state["hidden_unticked"]
 
 
 async def opened_window(tmp_path, monkeypatch):

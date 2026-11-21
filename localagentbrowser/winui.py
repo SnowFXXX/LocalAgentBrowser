@@ -16,6 +16,7 @@ import html
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -116,25 +117,55 @@ def run_environment(choices, stop_file):
     if choices.get("remote"):
         env.update(settings.setup_choices("cloud.cmd"))
         env["LMSTUDIO_API_KEY"] = os.environ.get("OPENROUTER_API_KEY", "")
+        if CLOUD_MODEL_ID.match(choices.get("remote_model") or ""):  # Picked on the start screen; else setup's
+            env["LMSTUDIO_MODEL"] = choices["remote_model"]
     # cloud:end
     env.update(LAB_UI="windows", LAB_EVENTS="stdout", LAB_STOP_FILE=stop_file, PYTHONUNBUFFERED="1", PYTHONUTF8="1",
                PYTHONIOENCODING="utf-8", PYTHONPATH=os.pathsep.join(p for p in (settings.APP, env.get("PYTHONPATH")) if p))
     return env
 
 
-def remote_option():
-    """The second kind of model the start screen offers besides LM Studio's, or None (Clean Room has none)."""
+def remote_option(saved=None):
+    """The second kind of model the start screen offers besides LM Studio's, or None (Clean Room has none). saved is
+    the one picked last time (settings' remote_model)."""
     option = None
     # cloud:start
     chosen = settings.setup_choices("cloud.cmd")
     if chosen:
         ready = bool(os.environ.get("OPENROUTER_API_KEY"))
-        option = {"label": "Use a cloud model through OpenRouter (your own key)", "model": chosen.get("LMSTUDIO_MODEL", ""),
+        option = {"label": "Use a cloud model through OpenRouter (your own key)",
+                  "model": saved or chosen.get("LMSTUDIO_MODEL", ""), "models": cloud_models(),
                   "ready": ready, "note": "" if ready else ("The OPENROUTER_API_KEY environment variable is not set: set it "
                                                            "to your OpenRouter key, then start LocalAgentBrowser again."),
-                  "warning": "The prompts and the pages read go to OpenRouter."}
+                  "warning": "The prompts and the pages read go to OpenRouter.",
+                  "other_hint": "A model ID as OpenRouter lists it, such as mistralai/mistral-small-2603",
+                  "other_note": ("Not tested with LocalAgentBrowser: it may not answer in the agent's format. Model IDs "
+                                 "are on openrouter.ai/models.")}
     # cloud:end
     return option
+
+
+# cloud:start
+CLOUD_MODELS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cloud_models.json")
+CLOUD_MODEL_ID = re.compile(r"^[\w.~-]+/[\w.:~-]+$")  # An OpenRouter model ID: vendor/model, maybe with :variant
+
+
+def cloud_models():
+    """The cloud models the start screen lists, from cloud_models.json (built from the compatibility test's results):
+    the recommended ones first, then the others that passed every compatibility check, each with a note saying why
+    it is listed. Any other model can be typed in."""
+    try:
+        with open(CLOUD_MODELS_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return []
+    tested = data.get("tested", "")
+    models = [{"id": m["id"], "group": "Recommended", "note": m["note"]} for m in data.get("recommended", [])]
+    models += [{"id": m["id"], "group": "Passed the compatibility test",
+                "note": f"Passed every check of the compatibility test ({tested}); the test cost ${m['cost']:.3f}."}
+               for m in data.get("compatible", [])]
+    return models
+# cloud:end
 
 
 class Run:
@@ -215,7 +246,7 @@ class App:
         model = self.choices.get("model") or settings.setup_choices("model.cmd").get("LMSTUDIO_MODEL")
         return {"edition": EDITION, "ready": ready, "models": models, "note": note, "model": model,
                 "minutes": self.choices.get("minutes") or 0, "folder": self.choices.get("folder") or settings.runs_folder(),
-                "remote": remote_option(), "remote_chosen": self.remote,
+                "remote": remote_option(self.choices.get("remote_model")), "remote_chosen": self.remote,
                 "recent": recent_reports(self.choices.get("folder") or settings.runs_folder())}
 
     async def start(self, message):
@@ -226,25 +257,28 @@ class App:
                                      minutes=int(message.get("minutes") or 0),
                                      folder=message.get("folder") or self.choices.get("folder") or settings.runs_folder())
         choices = dict(self.choices, remote=bool(message.get("remote")))  # For this run only
+        # cloud:start
+        picked = str(message.get("remote_model") or "").strip()
+        if choices["remote"] and CLOUD_MODEL_ID.match(picked):  # Kept for next time; the tick is not
+            self.choices = settings.save(remote_model=picked)
+            choices["remote_model"] = picked
+        # cloud:end
         folder = new_run_folder(choices["folder"])
         stop_file = os.path.join(tempfile.gettempdir(), f"LocalAgentBrowser-stop-{os.getpid()}-{os.path.basename(folder)}")
         if os.path.exists(stop_file):
             os.remove(stop_file)
+        env = run_environment(choices, stop_file)
         process = await asyncio.create_subprocess_exec(
             settings.python(windowless=False), "-u", "-m", "localagentbrowser", cwd=folder,
-            env=run_environment(choices, stop_file), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, creationflags=CREATE_NO_WINDOW if sys.platform == "win32" else 0)
         process.stdin.write((objective + "\n").encode("utf-8"))
         await process.stdin.drain()
         process.stdin.close()
         self.run = Run(folder, process, stop_file, choices)
         place_window("left")
-        model = choices.get("model") or ""
-        # cloud:start
-        if choices["remote"]:  # The run uses setup's cloud model, not the one picked in LM Studio's list
-            model = (remote_option() or {}).get("model") or ""
-        # cloud:end
-        await self.send("started", objective=objective, folder=folder, model=model)
+        # The model the run uses (the second kind's when ticked, not the one in LM Studio's list)
+        await self.send("started", objective=objective, folder=folder, model=env.get("LMSTUDIO_MODEL") or "")
         asyncio.ensure_future(self.follow(self.run))
         if choices.get("minutes"):
             asyncio.ensure_future(self.time_limit(self.run, choices["minutes"]))

@@ -33,6 +33,10 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
   opens the window, starts a new research, opens a recent report, stops the run or opens the reports folder. The window
   is the agent's own Chromium showing a local page: nothing is fetched for it, in either edition. Each research runs
   as its own process, with its console text saved as console.txt in its run folder.
+- **A choice of cloud model on the start screen**, when cloud models are on: a menu of our recommendations (models
+  that also finished the whole test suite, Phi-4 first), then the other 58 models that passed every check of the
+  compatibility test, each with a note of what was measured, and "Another model..." for any OpenRouter model ID. The
+  model picked is kept for next time; the cloud tick still never is. Setup's cloud model stays the default.
 - **Classic mode stays one switch away**: "Classic console" in the UI opens the console and keeps it as the choice;
   typing `/ui` as the objective there switches back. `pip install` (Linux, macOS) gets classic mode, as before;
   `localagentbrowser-ui` opens the Windows UI.
