@@ -357,9 +357,11 @@ function showRun(e) {
 }
 
 function showDone() {
-  // The report's top just below the sticky bar and run heading (scrollIntoView put it underneath them)
+  // The collapsed steps, then the buttons and the report, just below the sticky bar and run heading (scrollIntoView
+  // put them underneath; scrolling to the report itself left "Steps" half hidden under the heading)
   const below = document.querySelector(".head").getBoundingClientRect().bottom;
-  scrollTo({ top: $("done").getBoundingClientRect().top + scrollY - below - 8, behavior: "smooth" });
+  const top = ($("steps").hidden ? $("done") : $("steps")).getBoundingClientRect().top;
+  scrollTo({ top: top + scrollY - below - 8, behavior: "smooth" });
 }
 
 const handlers = {
