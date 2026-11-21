@@ -151,3 +151,31 @@ def test_the_window_follows_the_current_task_and_shows_its_report(watched, tmp_p
     assert kinds == ["started", "objective", "turn", "stopped", "report", "watch_done"]
     assert sent[0][1]["watch"]["label"] == "factual" and sent[0][1]["watch"]["n"] == 1
     assert "Kilimanjaro" in sent[4][1]["page"]
+
+
+def test_a_run_of_quick_checks_alone_is_shown_over_when_it_ends(watched, monkeypatch):
+    # Seen live (Nov 21): compat.py --no-live sends no "stopped", and the window stayed on "Thinking" after the run
+    monkeypatch.setenv("LAB_EVENTS", "")  # begin() sets them in this process: put back after the test
+    monkeypatch.setenv("LAB_UI", "")
+    events = watch.begin("microsoft/phi-4", "out", "microsoft/phi-4")
+    with open(events, "w", encoding="utf-8") as f:
+        f.write(json.dumps({"kind": "waiting"}) + "\n")
+    sent = []
+
+    class App:
+        done = asyncio.Event()
+
+        async def send(self, kind, **data):
+            sent.append(kind)
+    monkeypatch.setattr(winui, "WATCH_POLL_SECONDS", 0.01)
+
+    async def follow():
+        app = App()
+        task = asyncio.ensure_future(winui.follow_watch(app, str(watched)))
+        await asyncio.sleep(0.1)
+        watch.finish()
+        await asyncio.sleep(0.1)
+        app.done.set()
+        await task
+    asyncio.run(follow())
+    assert sent == ["started", "waiting", "watch_done"]

@@ -35,6 +35,18 @@ class TestVerdict:
         assert compat.verdict([check("view", False), check("live task", False, "did not finish")]) == \
             "not compatible (live task failed)"
 
+    def test_a_live_task_stopped_by_its_time_limit_did_not_finish_in_that_time(self):
+        # Nine local models on this PC's CPU ran out of 30 minutes (Nov 20): too slow for the limit, not incompatible
+        stopped = dict(check("live task", False, "did not finish (time limit)"), minutes=90, time_limit=True)
+        assert compat.verdict([check("split", True), stopped]) == "did not finish in 90 minutes"
+        assert compat.verdict([check("view", False), stopped]) == "did not finish in 90 minutes (view failed)"
+        # A hard failure still decides
+        assert compat.verdict([check("discover", False, "NoReply: no reply", error=True), stopped]) == \
+            "not compatible (discover, live task failed)"
+
+    def test_the_live_task_s_limit_is_90_minutes_on_this_pc(self):
+        assert compat.LIVE_MINUTES == 90
+
     def test_hard_failures_are_errors_invalid_json_no_result_and_a_refused_retry(self):
         assert compat.is_hard(check("discover", False, "ValueError: x", error=True))
         assert compat.is_hard(check("search page", False, "No valid JSON in the reply"))

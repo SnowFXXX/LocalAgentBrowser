@@ -18,8 +18,9 @@ Each model is tested in a process of its own, with the agent's own code, in two 
 Only a hard failure ends the test before the live task: an error, a reply with no valid JSON, no final result, or a
 refused retry. The result is "compatible" when every check passes and the live task finishes with a cited result of
 the model's own; "compatible, with limits" when the live task passes but a quick check failed (it is named: the agent
-works, with that step weaker); and "not compatible" when a hard failure happened or the live task did not pass, with
-that named. What the live result says (a height missing) is a note in its detail, not a failure. Results go to LAB_COMPAT_DIR (default
+works, with that step weaker); "did not finish in N minutes" when the live task's time limit stopped it with no hard
+failure (too slow on that server for the limit: 90 minutes for a model on this PC, by default); and "not compatible"
+when a hard failure happened or the live task did not pass, with that named. What the live result says (a height missing) is a note in its detail, not a failure. Results go to LAB_COMPAT_DIR (default
 C:\\LocalAgentBrowser-compat-runs), a new folder per test run: summary.md and results.json for the list, and a folder
 per model with its result.json, console.txt and the live task's run.
 """
@@ -52,7 +53,11 @@ from localagentbrowser import agent, events, watch  # noqa: E402
 RESULTS_DIR = os.environ.get("LAB_COMPAT_DIR", r"C:\LocalAgentBrowser-compat-runs")
 LMS = next((p for p in (os.path.expanduser(r"~\.lmstudio\bin\lms.exe"), shutil.which("lms") or "") if p and os.path.exists(p)), "lms")
 LMS_MODELS = os.path.expanduser(r"~\.lmstudio\models")
-LIVE_MINUTES = 30
+# The live task's limit: 90 minutes for a model on this PC (as the regression suite gives every task), since on a CPU
+# a model that works with the agent can need more than 30 (nine of the first local run's 18 models ran out of 30);
+# 30 for the second kind of model (--minutes sets another)
+LIVE_MINUTES = 90
+REMOTE_LIVE_MINUTES = 30
 CUT_OFF_TOKENS = 40  # The forced cut-off check's reply limit
 REMOTE_CALL_SECONDS = 300  # Longest wait for one quick-check call to a server that is not on this PC
 # The server failing every call: after this many checks in a row ended so, the rest are not run. LFM 2.5's provider
@@ -289,7 +294,7 @@ def live_task(folder, minutes, model):
     # only in the checks' own "Left out, because ..." note is not one: MiniMax M2.7's whole answer was cut into it
     why = ("did not finish" if not score["finished"] else "no result written" if result.startswith(ab.NO_RESULT)
            else "no citation" if not rg.cited_numbers(ab.LEFT_OUT_NOTE.sub("", result)) else "")
-    return {"check": "live task", "passed": not why, "minutes": minutes,
+    return {"check": "live task", "passed": not why, "minutes": minutes, "time_limit": score["time_limit_reached"],
             "detail": "; ".join(([why] if why and why != "did not finish" else []) + score["problems"])
             or "finished with both heights, cited",
             "model_minutes": score["model_minutes"], "model_calls": score["model_calls"]}
@@ -310,6 +315,13 @@ def verdict(results):
     if not failed:
         return "compatible"
     hard = [r["check"] for r in failed if is_hard(r) or r["check"] == "live task"]
+    live = next((r for r in failed if r["check"] == "live task"), None)
+    if hard == ["live task"] and live.get("time_limit"):
+        # Stopped by the time limit, with no hard failure: too slow on this server for the limit, which says nothing
+        # about whether the model works with the agent
+        others = [r["check"] for r in failed if r is not live]
+        return (f"did not finish in {live['minutes']:g} minutes"
+                + (f" ({', '.join(others)} failed)" if others else ""))
     if hard:
         return "not compatible (" + ", ".join(hard) + " failed)"
     return "compatible, with limits (" + ", ".join(r["check"] for r in failed) + " failed)"
@@ -551,7 +563,8 @@ def main():
     parser.add_argument("models", nargs="*", help="models to test (or --models FILE)")
     parser.add_argument("--models", dest="models_file", help="a file with one model per line")
     parser.add_argument("--no-live", action="store_true", help="quick checks only, no live task")
-    parser.add_argument("--minutes", type=float, default=LIVE_MINUTES, help=f"the live task's limit (default {LIVE_MINUTES})")
+    parser.add_argument("--minutes", type=float, help=f"the live task's limit (default {LIVE_MINUTES}, or "
+                                                        f"{REMOTE_LIVE_MINUTES} for models not on this PC)")
     parser.add_argument("--one", help=argparse.SUPPRESS)
     parser.add_argument("--out", help=argparse.SUPPRESS)
     # cloud:start
@@ -559,6 +572,12 @@ def main():
     parser.add_argument("--budget", type=float, default=5.0, help="stop once this many dollars are spent (default 5)")
     # cloud:end
     args = parser.parse_args()
+    if args.minutes is None:
+        args.minutes = LIVE_MINUTES
+        # cloud:start
+        if args.cloud:
+            args.minutes = REMOTE_LIVE_MINUTES
+        # cloud:end
     if args.one:
         return test_one(args.one, args.out, not args.no_live, args.minutes)
     models = list(args.models)

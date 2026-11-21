@@ -436,7 +436,10 @@ async def follow_watch(app, folder):
                     whole = report_page_for(current.get("folder") or "")
                     if whole:
                         await app.send("report", page=whole, folder=current["folder"], past=False)
-        if state.get("done") and not finished and (stopped or not current):
+        # The run is over once it says so: it says so after its last task's process ended, so that task's events are
+        # all read above. (It waited for the task's "stopped" too, which a run of quick checks alone never sends: the
+        # window then stayed on "Thinking", its clock running, after the run had ended.)
+        if state.get("done") and not finished:
             finished = True
             await app.send("watch_done")
         await asyncio.sleep(WATCH_POLL_SECONDS)

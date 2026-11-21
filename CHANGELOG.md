@@ -51,9 +51,12 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
   coverage, write a cited result, write a view, and a reply cut off at its limit retried), then one live task with
   the browser (the suite's factual question). A model is "compatible" when every check passes and the live task
   finishes with a cited result; "compatible, with limits" when the live task passes but a quick check failed (named);
-  and "not compatible" on an error, a reply with no valid JSON, no result, a refused retry, or a failed live task. In
-  LM Studio it downloads a model for the test and deletes it after; with `--cloud` it tests OpenRouter models within
-  a budget (`--budget`), reading the cost of each from OpenRouter.
+  "did not finish in N minutes" when the live task's time limit stopped it with no other hard failure; and "not
+  compatible" on an error, a reply with no valid JSON, no result, a refused retry, or a failed live task. The live
+  task gets 90 minutes for a model in LM Studio (on a CPU, half the first local run's models needed more than 30) and
+  30 in the cloud; `--minutes` sets another. In LM Studio it downloads a model for the test, and deletes it after unless
+  it was on the PC already; with `--cloud` it tests OpenRouter models within a budget (`--budget`), reading the cost of
+  each from OpenRouter.
 - **The regression suite counts silent omissions** ([issue #11](https://github.com/SnowFXXX/LocalAgentBrowser/issues/11)):
   an expected part the final result lacks without a sentence saying it was not found. Each is "dropped" when a
   discovery had it (found, then lost while the result was written) or "never found" when none did. It is a problem
