@@ -24,7 +24,8 @@ from .checklist import after_discovery_advice, check_parts, checklist_lines, lin
 from .coverage import amounts_not_found, coverage_refusal, not_found_items, record_install_line, remember_install_lines
 from .checks import check_decision, escalation_message, numbered_discoveries, numbered_lines, refusal_correction, source_note
 from . import windows
-from .events import emit
+from .events import LISTENERS as EVENT_LISTENERS, Stopped, emit, listen, print_line, stop_requested
+from . import settings
 from .report import compact_journal, compose_final_result, visited_summary, write_report, write_research_log
 
 def new_conversation():
@@ -329,15 +330,20 @@ async def ticking(call):
     and ends, console or not: the Windows UI has no console and draws its own timer."""
     emit("waiting")
     started = time.monotonic()
+    # A run started by the Windows UI can be stopped while the model works: on a CPU one call can take minutes
+    watching, console = bool(os.environ.get("LAB_STOP_FILE")), sys.stdout.isatty()
     try:
-        if not sys.stdout.isatty():
+        if not console and not watching:
             return await call
         task = asyncio.ensure_future(call)
         shown = False
         try:
             while not (await asyncio.wait({task}, timeout=TIMER_TICK_SECONDS))[0]:
+                reason = stop_requested() if watching else None
+                if reason:
+                    raise Stopped(reason)
                 waited = int(time.monotonic() - started)
-                if waited >= TIMER_AFTER_SECONDS:
+                if console and waited >= TIMER_AFTER_SECONDS:
                     print(f"\r   Waiting for the model: {waited} s", end="", flush=True)
                     shown = True
         except BaseException:
@@ -468,7 +474,11 @@ def with_retries(client):
     client.chat.completions.create = create_with_retries
     return client
 
+SWITCH_TO_WINDOWS_UI = "/ui"  # Typed as the objective in classic mode on Windows: the Windows UI opens instead
+
 async def main():
+    if os.environ.get("LAB_EVENTS") == "stdout" and print_line not in EVENT_LISTENERS:
+        listen(print_line)  # Started by the Windows UI: it reads the events from the console output
     if not server_allowed():
         print(f"Error: The model server {BASE_URL} is not on this PC or your local network, and this edition only uses one "
               "that is. Set LMSTUDIO_BASE_URL to LM Studio's address (default http://localhost:1234/v1).")
@@ -493,6 +503,12 @@ async def main():
     objective = input("Define the Agent's High-Level Objective: ").lstrip("﻿").strip()
     if not objective:
         print("The objective cannot be empty.")
+        return
+    if objective.lower() == SWITCH_TO_WINDOWS_UI and sys.platform == "win32":
+        # Classic mode is one switch away from the Windows UI, and back: this setting picks the mode the shortcuts open
+        settings.save(ui="windows")
+        print("Opening the Windows UI. Classic mode is its \"Classic console\" button away.")
+        settings.open_windows_ui()
         return
 
     journal = []
@@ -529,6 +545,10 @@ async def main():
 
         try:
             while turn_counter <= max_turns:
+                stop_reason = stop_requested() or stop_reason
+                if stop_reason:
+                    print(f"\nStopped: {stop_reason}.")
+                    break
                 print(f"\n[TURN {turn_counter}/{max_turns}] Active reasoning cycle executing...")
                 emit("turn", number=turn_counter, of=max_turns)
                 tried["finish_confirmed"] = False  # The finish check runs once per turn
@@ -767,6 +787,9 @@ async def main():
                 turn_counter += 1
                 print("\nCycle pacing check complete. Refreshing navigation loop pipeline...")
                 await asyncio.sleep(TURN_PAUSE_SECONDS)
+        except Stopped as stopped:
+            stop_reason = str(stopped)
+            print(f"\nStopped: {stop_reason}.")
         finally:
             # Always saved, however the run ends: FINISH, the turn limit, Ctrl+C or an outside time limit
             write_research_log(objective, journal, tried.get("checklist"))
@@ -784,3 +807,5 @@ def run():
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\nStopped. Findings so far are in research_log.txt.")
+    except Stopped as stopped:  # Before the first turn (while the objective was split): nothing found yet
+        print(f"\nStopped: {stopped}.")

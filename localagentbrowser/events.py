@@ -22,7 +22,13 @@ Kinds, in the order a run sends them:
 - result: text
 - stopped: reason (None when the agent finished)
 """
+import json
+import os
+
 LISTENERS = []
+# A run started by the Windows UI (winui.py) is a process of its own: it prints its usual console text, and each event
+# as one line starting with this mark, which the UI reads and never shows as text
+MARK = "\x1eLAB_EVENT "
 
 
 def listen(listener):
@@ -42,3 +48,36 @@ def emit(kind, **data):
             listener(kind, data)
         except Exception:  # A view must never stop or change a run
             pass
+
+
+def print_line(kind, data):
+    """A listener printing each event as a marked line (a run started by the Windows UI)."""
+    print(MARK + json.dumps({"kind": kind, **data}, ensure_ascii=False, default=str), flush=True)
+
+
+def read_line(line):
+    """(kind, data) of a marked event line, or None for a line of console text."""
+    if not line.startswith(MARK):
+        return None
+    try:
+        event = json.loads(line[len(MARK):])
+    except ValueError:
+        return None
+    return event.pop("kind", ""), event
+
+
+class Stopped(BaseException):
+    """The view asked the run to stop (the Windows UI's Stop button, or its time limit). Not an Exception, so no
+    handler meant for a failed call or page takes it: the run ends as on Ctrl+C, and its report says why."""
+
+
+def stop_requested():
+    """The reason a view asked the run to stop, or None: the file LAB_STOP_FILE names exists, holding the reason."""
+    path = os.environ.get("LAB_STOP_FILE")
+    if not path or not os.path.exists(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read().strip() or "stopped"
+    except OSError:
+        return "stopped"
