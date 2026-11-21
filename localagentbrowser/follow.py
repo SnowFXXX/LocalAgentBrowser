@@ -11,6 +11,76 @@ import re
 FIRST_WORDS = 8          # The words of a part looked for on the page, to scroll to it
 READING_TINT_MS = 2500   # How long the first words of the part read stay tinted
 MIN_QUOTE_CHARS = 12     # Shorter sentences of a discovery are not looked for (they match too much)
+# A discovery the model put in its own words (the checks accept one whose facts are on the page) is marked at the page
+# sentence closest to it: one with every number the discovery gives and at least this share of its words
+NEAREST_SHARE = 0.6
+NEAREST_MAX_CHARS = 600  # Longer stretches without a full stop (lists, tables) are not taken for a sentence
+
+# Finds, for each text, the page sentence sharing most of its words, with all of its numbers, and highlights it under
+# the given name; scrolls to the first. Returns how many were found. (Seen live, Nov 21: Qwen2.5 7B recorded "Mount
+# Kilimanjaro is the highest mountain in Africa, at an elevation of 5,895 m (19,341 ft) above sea level" from a page
+# saying "It is the highest mountain in Africa and ... at 5,895 m (19,341 ft) above sea level", and nothing was marked.)
+NEAREST_JS = r"""([texts, name, share, maxChars]) => { // labFollowNearest
+  try {
+    const skip = /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE)$/;
+    const words = s => [...new Set((s.toLowerCase().match(/[\p{L}\p{N}](?:[\p{L}\p{N},.'-]*[\p{L}\p{N}])?/gu) || [])
+      .filter(w => w.length > 2 || /\d/.test(w)))];
+    const numbers = ws => ws.filter(w => /\d/.test(w));
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT,
+      { acceptNode: n => n.parentElement && !skip.test(n.parentElement.tagName) && n.nodeValue.trim() ? 1 : 2 });
+    let full = "", map = [];
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      for (let i = 0; i < n.nodeValue.length; i++) { full += n.nodeValue[i]; map.push([n, i]); }
+      full += " "; map.push(null);
+    }
+    const sentences = [];
+    let start = 0;
+    for (let i = 0; i <= full.length; i++) {
+      if (i === full.length || (/[.!?]/.test(full[i]) && (i + 1 === full.length || /\s/.test(full[i + 1])))) {
+        const text = full.slice(start, i + 1);
+        if (text.trim().length > 0 && text.length <= maxChars) sentences.push([start, i, text]);
+        start = i + 1;
+      }
+    }
+    const ranges = [];
+    for (const want of texts) {
+      const ws = words(want), nums = numbers(ws);
+      if (ws.length < 4) continue;
+      let best = null;
+      for (const [a, b, text] of sentences) {
+        const have = new Set(words(text));
+        if (!nums.every(n => have.has(n))) continue;
+        const shared = ws.filter(w => have.has(w)).length / ws.length;
+        if (shared >= share && (!best || shared > best[0] || (shared === best[0] && b - a < best[2] - best[1])))
+          best = [shared, a, b];
+      }
+      if (!best) continue;
+      let a = best[1], b = best[2];
+      while (a <= b && (!map[a] || /\s/.test(full[a]))) a++;
+      while (b >= a && (!map[b] || /\s/.test(full[b]))) b--;
+      if (a > b) continue;
+      const range = document.createRange();
+      range.setStart(map[a][0], map[a][1]); range.setEnd(map[b][0], map[b][1] + 1);
+      ranges.push(range);
+    }
+    if (!ranges.length) return 0;
+    if (!document.labFollowSheet && window.CSSStyleSheet) {
+      const sheet = new CSSStyleSheet();
+      sheet.replaceSync("::highlight(lab-found){background-color:rgba(95,211,166,.42);color:inherit}" +
+                        "::highlight(lab-reading){background-color:rgba(127,179,230,.3);color:inherit}");
+      document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+      document.labFollowSheet = sheet;
+    }
+    if (window.CSS && CSS.highlights && window.Highlight) {
+      const highlight = CSS.highlights.get(name) || new Highlight();
+      ranges.forEach(r => highlight.add(r));
+      CSS.highlights.set(name, highlight);
+    }
+    const box = ranges[0].getBoundingClientRect();
+    window.scrollTo({ top: window.scrollY + box.top - window.innerHeight * 0.2, behavior: "smooth" });
+    return ranges.length;
+  } catch (err) { return 0; }
+}"""
 
 # Finds the text on the page (spaces and case aside, so a paragraph break is no obstacle), highlights it under the
 # given name, and scrolls to the first one found. Returns whether it found anything.
@@ -86,12 +156,15 @@ async def show_part(page, part_text):
 
 async def show_discovery(page, text):
     """Highlights a recorded discovery on the page, and scrolls to it: the whole of it, or failing that each of its
-    sentences that is on the page."""
+    sentences that is on the page, or failing that (a discovery in the model's own words) the page sentence closest
+    to each."""
     if not enabled() or not text:
         return False
     whole, *sentences = quote_pieces(text)
     try:
         return (bool(await page.evaluate(FOLLOW_JS, [[whole], "lab-found", True, 0]))
-                or bool(sentences and await page.evaluate(FOLLOW_JS, [sentences, "lab-found", True, 0])))
+                or bool(sentences and await page.evaluate(FOLLOW_JS, [sentences, "lab-found", True, 0]))
+                or bool(await page.evaluate(NEAREST_JS, [sentences or [whole], "lab-found", NEAREST_SHARE,
+                                                         NEAREST_MAX_CHARS])))
     except Exception:
         return False

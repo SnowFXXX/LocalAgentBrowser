@@ -157,6 +157,48 @@ def test_a_discovery_joining_sentences_is_highlighted_sentence_by_sentence():
     assert asyncio.run(follow_by_sentence()) == (True, 2)
 
 
+KILIMANJARO = ("<p>Mount Kilimanjaro is a dormant volcano in Tanzania. It is the highest mountain in Africa and the "
+               "highest free-standing mountain above sea level in the world, at 5,895 m (19,341 ft) above sea level and "
+               "4,900 m (16,100 ft) above its plateau base.</p><p>It is also the highest volcano in the Eastern "
+               "Hemisphere.</p>")
+
+
+async def follow_in_own_words():
+    from playwright.async_api import async_playwright
+    from localagentbrowser import follow
+    async with async_playwright() as p:
+        try:
+            browser = await p.chromium.launch()
+        except Exception as err:
+            pytest.skip(f"no Chromium for Playwright ({str(err)[:80]})")
+        page = await browser.new_page()
+        state = {}
+        for name, finding in (
+                # As Qwen2.5 7B recorded it (live, Nov 21): the checks accepted it; nothing was marked
+                ("own words", "Mount Kilimanjaro is the highest mountain in Africa, at an elevation of 5,895 m "
+                              "(19,341 ft) above sea level."),
+                ("other number", "Mount Kilimanjaro is the highest mountain in Africa, at 5,896 m above sea level."),
+                ("other words", "Paris is the capital and largest city of France, with many famous museums.")):
+            await page.set_content(KILIMANJARO)
+            await page.evaluate("() => CSS.highlights.clear()")  # The last case's marks outlive set_content
+            found = await follow.show_discovery(page, finding)
+            marked = await page.evaluate("() => { const h = CSS.highlights.get('lab-found'); "
+                                         "return h ? [...h].map(r => r.toString()) : []; }")
+            state[name] = (found, marked)
+        await browser.close()
+        return state
+
+
+def test_a_discovery_in_the_model_s_own_words_marks_the_closest_page_sentence():
+    state = asyncio.run(follow_in_own_words())
+    found, marked = state["own words"]
+    assert found and marked == ["It is the highest mountain in Africa and the highest free-standing mountain above sea "
+                                "level in the world, at 5,895 m (19,341 ft) above sea level and 4,900 m (16,100 ft) "
+                                "above its plateau base."]
+    assert state["other number"] == (False, [])  # A number the page sentence doesn't give: not that sentence
+    assert state["other words"] == (False, [])
+
+
 async def watch_mode():
     from playwright.async_api import async_playwright
     async with async_playwright() as p:
