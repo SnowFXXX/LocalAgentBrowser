@@ -55,6 +55,29 @@ def print_line(kind, data):
     print(MARK + json.dumps({"kind": kind, **data}, ensure_ascii=False, default=str), flush=True)
 
 
+def file_listener(path):
+    """A listener appending each event to a file as a line of JSON (a test run's watch window reads it: watch.py)."""
+    def write(kind, data):
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"kind": kind, **data}, ensure_ascii=False, default=str) + "\n")
+    return write
+
+
+ATTACHED = {}  # {target: its listener}
+
+
+def attach(target):
+    """Sends the events where LAB_EVENTS says: "stdout" (a run of the Windows UI's own) or a file path (a test run
+    the watch window follows). Nothing when it is unset, as in a console run; once per target."""
+    if not target or target in ATTACHED:
+        return
+    ATTACHED[target] = listen(print_line if target == "stdout" else file_listener(target))
+
+
+def detach(target):
+    stop_listening(ATTACHED.pop(target, None))
+
+
 def read_line(line):
     """(kind, data) of a marked event line, or None for a line of console text."""
     if not line.startswith(MARK):

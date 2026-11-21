@@ -24,7 +24,7 @@ from .checklist import after_discovery_advice, check_parts, checklist_lines, lin
 from .coverage import amounts_not_found, coverage_refusal, not_found_items, record_install_line, remember_install_lines
 from .checks import check_decision, escalation_message, numbered_discoveries, numbered_lines, refusal_correction, source_note
 from . import colors, follow, windows
-from .events import LISTENERS as EVENT_LISTENERS, Stopped, emit, listen, print_line, stop_requested
+from .events import Stopped, attach as attach_events, emit, stop_requested
 from . import settings
 from .report import compact_journal, compose_final_result, visited_summary, write_report, write_research_log
 
@@ -477,8 +477,8 @@ def with_retries(client):
 SWITCH_TO_WINDOWS_UI = "/ui"  # Typed as the objective in classic mode on Windows: the Windows UI opens instead
 
 async def main():
-    if os.environ.get("LAB_EVENTS") == "stdout" and print_line not in EVENT_LISTENERS:
-        listen(print_line)  # Started by the Windows UI: it reads the events from the console output
+    # Started by the Windows UI (events in the console output), or a test run with a watch window (events to a file)
+    attach_events(os.environ.get("LAB_EVENTS"))
     if not server_allowed():
         print(f"Error: The model server {BASE_URL} is not on this PC or your local network, and this edition only uses one "
               "that is. Set LMSTUDIO_BASE_URL to LM Studio's address (default http://localhost:1234/v1).")

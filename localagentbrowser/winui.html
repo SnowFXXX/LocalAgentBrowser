@@ -141,6 +141,7 @@ pre.console { font-family: var(--mono); font-size: 12px; color: var(--sub); back
 
   <section id="live" hidden>
     <div class="head">
+      <div class="note" id="watch-line" hidden></div>
       <div class="objective" id="live-objective"></div>
       <div class="status">
         <span class="state" id="state">Starting</span>
@@ -175,6 +176,7 @@ const host = url => { try { return new URL(url).host.replace(/^www\./, ""); } ca
 const STATES = { SEARCH: ["Searching", ""], NAVIGATE: ["Reading", ""], READ_MORE: ["Reading", ""],
   DISCOVER: ["Recording", "mint"], FINISH: ["Checking", "amber"] };
 let setup = null, run = null, current = null, timer = null, clock = null, lines = 0;
+let watching = null;  // The watch window of a test run (winui.py --watch): its title; it follows tasks, starts none
 
 function setState(text, tone) { const s = $("state"); s.textContent = text; s.className = "state " + (tone || ""); }
 
@@ -287,9 +289,28 @@ function showRun(e) {
 }
 
 const handlers = {
-  setup: fillSetup,
+  setup(e) { if (!watching) fillSetup(e); },
   server: server,
-  started: showRun,
+  started(e) {
+    showRun(e);
+    if (watching) {
+      $("stop").hidden = true;
+      const w = e.watch || {};
+      $("watch-line").hidden = false;
+      $("watch-line").textContent = watching + (w.n ? " · " + w.n + (w.of ? " of " + w.of : "") : "") + " · " + (w.label || "");
+      $("live-objective").textContent = "";
+    }
+  },
+  watch(e) {
+    watching = e.title;
+    $("start").hidden = true; $("live").hidden = false;
+    $("stop").hidden = true; $("classic").hidden = true; $("again").hidden = true;
+    $("watch-line").hidden = false; $("watch-line").textContent = e.title + " · waiting for the first task";
+    setState("Waiting", "");
+  },
+  watch_done() { setState("Finished", "mint"); $("watch-line").textContent += " · the run is over"; },
+  objective(e) { if (watching || !$("live-objective").textContent) $("live-objective").textContent = e.objective; },
+  note(e) { card(e.tone || "quiet", e.label || "NOTE", e.text); },
   checklist(e) { run.checklist = e.items; chips(e.items); },
   turn(e) { $("turn").textContent = "Turn " + e.number; },
   waiting() { startTimer(); if (!run.ended && $("state").textContent !== "Writing") setState("Thinking", ""); },

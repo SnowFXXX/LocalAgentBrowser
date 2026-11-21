@@ -56,6 +56,7 @@ def main():
     start = time.time()
     print(f"SimpleQA: {len(questions)} questions from {args.sample}, {args.model} on OpenRouter, "
           f"commit {info['commit'][:7]}.\nResults: {out}\n", flush=True)
+    simpleqa.watch.start(f"SimpleQA · {args.model}", total=len(questions))  # LAB_WATCH=0 for none
     for q in questions:
         folder = os.path.join(out, f"q{q['n']:03d}")
         os.makedirs(folder, exist_ok=True)
@@ -64,7 +65,8 @@ def main():
         with open(os.path.join(folder, "console.txt"), "w", encoding="utf-8") as console:
             p = subprocess.Popen([sys.executable, "-u", os.path.join(simpleqa.ROOT, "tools", "live_test.py"), q["problem"],
                                   "--minutes", str(simpleqa.MINUTES), "--out", folder],
-                                 cwd=simpleqa.ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, text=True,
+                                 cwd=simpleqa.ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                                 env=simpleqa.watch.task_env(env, f"q{q['n']:03d}", folder, args.model),
                                  encoding="utf-8", errors="replace")
             for line in p.stdout:
                 console.write(line)
@@ -72,6 +74,7 @@ def main():
             p.wait()
         answer = " ".join((simpleqa.final_result(folder) or "(no final result)").split())
         print(f"     {time.time() - t:.0f} s   answer:    {answer[:600]}\n     reference: {q['answer']}\n", flush=True)
+    simpleqa.watch.finish()
     info.update(finished=datetime.datetime.now().isoformat(timespec="seconds"),
                 minutes=round((time.time() - start) / 60, 1))
     with open(os.path.join(out, "run_info.json"), "w", encoding="utf-8") as f:

@@ -22,7 +22,7 @@ import tempfile
 import urllib.request
 import webbrowser
 
-from . import settings, windows
+from . import settings, watch, windows
 from .config import BASE_URL, CHROMIUM_ARGS
 from .events import read_line
 from .reportpage import page as report_page, to_html
@@ -143,10 +143,11 @@ class Run:
 
 
 class App:
-    def __init__(self, page, remote=False):
+    def __init__(self, page, remote=False, watching=False):
         self.page, self.run, self.done, self.tray = page, None, asyncio.Event(), None
         self.choices = settings.load()
         self.remote = remote  # Opened from the second shortcut ("--remote"): its model starts ticked; never saved
+        self.watching = watching  # The watch window of a test run (watch.py): it follows tasks, it starts none
 
     async def tray_command(self, command):
         """A choice from the tray icon's menu (or a click on the icon: "open")."""
@@ -171,6 +172,8 @@ class App:
 
     async def handle(self, message):
         kind = message.get("type")
+        if self.watching and kind != "open":
+            return
         if kind == "hello":
             await self.send("setup", **self.setup_state())
         elif kind == "check":
@@ -356,9 +359,83 @@ async def show_ui(profile, remote):
             pass
 
 
+WATCH_POLL_SECONDS = 0.5  # How often the watch window looks for new events and a new task
+
+
+async def follow_watch(app, folder):
+    """The watch window's loop: the current task's events, as they are written, then its report; then the next."""
+    current, offset, pending, stopped, finished = {}, 0, b"", False, False
+    while not app.done.is_set():
+        state = watch.read_state(folder)
+        if state.get("file") and state["file"] != current.get("file"):
+            current, offset, pending, stopped = state, 0, b"", False
+            await app.send("started", objective=state.get("label") or "", folder=state.get("folder") or "",
+                           model=state.get("model") or "", watch=state)
+        if current.get("file"):
+            try:
+                with open(current["file"], "rb") as f:
+                    f.seek(offset)
+                    chunk = f.read()
+            except OSError:
+                chunk = b""
+            offset += len(chunk)
+            *lines, pending = (pending + chunk).split(b"\n")
+            for raw in lines:
+                try:
+                    event = json.loads(raw.decode("utf-8"))
+                except ValueError:
+                    continue
+                kind = event.pop("kind", "")
+                if kind == "result":
+                    event["html"] = to_html(event.get("text") or "")
+                await app.send(kind, **event)
+                if kind == "stopped" and not stopped:
+                    stopped = True
+                    whole = report_page_for(current.get("folder") or "")
+                    if whole:
+                        await app.send("report", page=whole, folder=current["folder"], past=False)
+        if state.get("done") and not finished and (stopped or not current):
+            finished = True
+            await app.send("watch_done")
+        await asyncio.sleep(WATCH_POLL_SECONDS)
+
+
+async def show_watch(profile, folder):
+    from playwright.async_api import async_playwright
+    async with async_playwright() as p:
+        context = await p.chromium.launch_persistent_context(
+            profile, headless=False, no_viewport=True, args=["--app=about:blank", *CHROMIUM_ARGS])
+        page = context.pages[0] if context.pages else await context.new_page()
+        app = App(page, watching=True)
+        await context.expose_binding("labSend", app.on_message)
+        page.on("close", lambda _: app.done.set())
+        with open(PAGE_FILE, encoding="utf-8") as f:
+            await page.set_content(f.read())
+        place_window("left")
+        await app.send("watch", title=watch.read_state(folder).get("title") or "Test run")
+        await follow_watch(app, folder)
+        try:
+            await context.close()
+        except Exception:
+            pass
+
+
+async def watch_main(folder):
+    profile = tempfile.mkdtemp(prefix="LocalAgentBrowser-ui-")
+    try:
+        await show_watch(profile, folder)
+    finally:
+        shutil.rmtree(profile, ignore_errors=True)
+        if watch.read_state(folder).get("done"):  # Closed after the run: its files are not needed any more
+            shutil.rmtree(folder, ignore_errors=True)
+
+
 def run():
     """Entry point (`localagentbrowser-ui`, and the Windows shortcuts). Classic mode where the setting asks for it, or
-    where there is no Windows. "--remote" (the second shortcut) starts with the second kind of model ticked."""
+    where there is no Windows. "--remote" (the second shortcut) starts with the second kind of model ticked;
+    "--watch FOLDER" opens the watch window of a test run (watch.py) instead."""
+    if "--watch" in sys.argv[1:]:
+        return asyncio.run(watch_main(sys.argv[sys.argv.index("--watch") + 1]))
     if sys.platform != "win32":
         from .agent import run as classic
         return classic()

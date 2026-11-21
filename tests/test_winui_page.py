@@ -154,3 +154,43 @@ async def follow_by_sentence():
 
 def test_a_discovery_joining_sentences_is_highlighted_sentence_by_sentence():
     assert asyncio.run(follow_by_sentence()) == (True, 2)
+
+
+async def watch_mode():
+    from playwright.async_api import async_playwright
+    async with async_playwright() as p:
+        try:
+            browser = await p.chromium.launch()
+        except Exception as err:
+            pytest.skip(f"no Chromium for Playwright ({str(err)[:80]})")
+        page = await browser.new_page()
+        await page.expose_binding("labSend", lambda source, message: None)
+        with open(winui.PAGE_FILE, encoding="utf-8") as f:
+            await page.set_content(f.read())
+
+        async def receive(kind, data):
+            await page.evaluate("e => lab.receive(e)", {"kind": kind, **data})
+        await receive("watch", {"title": "Test suite · gemma-3-4b-it"})
+        state = {"waiting": await page.inner_text("#watch-line"), "start": await page.is_visible("#start"),
+                 "classic": await page.is_visible("#classic")}
+        await receive("setup", SETUP)  # The page asks for its setup on load; a watch window keeps its own view
+        await receive("started", {"objective": "factual", "folder": "C:\\Runs\\x", "model": "gemma-3-4b-it",
+                                  "watch": {"label": "factual", "n": 2, "of": 7}})
+        await receive("objective", {"objective": "What is the tallest mountain in Africa?"})
+        await receive("note", {"label": "QUICK CHECK", "text": "PASS split: 3 item(s)", "tone": "mint"})
+        await receive("watch_done", {})
+        state.update(line=await page.inner_text("#watch-line"), objective=await page.inner_text("#live-objective"),
+                     stop=await page.is_visible("#stop"), start_after=await page.is_visible("#start"),
+                     labels=await page.eval_on_selector_all("#timeline .card .label", "ls => ls.map(l => l.textContent)"),
+                     state=await page.inner_text("#state"))
+        await browser.close()
+        return state
+
+
+def test_the_watch_window_follows_tasks_and_starts_none():
+    state = asyncio.run(watch_mode())
+    assert "waiting for the first task" in state["waiting"]
+    assert not state["start"] and not state["classic"] and not state["start_after"] and not state["stop"]
+    assert state["line"] == "Test suite · gemma-3-4b-it · 2 of 7 · factual · the run is over"
+    assert state["objective"] == "What is the tallest mountain in Africa?"
+    assert state["labels"] == ["START", "QUICK CHECK"] and state["state"] == "FINISHED"

@@ -26,6 +26,8 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
+sys.path.insert(0, ROOT)
+from localagentbrowser import watch  # noqa: E402  (the watch window beside each question's browser)
 DATA = os.path.join(HERE, "data", "simple_qa_test_set.csv")
 DATA_SHA256 = "feee3f7e7db3617e94e8fcf1977b756ec420ef8568f4e0fcbbe0e92e9d5fc032"  # As downloaded 2026-11-06 (MD5 = server's)
 SAMPLE = os.path.join(HERE, "sample.json")
@@ -83,6 +85,7 @@ def run(part, of, model):
     mine = [q for q in questions if (q["n"] - 1) % of == part - 1]
     env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1", LMSTUDIO_MODEL=model,
                LAB_BLOCKED_SITES=",".join(BLOCKED))
+    watch.start(f"SimpleQA · {model}", total=len(mine))  # LAB_WATCH=0 for none
     for q in mine:
         folder = os.path.join(RUNS, f"q{q['n']:02d}")
         if final_result(folder) is not None:
@@ -93,7 +96,8 @@ def run(part, of, model):
         with open(os.path.join(folder, "console.txt"), "w", encoding="utf-8") as console:
             process = subprocess.Popen([sys.executable, "-u", os.path.join(ROOT, "tools", "live_test.py"),
                                         q["problem"], "--minutes", str(MINUTES), "--out", folder],
-                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, text=True,
+                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                                       env=watch.task_env(env, f"q{q['n']:02d}", folder, model),
                                        encoding="utf-8", errors="replace")
             for line in process.stdout:
                 console.write(line)
@@ -101,6 +105,7 @@ def run(part, of, model):
             process.wait()
         result = final_result(folder)
         print(f"===== RESULT q{q['n']:02d}: {'finished' if result else 'no final result'}", flush=True)
+    watch.finish()
 
 
 def sheet():

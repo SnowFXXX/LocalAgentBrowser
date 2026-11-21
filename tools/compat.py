@@ -47,7 +47,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 import agent_browser as ab  # noqa: E402
 import regression as rg  # noqa: E402
-from localagentbrowser import agent  # noqa: E402
+from localagentbrowser import agent, events, watch  # noqa: E402
 
 RESULTS_DIR = os.environ.get("LAB_COMPAT_DIR", r"C:\LocalAgentBrowser-compat-runs")
 LMS = next((p for p in (os.path.expanduser(r"~\.lmstudio\bin\lms.exe"), shutil.which("lms") or "") if p and os.path.exists(p)), "lms")
@@ -251,6 +251,7 @@ async def quick_checks(counted):
         results.append({"check": name, "passed": ok, "detail": detail, "error": error,
                         "calls": counted.calls - calls, "seconds": round(time.time() - started, 1)})
         print(f"   {'PASS' if ok else 'FAIL'} {name}: {detail}", flush=True)
+        shown(name, ok, detail)
 
     started = time.time()
     checklist = await ab.split_objective(client, OBJECTIVE)
@@ -259,6 +260,7 @@ async def quick_checks(counted):
                     "seconds": round(time.time() - started, 1),
                     "detail": f"{len(texts)} item(s): " + " | ".join(t[:80] for t in texts)})
     print(f"   {'PASS' if results[0]['passed'] else 'FAIL'} split: {results[0]['detail']}", flush=True)
+    shown("split", results[0]["passed"], results[0]["detail"])
     await run("search page", check_search_page(client, [dict(i, discoveries=[]) for i in checklist]))
     await run("discover", check_discover(client, [dict(i, discoveries=[]) for i in checklist]))
     await run("coverage", check_coverage(client, [dict(i, discoveries=[]) for i in checklist]))
@@ -266,6 +268,12 @@ async def quick_checks(counted):
     await run("view", check_view(client))
     await run("cut-off retry", check_cut_off(client, [dict(i, discoveries=[]) for i in checklist]))
     return results
+
+
+def shown(name, ok, detail):
+    """A quick check's result, for the watch window (watch.py), as a card of its own."""
+    events.emit("note", label="QUICK CHECK", text=f"{'PASS' if ok else 'FAIL'} {name}: {detail}",
+                tone="mint" if ok else "amber")
 
 
 def live_task(folder, minutes, model):
@@ -320,6 +328,9 @@ def test_one(model, folder, live, minutes):
                                                      default_headers=ab.EXTRA_HEADERS or None,
                                                      # cloud:end
                                                      )))
+    # The watch window, when the list has one: this model's quick checks, then its live task, as one task
+    watch.begin(model, os.path.join(folder, "factual"), model)
+    events.attach(os.environ.get("LAB_EVENTS"))
     print(f"Quick checks of {model}:", flush=True)
     results = asyncio.run(quick_checks(counted))
     workarounds = []
@@ -462,6 +473,10 @@ def run_list(models, args):
     # cloud:end
     folder = os.path.join(RESULTS_DIR, f"{datetime.datetime.now():%Y%m%d-%H%M}_{where}")
     os.makedirs(folder, exist_ok=True)
+    # The watch window: each model's quick checks and live task beside its browser (watch.py; LAB_WATCH=0 for none)
+    watched = watch.start(f"Compatibility test · {where} models", total=len(models))
+    if watched:
+        env["LAB_WATCH_DIR"] = watched
     rows = []
     for n, line in enumerate(models, 1):
         print(f"\n===== {n}/{len(models)}: {line}", flush=True)
@@ -481,7 +496,9 @@ def run_list(models, args):
                        "--minutes", str(args.minutes)] + (["--no-live"] if args.no_live else [])
             with open(os.path.join(out, "console.txt"), "w", encoding="utf-8") as console:
                 process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                                           encoding="utf-8", errors="replace", env=dict(env, LMSTUDIO_MODEL=model))
+                                           encoding="utf-8", errors="replace",
+                                           env=dict(env, LMSTUDIO_MODEL=model, LAB_WATCH_N=str(n),
+                                                    LAB_WATCH_OF=str(len(models))))
                 for text in process.stdout:
                     print(text, end="", flush=True)
                     console.write(text)
@@ -524,6 +541,7 @@ def run_list(models, args):
                 print(f"Stopping: ${spent:.4f} spent, the budget is ${args.budget:g}.", flush=True)
                 break
         # cloud:end
+    watch.finish()
     print(f"\nSummary: {os.path.join(folder, 'summary.md')}", flush=True)
 
 

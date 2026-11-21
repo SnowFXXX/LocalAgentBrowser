@@ -37,6 +37,7 @@ from urllib.parse import urlparse
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 import agent_browser as ab  # noqa: E402
+from localagentbrowser import watch  # noqa: E402
 
 
 def says(word, text):
@@ -567,6 +568,7 @@ def run_task(task, folder, minutes, model):
     """Runs one task through the live test runner, copying its console output to the screen and to console.txt."""
     os.makedirs(folder, exist_ok=True)
     env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1", LMSTUDIO_MODEL=model)
+    env = watch.task_env(env, task["id"], folder, model)  # The watch window follows it, when there is one
     command = [sys.executable, "-u", os.path.join(ROOT, "tools", "live_test.py"), task["objective"],
                "--minutes", str(minutes), "--out", folder]
     with open(os.path.join(folder, "console.txt"), "w", encoding="utf-8") as console:
@@ -648,6 +650,8 @@ def main():
     print(f"Run info: {info['pc']}, commit {info['commit']}, changes {str(info['changes_sha256'])[:16]} "
           f"({len(info['changed_files'])} files)", flush=True)
     scores = []
+    # The watch window: each task's live view beside its browser (watch.py; LAB_WATCH=0 for none)
+    watch.start(f"Test suite · {model}", total=len(tasks))
     for number, task in enumerate(tasks, start=1):
         minutes = args.minutes
         print(f"\n===== REGRESSION TASK {number}/{len(tasks)}: {task['id']} ({task['kind']}, up to {minutes:g} min) =====\n",
@@ -664,6 +668,7 @@ def main():
             if "The model call failed" in console.read() and number < len(tasks):
                 print(f"The model call failed in this task; waiting {FAILURE_PAUSE_SECONDS} s before the next one.", flush=True)
                 time.sleep(FAILURE_PAUSE_SECONDS)
+    watch.finish()
     print("\n" + summary_markdown(meta, scores, baseline))
     print(f"Summary: {os.path.join(folder, 'summary.md')}")
 
