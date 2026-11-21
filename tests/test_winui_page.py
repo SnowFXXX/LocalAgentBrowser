@@ -313,6 +313,51 @@ async def long_run():
         return state
 
 
+async def following_the_newest_card():
+    from playwright.async_api import async_playwright
+    async with async_playwright() as p:
+        try:
+            browser = await p.chromium.launch()
+        except Exception as err:
+            pytest.skip(f"no Chromium for Playwright ({str(err)[:80]})")
+        page = await browser.new_page(viewport={"width": 720, "height": 800})
+        await page.expose_binding("labSend", lambda source, message: None)
+        with open(winui.PAGE_FILE, encoding="utf-8") as f:
+            await page.set_content(f.read())
+
+        async def receive(kind, data):
+            await page.evaluate("e => lab.receive(e)", {"kind": kind, **data})
+            await page.wait_for_timeout(120)
+
+        def at_bottom():
+            return page.evaluate("() => innerHeight + scrollY >= document.documentElement.scrollHeight - 2")
+        await receive("started", {"objective": "How tall is Kilimanjaro?", "folder": "C:\\Runs\\x", "model": "m"})
+        await receive("checklist", {"items": [{"text": "its height", "discoveries": []}]})
+        for n in range(12):
+            await receive("decision", {"action": "READ_MORE", "parameter": str(n + 2), "thought": "Reading on. " * 20})
+        # A card that grows after it is made: the finding gets its source and items, then a check's whole message
+        await receive("decision", {"action": "DISCOVER", "parameter": "Kilimanjaro is 5,895 m.", "thought": ""})
+        await receive("discovery", {"number": 1, "text": "Kilimanjaro is 5,895 m.", "source": A, "items": [1],
+                                    "checklist": [{"text": "its height", "discoveries": [1]}]})
+        await receive("retried", {"action": "FINISH", "parameter": "x", "reason": LONG_REASON})
+        state = {"follows": await at_bottom()}
+        await page.evaluate("() => window.scrollTo(0, 300)")  # The person scrolls up to read
+        await page.wait_for_timeout(120)
+        await receive("decision", {"action": "READ_MORE", "parameter": "20", "thought": "More."})
+        state["stays"] = await page.evaluate("() => window.scrollY") == 300
+        await page.evaluate("() => window.scrollTo(0, document.documentElement.scrollHeight)")  # And back down
+        await page.wait_for_timeout(120)
+        await receive("decision", {"action": "READ_MORE", "parameter": "21", "thought": "More. " * 30})
+        state["follows_again"] = await at_bottom()
+        await browser.close()
+        return state
+
+
+def test_the_live_view_keeps_its_newest_card_in_sight_unless_scrolled_up():
+    """Seen live (Nov 21): cards that grow once made were left below the window's edge."""
+    assert asyncio.run(following_the_newest_card()) == {"follows": True, "stays": True, "follows_again": True}
+
+
 def test_a_long_run_keeps_the_bar_and_a_check_s_card_shows_its_reason_first():
     """Seen live (Nov 21): past a window's length the bar scrolled away (the body was the window's height), and a
     refusal's card showed the checks' whole message to the model, a page long."""

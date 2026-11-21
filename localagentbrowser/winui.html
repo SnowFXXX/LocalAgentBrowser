@@ -204,8 +204,7 @@ function card(tone, label, main) {
   c.append(head);
   $("timeline").append(c);
   $("steps-summary").textContent = "Steps (" + $("timeline").children.length + ")";
-  if (!run || !run.ended) c.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  return c;
+  return c;  // keepUp() brings it into sight, once it is whole
 }
 
 // A check's message to the model can run to a page: its card shows the first sentence (the reason), and the whole
@@ -342,6 +341,7 @@ function start() {
 
 function showRun(e) {
   run = { started: Date.now(), folder: e.folder, ended: false, checklist: [] };
+  following = true;  // A new run follows its newest card again
   $("start").hidden = true; $("live").hidden = false; $("done").hidden = true;
   $("timeline").textContent = ""; $("chips").textContent = ""; $("console").textContent = ""; lines = 0;
   $("steps").open = true; $("steps-summary").textContent = "Steps";
@@ -507,6 +507,21 @@ const handlers = {
 };
 
 window.lab = { receive(e) { const h = handlers[e.kind]; if (h) h(e); } };
+
+// The live view keeps its newest card in sight as the run goes, unless the person has scrolled up to read an earlier
+// one (scrolling back to the bottom follows again). It acts on every change to the timeline, after the change: cards
+// grow once made (a finding's source and items, a check's whole message), and scrolling each card into view as it was
+// made left the newest ones below the window's edge (seen live, Nov 21). The report, once shown, has its own place.
+let following = true;
+function keepUp() {
+  if (!run || run.ended || $("live").hidden || !$("done").hidden || !following) return;
+  window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "auto" });
+}
+new MutationObserver(() => requestAnimationFrame(keepUp))
+  .observe($("timeline"), { childList: true, subtree: true, characterData: true });
+window.addEventListener("scroll", () => {
+  following = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 120;
+}, { passive: true });
 
 document.addEventListener("click", ev => {
   const a = ev.target.closest("a");
