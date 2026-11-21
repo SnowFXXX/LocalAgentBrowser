@@ -599,6 +599,7 @@ More in [docs/how-it-works.md](https://github.com/SnowFXXX/LocalAgentBrowser/blo
 - [x] **The Windows UI (1.68):** a window of its own with a live view, a browser that follows the agent, a tray icon,
   and a choice of cloud model; a compatibility test for any model; silent omissions counted in the regression suite
   ([issue #11](https://github.com/SnowFXXX/LocalAgentBrowser/issues/11))
+- [ ] Understand loosely worded questions, and check the checklist with you when it's unsure
 - [ ] Decide in code, not by asking the model, whether a finding answers the part it's credited to
 - [ ] Refuse a finding that changes one of the page's key words (1.66's SimpleQA run recorded "men's foil" from a
   page that says "épée")
