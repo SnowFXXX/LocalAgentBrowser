@@ -32,6 +32,11 @@ Chromium window you can watch. By default the model runs in [LM Studio](https://
 and the agent is built to work even with a **small model on an ordinary CPU, no GPU required**; if you want speed, it
 can use a cloud model instead. Every claim in its answer points to the page it came from.
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/ui/run-beside-browser.png" alt="LocalAgentBrowser 1.68 on Windows. On the left, its window follows the run: the two parts of the question as chips, a card for reading part 20 of 32, the finding it recorded (60 tons of paint every 7 years, repainted at least 19 times), and the checks asking the model again before finishing. On the right, the agent's browser shows the Eiffel Tower article with that sentence marked in mint." width="820">
+</p>
+<p align="center"><sub>1.68 on Windows: the window follows the run on the left; the agent's browser marks what it recorded, in mint, on the right. The amber cards are the checks at work.</sub></p>
+
 - 🔒 **Local by default, cloud if you choose.** By default the model runs in your own LM Studio, with no API key, and
   your objective and report stay on your computer (searches go to DuckDuckGo and pages load like in any browser).
   Cloud models through OpenRouter are an option you turn on yourself, with your own key: much faster, but your
@@ -243,7 +248,9 @@ Tested on the pre-release 1.68 code, November 20 and 21, 2026:
 
 - **79 cloud models on OpenRouter:** 61 compatible, 14 compatible with limits, 1 not compatible (Command R7B,
   which finished from what it had read without recording it), and 3 not settled because their providers failed the
-  calls. The 79 tests cost $3.70 together. The window's cloud model menu lists the 61, with our recommendations first.
+  calls. The 79 tests cost $3.70 together. The window's cloud model menu lists the 61, with our recommendations first:
+
+  <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/ui/cloud-model-menu.png" alt="The start screen with the cloud box ticked: a Model menu showing microsoft/phi-4, and under it the note: The default. Finished all 7 test tasks on 1.67 in 4.9 minutes, for about $0.03; 85% right on 200 SimpleQA questions." width="600">
 - **18 local models in LM Studio, on the same CPU as the suite:** <!-- local results to add when the run ends -->
 
 <details>
@@ -354,7 +361,17 @@ your browser when the run ends.
    under **Documents\LocalAgentBrowser runs**. Minimized, the window goes to the notification area; its icon's menu
    has New research, Recent reports, Stop the run and Quit.
 
-<!-- Screenshots of 1.68 to add: the start screen, a run with the browser beside it, the report in the window -->
+<p align="center">
+  <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/ui/start-screen.png" alt="The start screen: What should I research?, a question typed in, the model from LM Studio's list, a time limit, the reports folder, the cloud option unticked, LM Studio ready, Start research, and recent reports" width="420">
+  <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/ui/live-view.png" alt="The live view: the question, its two parts as chips, a Read more card for part 20 of 32, the finding recorded with its source and the items it answers, and the checks asking the model again" width="190">
+  <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/ui/report-in-window.png" alt="The report in the window, with buttons for New research, Open the run folder and Open the report as a page, and the final result with its citations" width="190">
+</p>
+<p align="center"><sub>Ask, watch it work, read the report: 1.68's window, here on a cloud model.</sub></p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/ui/reading-on.png" alt="Reading on: the agent's browser has jumped to part 2 of the Eiffel Tower article, the Origin section, and tints its first words; on the left, a Read more card for part 2 of 32 between two amber cards, the checks refusing to let it read on before recording what it saw" width="820">
+</p>
+<p align="center"><sub>On READ_MORE the browser jumps to the part now read and tints its first words. In amber, the checks: each card gives the reason, and the whole message to the model is one click away.</sub></p>
 
 **The classic console** is one click away: **Classic console** at the top of the window (or the Start menu's
 **LocalAgentBrowser (classic console)**) opens it, with the console and the browser side by side as in 1.66, and
@@ -630,6 +647,10 @@ list, `--no-live` runs the quick checks only, and `--minutes` changes the live t
 On Windows, a test run started from a console (the suite, the compatibility test or SimpleQA) opens a **watch
 window**: the same live view as the app's, on the left, following each task beside its browser (`LAB_WATCH=0` turns
 it off).
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/ui/watch-window.png" alt="The watch window of a compatibility test, Phi-4 through OpenRouter, 1 of 1: the live task's question with its three parts lit up, the search results, the Wikipedia page opened, the finding recorded with the three items it answers, and the checks asking again before finishing; the agent's browser shows the Mount Kilimanjaro article on the right." width="820">
+</p>
 
 Each run gets a folder in `regression_runs/` (or in the folder `LAB_RUNS_DIR` names; the installer's "Run the test
 suite" shortcut uses Documents\LocalAgentBrowser test-suite runs) with every task's report, journal and prompt
