@@ -33,19 +33,35 @@ class TestLauncherText:
 
 
 class TestInstallerShortcuts:
-    def test_the_cloud_shortcuts_pass_cloud_and_only_when_chosen(self):
+    """Nothing leaves the PC unless the cloud shortcut was the one opened: the Windows UI's "--remote" (never saved)
+    or, in classic mode, the launcher's "cloud" argument."""
+
+    def test_the_cloud_shortcuts_tick_the_cloud_model_and_only_when_chosen(self):
         with open(INSTALLER, encoding="utf-8") as f:
             lines = [line for line in f.read().splitlines() if "(cloud)\"; Filename:" in line]
         assert len(lines) == 2
         for line in lines:
-            assert 'Parameters: "cloud"' in line and "Check: CloudChosen" in line
+            assert 'Parameters: "-m localagentbrowser.winui --remote"' in line and "Check: CloudChosen" in line
 
-    def test_the_plain_shortcuts_take_no_argument(self):
+    def test_the_plain_shortcuts_open_the_windows_ui_with_no_other_argument(self):
         with open(INSTALLER, encoding="utf-8") as f:
             lines = [line for line in f.read().splitlines() if line.startswith('Name: "{group}\\{#AppTitle}";')
                      or line.startswith('Name: "{autodesktop}\\{#AppTitle}";')]
         assert len(lines) == 2
-        assert not any("Parameters:" in line for line in lines)
+        for line in lines:
+            assert 'Filename: "{app}\\python\\pythonw.exe"; Parameters: "-m localagentbrowser.winui";' in line
+
+    def test_the_classic_shortcut_opens_the_console_launcher_with_no_argument(self):
+        with open(INSTALLER, encoding="utf-8") as f:
+            lines = [line for line in f.read().splitlines() if "(classic console)\"; Filename:" in line]
+        assert len(lines) == 1
+        assert 'Filename: "{app}\\tools\\windows\\LocalAgentBrowser.cmd";' in lines[0] and "Parameters:" not in lines[0]
+
+    def test_the_cloud_tick_is_never_kept(self, tmp_path, monkeypatch):
+        from localagentbrowser import settings
+        monkeypatch.setenv("APPDATA", str(tmp_path))
+        settings.save(remote=True)  # Even if something tried
+        assert "remote" not in settings.defaults() and "remote" not in settings.load()
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="runs the Windows launcher")

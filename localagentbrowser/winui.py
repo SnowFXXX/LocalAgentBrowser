@@ -15,6 +15,7 @@ import datetime
 import html
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -142,9 +143,10 @@ class Run:
 
 
 class App:
-    def __init__(self, page):
+    def __init__(self, page, remote=False):
         self.page, self.run, self.done, self.tray = page, None, asyncio.Event(), None
         self.choices = settings.load()
+        self.remote = remote  # Opened from the second shortcut ("--remote"): its model starts ticked; never saved
 
     async def tray_command(self, command):
         """A choice from the tray icon's menu (or a click on the icon: "open")."""
@@ -194,7 +196,7 @@ class App:
         model = self.choices.get("model") or settings.setup_choices("model.cmd").get("LMSTUDIO_MODEL")
         return {"edition": EDITION, "ready": ready, "models": models, "note": note, "model": model,
                 "minutes": self.choices.get("minutes") or 0, "folder": self.choices.get("folder") or settings.runs_folder(),
-                "remote": remote_option(), "remote_chosen": bool(self.choices.get("remote")),
+                "remote": remote_option(), "remote_chosen": self.remote,
                 "recent": recent_reports(self.choices.get("folder") or settings.runs_folder())}
 
     async def start(self, message):
@@ -203,25 +205,25 @@ class App:
             return
         self.choices = settings.save(model=message.get("model") or self.choices.get("model"),
                                      minutes=int(message.get("minutes") or 0),
-                                     folder=message.get("folder") or self.choices.get("folder") or settings.runs_folder(),
-                                     remote=bool(message.get("remote")))
-        folder = new_run_folder(self.choices["folder"])
+                                     folder=message.get("folder") or self.choices.get("folder") or settings.runs_folder())
+        choices = dict(self.choices, remote=bool(message.get("remote")))  # For this run only
+        folder = new_run_folder(choices["folder"])
         stop_file = os.path.join(tempfile.gettempdir(), f"LocalAgentBrowser-stop-{os.getpid()}-{os.path.basename(folder)}")
         if os.path.exists(stop_file):
             os.remove(stop_file)
         process = await asyncio.create_subprocess_exec(
             settings.python(windowless=False), "-u", "-m", "localagentbrowser", cwd=folder,
-            env=run_environment(self.choices, stop_file), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            env=run_environment(choices, stop_file), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, creationflags=CREATE_NO_WINDOW if sys.platform == "win32" else 0)
         process.stdin.write((objective + "\n").encode("utf-8"))
         await process.stdin.drain()
         process.stdin.close()
-        self.run = Run(folder, process, stop_file, self.choices)
+        self.run = Run(folder, process, stop_file, choices)
         place_window("left")
-        await self.send("started", objective=objective, folder=folder, model=self.choices.get("model") or "")
+        await self.send("started", objective=objective, folder=folder, model=choices.get("model") or "")
         asyncio.ensure_future(self.follow(self.run))
-        if self.choices.get("minutes"):
-            asyncio.ensure_future(self.time_limit(self.run, self.choices["minutes"]))
+        if choices.get("minutes"):
+            asyncio.ensure_future(self.time_limit(self.run, choices["minutes"]))
 
     async def follow(self, run):
         """The run's output: event lines to the page, console text to console.txt and the page's console view."""
@@ -319,14 +321,21 @@ async def to_tray_when_minimized(app):
         await asyncio.sleep(TRAY_CHECK_SECONDS)
 
 
-async def main():
+async def main(remote=False):
+    profile = tempfile.mkdtemp(prefix="LocalAgentBrowser-ui-")  # The UI window's own browser profile, removed at the end
+    try:
+        await show_ui(profile, remote)
+    finally:
+        shutil.rmtree(profile, ignore_errors=True)
+
+
+async def show_ui(profile, remote):
     from playwright.async_api import async_playwright
     async with async_playwright() as p:
         context = await p.chromium.launch_persistent_context(
-            tempfile.mkdtemp(prefix="LocalAgentBrowser-ui-"), headless=False, no_viewport=True,
-            args=["--app=about:blank", *CHROMIUM_ARGS])
+            profile, headless=False, no_viewport=True, args=["--app=about:blank", *CHROMIUM_ARGS])
         page = context.pages[0] if context.pages else await context.new_page()
-        app = App(page)
+        app = App(page, remote)
         await context.expose_binding("labSend", app.on_message)
         page.on("close", lambda _: asyncio.ensure_future(app.quit()))
         with open(PAGE_FILE, encoding="utf-8") as f:
@@ -349,13 +358,18 @@ async def main():
 
 def run():
     """Entry point (`localagentbrowser-ui`, and the Windows shortcuts). Classic mode where the setting asks for it, or
-    where there is no Windows."""
+    where there is no Windows. "--remote" (the second shortcut) starts with the second kind of model ticked."""
     if sys.platform != "win32":
         from .agent import run as classic
         return classic()
+    remote = "--remote" in sys.argv[1:]
     if settings.load().get("ui") == "classic":
-        return settings.open_classic()
-    asyncio.run(main())
+        arguments = []
+        # cloud:start
+        arguments = ["cloud"] if remote else []  # The console launcher's own argument for it
+        # cloud:end
+        return settings.open_classic(arguments)
+    asyncio.run(main(remote))
 
 
 if __name__ == "__main__":

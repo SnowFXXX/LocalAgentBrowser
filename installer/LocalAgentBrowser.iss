@@ -64,15 +64,18 @@ Source: "{#Stage}\tools\live_test.py"; DestDir: "{app}\tools"; Flags: ignorevers
 Source: "{#Stage}\tools\windows\run_suite.cmd"; DestDir: "{app}\tools\windows"; Flags: ignoreversion; Components: suite
 
 [Icons]
-; The launcher starts in Documents, not in the program folder: a launcher window left open then doesn't keep the
-; program folder from being removed by the uninstaller
-Name: "{group}\{#AppTitle}"; Filename: "{app}\tools\windows\LocalAgentBrowser.cmd"; WorkingDir: "{userdocs}"; IconFilename: "{app}\tools\windows\localagentbrowser.ico"; Comment: "Research an objective with a local model"
-Name: "{autodesktop}\{#AppTitle}"; Filename: "{app}\tools\windows\LocalAgentBrowser.cmd"; WorkingDir: "{userdocs}"; IconFilename: "{app}\tools\windows\localagentbrowser.ico"; Comment: "Research an objective with a local model"; Tasks: desktopicon
+; The shortcuts open the Windows UI (pythonw: no console window), which opens classic mode instead when that is the
+; saved choice. They start in Documents, not in the program folder: a window left open then doesn't keep the program
+; folder from being removed by the uninstaller
+Name: "{group}\{#AppTitle}"; Filename: "{app}\python\pythonw.exe"; Parameters: "-m localagentbrowser.winui"; WorkingDir: "{userdocs}"; IconFilename: "{app}\tools\windows\localagentbrowser.ico"; Comment: "Research an objective with a local model"
+Name: "{autodesktop}\{#AppTitle}"; Filename: "{app}\python\pythonw.exe"; Parameters: "-m localagentbrowser.winui"; WorkingDir: "{userdocs}"; IconFilename: "{app}\tools\windows\localagentbrowser.ico"; Comment: "Research an objective with a local model"; Tasks: desktopicon
+; Classic mode, the console, without changing the saved choice
+Name: "{group}\{#AppTitle} (classic console)"; Filename: "{app}\tools\windows\LocalAgentBrowser.cmd"; WorkingDir: "{userdocs}"; IconFilename: "{app}\tools\windows\localagentbrowser.ico"; Comment: "Research an objective in a console window (classic mode)"
 #ifndef CleanRoom
-; With cloud models chosen, a second shortcut beside the local one: the plain shortcut always uses LM Studio, so a run
-; only goes to OpenRouter when this one is opened (the launcher's "cloud" argument)
-Name: "{group}\{#AppTitle} (cloud)"; Filename: "{app}\tools\windows\LocalAgentBrowser.cmd"; Parameters: "cloud"; WorkingDir: "{userdocs}"; IconFilename: "{app}\tools\windows\localagentbrowser.ico"; Comment: "Research an objective with a cloud model through OpenRouter (your own key)"; Check: CloudChosen
-Name: "{autodesktop}\{#AppTitle} (cloud)"; Filename: "{app}\tools\windows\LocalAgentBrowser.cmd"; Parameters: "cloud"; WorkingDir: "{userdocs}"; IconFilename: "{app}\tools\windows\localagentbrowser.ico"; Comment: "Research an objective with a cloud model through OpenRouter (your own key)"; Tasks: desktopicon; Check: CloudChosen
+; With cloud models chosen, a second shortcut beside the local one: the plain shortcut starts with LM Studio's model,
+; this one with the cloud model ticked (the UI's "--remote"; in classic mode, the launcher's "cloud" argument)
+Name: "{group}\{#AppTitle} (cloud)"; Filename: "{app}\python\pythonw.exe"; Parameters: "-m localagentbrowser.winui --remote"; WorkingDir: "{userdocs}"; IconFilename: "{app}\tools\windows\localagentbrowser.ico"; Comment: "Research an objective with a cloud model through OpenRouter (your own key)"; Check: CloudChosen
+Name: "{autodesktop}\{#AppTitle} (cloud)"; Filename: "{app}\python\pythonw.exe"; Parameters: "-m localagentbrowser.winui --remote"; WorkingDir: "{userdocs}"; IconFilename: "{app}\tools\windows\localagentbrowser.ico"; Comment: "Research an objective with a cloud model through OpenRouter (your own key)"; Tasks: desktopicon; Check: CloudChosen
 #endif
 Name: "{group}\Past reports"; Filename: "{userdocs}\LocalAgentBrowser runs"
 Name: "{group}\Run the test suite"; Filename: "{app}\tools\windows\run_suite.cmd"; WorkingDir: "{userdocs}"; IconFilename: "{app}\tools\windows\localagentbrowser.ico"; Components: suite
@@ -96,10 +99,10 @@ Name: "{userdocs}\LocalAgentBrowser runs"; Flags: uninsneveruninstall
 Filename: "{app}\python\python.exe"; Parameters: "-m playwright install chromium"; StatusMsg: "Downloading the Chromium browser the agent uses (about 150 MB, once)..."; Flags: waituntilterminated runhidden
 Filename: "{code:LmsPath}"; Parameters: "get {code:ModelDownload} -y"; StatusMsg: "Downloading the chosen model through LM Studio (several GB; this can take a while)..."; Check: WantsModelDownload; Flags: waituntilterminated runhidden
 #ifdef CleanRoom
-Filename: "{app}\tools\windows\LocalAgentBrowser.cmd"; WorkingDir: "{userdocs}"; Description: "Start {#AppTitle} now"; Flags: postinstall nowait skipifsilent shellexec unchecked
+Filename: "{app}\python\pythonw.exe"; Parameters: "-m localagentbrowser.winui"; WorkingDir: "{userdocs}"; Description: "Start {#AppTitle} now"; Flags: postinstall nowait skipifsilent unchecked
 #else
-; With cloud models chosen, "Start now" opens the launcher the way the cloud shortcut does
-Filename: "{app}\tools\windows\LocalAgentBrowser.cmd"; Parameters: "{code:StartParameters}"; WorkingDir: "{userdocs}"; Description: "Start {#AppTitle} now"; Flags: postinstall nowait skipifsilent shellexec unchecked
+; With cloud models chosen, "Start now" opens the UI the way the cloud shortcut does
+Filename: "{app}\python\pythonw.exe"; Parameters: "-m localagentbrowser.winui {code:StartParameters}"; WorkingDir: "{userdocs}"; Description: "Start {#AppTitle} now"; Flags: postinstall nowait skipifsilent unchecked
 #endif
 
 [UninstallDelete]
@@ -112,6 +115,9 @@ Type: filesandordirs; Name: "{app}\python"
 Type: filesandordirs; Name: "{app}\localagentbrowser"
 Type: filesandordirs; Name: "{app}\tools"
 Type: filesandordirs; Name: "{app}\__pycache__"
+; The Windows UI's saved choices (mode, model, time limit, reports folder; localagentbrowser\settings.py). Reports
+; stay in Documents
+Type: filesandordirs; Name: "{userappdata}\LocalAgentBrowser"
 
 [Code]
 const
@@ -255,7 +261,7 @@ end;
 function StartParameters(Param: String): String;
 begin
   if CloudChosen then
-    Result := 'cloud'
+    Result := '--remote'
   else
     Result := '';
 end;

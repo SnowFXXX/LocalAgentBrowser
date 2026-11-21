@@ -24,8 +24,10 @@ def settings_folder():
 
 def defaults():
     # The Windows UI where it runs; everywhere else (pip install on Linux or macOS) the console, which is all there is
+    # The second kind of model is never kept: only its own shortcut ticks it, so nothing leaves the PC unless that
+    # shortcut was the one opened, as with the console launcher
     return {"ui": "windows" if sys.platform == "win32" else "classic", "model": None, "minutes": 0,
-            "folder": runs_folder(), "remote": False}
+            "folder": runs_folder()}
 
 
 def load():
@@ -94,11 +96,11 @@ def open_windows_ui():
                      creationflags=getattr(subprocess, "DETACHED_PROCESS", 0), close_fds=True)
 
 
-def open_classic():
+def open_classic(arguments=()):
     """Starts classic mode in a console window of its own: the console launcher where there is one (an install or a
-    clone), else the console command."""
+    clone), with its arguments, else the console command."""
     if os.path.exists(CLASSIC_LAUNCHER):
-        command = ["cmd", "/c", "start", "LocalAgentBrowser", CLASSIC_LAUNCHER]
+        command = ["cmd", "/c", "start", "LocalAgentBrowser", CLASSIC_LAUNCHER, *arguments]
     else:
         command = ["cmd", "/c", "start", "LocalAgentBrowser", python(windowless=False), "-m", "localagentbrowser"]
     subprocess.Popen(command, cwd=documents_folder(), close_fds=True)

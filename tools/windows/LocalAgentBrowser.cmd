@@ -1,7 +1,8 @@
 @echo off
 rem LocalAgentBrowser launcher for Windows: checks that the model server is ready, then runs the agent in this window.
 rem Each run gets its own folder under Documents\LocalAgentBrowser runs, so nothing in the program's folder is touched.
-rem Used by the Start menu and desktop shortcuts: from the installer, or from a clone (tools\windows\make_shortcuts.ps1).
+rem Classic mode: opened by the "(classic console)" Start menu shortcut, and by the Windows UI's "Classic console" button
+rem or its shortcuts when classic mode is the saved choice (localagentbrowser\winui.py, settings.py).
 rem The window's title names the edition: Clean Room's build leaves out the region below, so its title keeps "Clean Room"
 set "LAB_TITLE=LocalAgentBrowser Clean Room"
 rem cloud:start
