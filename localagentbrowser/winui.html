@@ -308,6 +308,7 @@ const handlers = {
     $("watch-line").hidden = false; $("watch-line").textContent = e.title + " · waiting for the first task";
     setState("Waiting", "");
   },
+  new_research() { $("objective").value = ""; send({ type: "hello" }); showStart(); },  // From the tray's menu
   watch_done() { setState("Finished", "mint"); $("watch-line").textContent += " · the run is over"; },
   objective(e) { if (watching || !$("live-objective").textContent) $("live-objective").textContent = e.objective; },
   note(e) { card(e.tone || "quiet", e.label || "NOTE", e.text); },

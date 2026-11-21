@@ -142,14 +142,82 @@ def test_the_tray_icon_opens_the_window_when_clicked():
     import ctypes
     from localagentbrowser import tray
     commands = []
-    icon = tray.Tray("LocalAgentBrowser test", commands.append)
+    icon = tray.Tray("LocalAgentBrowser test", lambda command, argument=None: commands.append((command, argument)))
     if not icon.start():
         pytest.skip("no taskbar to put an icon in (a service session)")
     try:
         ctypes.windll.user32.SendMessageW(icon.hwnd, tray.CALLBACK, 1, tray.WM_LBUTTONUP)
     finally:
         icon.stop()
-    assert commands == ["open"] and not icon.thread.is_alive()
+    assert commands == [("open", None)] and not icon.thread.is_alive()
+
+
+class TestTrayMenu:
+    RECENT = [("2026-11-20 090000 · Kilimanjaro", "C:\\Runs\\a"), ("2026-11-19 101500 · Owls", "C:\\Runs\\b")]
+
+    def test_new_research_waits_for_the_run_and_stop_needs_one(self):
+        from localagentbrowser import tray
+        idle = {item[2]: item[3] for item in tray.menu_items(False, []) if item and not isinstance(item[1], list)}
+        busy = {item[2]: item[3] for item in tray.menu_items(True, []) if item and not isinstance(item[1], list)}
+        assert idle["New research"] and not idle["Stop the run"]
+        assert not busy["New research"] and busy["Stop the run"] and busy["Open LocalAgentBrowser"]
+
+    def test_recent_reports_are_a_submenu_greyed_when_there_are_none(self):
+        from localagentbrowser import tray
+        submenu = next(item for item in tray.menu_items(False, self.RECENT) if item and isinstance(item[1], list))
+        assert submenu[0] == "Recent reports" and submenu[2]
+        assert submenu[1][0] == ("recent", "C:\\Runs\\a", "2026-11-20 090000 · Kilimanjaro", True)
+        empty = next(item for item in tray.menu_items(False, []) if item and isinstance(item[1], list))
+        assert empty == ("Recent reports", [], False)
+        assert tray.shorten_label("word " * 30, 20) == "word word word word…"
+
+    @pytest.mark.skipif(sys.platform != "win32", reason="the tray is Windows only")
+    def test_a_recent_report_chosen_from_the_real_menu_reaches_the_ui(self, monkeypatch):
+        from localagentbrowser import tray
+        commands = []
+        icon = tray.Tray("LocalAgentBrowser test", lambda command, argument=None: commands.append((command, argument)),
+                         recent=lambda: self.RECENT)
+        if not icon.start():
+            pytest.skip("no taskbar to put an icon in (a service session)")
+        try:
+            # The menu is built for real (a submenu's handle in a 64-bit id); only the person's click is played:
+            # numbered in order, Open 1, New research 2, the first recent report 3
+            monkeypatch.setattr(tray.user32, "TrackPopupMenu", lambda *args: 3)
+            icon.menu()
+        finally:
+            icon.stop()
+        assert commands == [("recent", "C:\\Runs\\a")]
+
+
+class TestTrayCommands:
+    def ui(self, monkeypatch, tmp_path, running):
+        (tmp_path / "research_report.md").write_text("# Research report\n\n## Final result\n\nOwls [1].\n", encoding="utf-8")
+        app = winui.App(page=None)
+        app.run = object() if running else None
+        sent, opened = [], []
+
+        async def send(kind, **data):
+            sent.append((kind, data))
+        monkeypatch.setattr(app, "send", send)
+        monkeypatch.setattr(winui, "open_outside", opened.append)
+        monkeypatch.setattr(winui.windows, "show", lambda hwnd: None)
+        return app, sent, opened
+
+    def test_a_recent_report_shows_in_the_window_when_no_run_is_going(self, monkeypatch, tmp_path):
+        app, sent, opened = self.ui(monkeypatch, tmp_path, running=False)
+        asyncio.run(app.tray_command("recent", str(tmp_path)))
+        assert sent[0][0] == "report" and sent[0][1]["past"] and not opened
+
+    def test_during_a_run_it_opens_as_a_page_and_the_live_view_stays(self, monkeypatch, tmp_path):
+        app, sent, opened = self.ui(monkeypatch, tmp_path, running=True)
+        asyncio.run(app.tray_command("recent", str(tmp_path)))
+        asyncio.run(app.tray_command("new"))  # Waits for the run to end
+        assert sent == [] and opened == [os.path.join(str(tmp_path), "research_report.html")]
+
+    def test_new_research_brings_back_the_start_screen(self, monkeypatch, tmp_path):
+        app, sent, opened = self.ui(monkeypatch, tmp_path, running=False)
+        asyncio.run(app.tray_command("new"))
+        assert sent == [("new_research", {})]
 
 
 class TestClassicColours:

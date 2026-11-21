@@ -23,6 +23,9 @@ if sys.platform == "win32":
     user32.LoadImageW.restype = wintypes.HANDLE
     user32.LoadIconW.restype = wintypes.HANDLE
     user32.CreatePopupMenu.restype = wintypes.HMENU
+    # The item's id is pointer-sized (a submenu's handle goes there), not a 32-bit int
+    user32.AppendMenuW.argtypes = [wintypes.HMENU, wintypes.UINT, ctypes.c_size_t, wintypes.LPCWSTR]
+    user32.DestroyMenu.argtypes = [wintypes.HMENU]
     user32.TrackPopupMenu.argtypes = [wintypes.HMENU, wintypes.UINT, ctypes.c_int, ctypes.c_int, ctypes.c_int,
                                       wintypes.HWND, wintypes.LPVOID]
     kernel32.GetModuleHandleW.restype = wintypes.HMODULE
@@ -49,18 +52,33 @@ MF_STRING, MF_GRAYED, MF_SEPARATOR = 0, 1, 0x800
 TPM_RETURNCMD, TPM_RIGHTBUTTON = 0x100, 0x2
 IMAGE_ICON, LR_LOADFROMFILE, LR_DEFAULTSIZE, IDI_APPLICATION = 1, 0x10, 0x40, 32512
 CALLBACK = WM_APP + 1
-# The menu, in order: (command, label); None is a separator. "stop" is greyed while no run is going
-MENU = [("open", "Open LocalAgentBrowser"), ("stop", "Stop the run"), ("folder", "Open the reports folder"), None,
-        ("quit", "Quit")]
+MF_POPUP = 0x10
 ICON = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools", "windows", "localagentbrowser.ico")
+RECENT_LABEL_CHARS = 60  # A recent report's objective, shortened in its menu line
+
+
+def menu_items(running, recent):
+    """The menu, in order, as data: (command, argument, label, enabled), None for a separator, or a submenu as
+    (label, [items], enabled). "New research" waits for the run to end; "Stop the run" needs one; "Recent reports"
+    lists the newest reports ((label, folder) pairs), greyed when there are none."""
+    reports = [("recent", folder, label, True) for label, folder in recent]
+    return [("open", None, "Open LocalAgentBrowser", True), ("new", None, "New research", not running),
+            ("Recent reports", reports, bool(reports)), ("stop", None, "Stop the run", running),
+            ("folder", None, "Open the reports folder", True), None, ("quit", None, "Quit", True)]
+
+
+def shorten_label(text, limit=RECENT_LABEL_CHARS):
+    text = " ".join(str(text).split())
+    return text if len(text) <= limit else text[:limit - 1].rstrip() + "…"
 
 
 class Tray:
-    """The tray icon. on_command(name) is called in the tray's thread with "open", "stop", "folder" or "quit"; the
-    UI hands it to its own loop. running() says whether "stop" applies."""
+    """The tray icon. on_command(name, argument) is called in the tray's thread: "open", "new", "recent" (with a
+    report's folder), "stop", "folder" or "quit"; the UI hands it to its own loop. running() says whether a run is
+    going, and recent() lists the newest reports as (label, folder) pairs, read each time the menu opens."""
 
-    def __init__(self, tooltip, on_command, running=lambda: False):
-        self.tooltip, self.on_command, self.running = tooltip, on_command, running
+    def __init__(self, tooltip, on_command, running=lambda: False, recent=lambda: []):
+        self.tooltip, self.on_command, self.running, self.recent = tooltip, on_command, running, recent
         self.hwnd, self.thread, self.ready = None, None, threading.Event()
 
     def start(self):
@@ -109,7 +127,7 @@ class Tray:
     def window_proc(self, hwnd, message, wparam, lparam):
         if message == CALLBACK:
             if lparam == WM_LBUTTONUP:
-                self.on_command("open")
+                self.on_command("open", None)
             elif lparam == WM_RBUTTONUP:
                 self.menu()
             return 0
@@ -123,17 +141,27 @@ class Tray:
         return user32.DefWindowProcW(hwnd, message, wparam, lparam)
 
     def menu(self):
-        menu = user32.CreatePopupMenu()
-        for number, item in enumerate(MENU, 1):
-            if item is None:
-                user32.AppendMenuW(menu, MF_SEPARATOR, 0, None)
-            else:
-                greyed = item[0] == "stop" and not self.running()
-                user32.AppendMenuW(menu, MF_STRING | (MF_GRAYED if greyed else 0), number, item[1])
+        choices = {}  # Menu command number: (command, argument)
+
+        def build(items):
+            menu = user32.CreatePopupMenu()
+            for item in items:
+                if item is None:
+                    user32.AppendMenuW(menu, MF_SEPARATOR, 0, None)
+                elif isinstance(item[1], list):  # A submenu
+                    label, children, enabled = item
+                    user32.AppendMenuW(menu, MF_POPUP | (0 if enabled else MF_GRAYED), build(children), label)
+                else:
+                    command, argument, label, enabled = item
+                    number = len(choices) + 1
+                    choices[number] = (command, argument)
+                    user32.AppendMenuW(menu, MF_STRING | (0 if enabled else MF_GRAYED), number, label)
+            return menu
+        menu = build(menu_items(self.running(), self.recent()))
         point = POINT()
         user32.GetCursorPos(ctypes.byref(point))
         user32.SetForegroundWindow(self.hwnd)  # Without it the menu does not close when clicked away from
         chosen = user32.TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON, point.x, point.y, 0, self.hwnd, None)
-        user32.DestroyMenu(menu)
-        if chosen and MENU[chosen - 1]:
-            self.on_command(MENU[chosen - 1][0])
+        user32.DestroyMenu(menu)  # Its submenu with it
+        if chosen in choices:
+            self.on_command(*choices[chosen])

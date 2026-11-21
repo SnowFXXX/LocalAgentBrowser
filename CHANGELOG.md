@@ -29,7 +29,8 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
   limit, reports folder) and lists recent reports. While the agent works, the live view shows what it is doing (the
   checklist as chips that light up as items are found, a card per action, refusals by the checks included, and a
   timer while the model thinks), and when it ends the report appears in place. Stop, and the time limit, end a run
-  even while the model is working, and its report says why. Minimized, it goes to the notification area. The window
+  even while the model is working, and its report says why. Minimized, it goes to the notification area, whose menu
+  opens the window, starts a new research, opens a recent report, stops the run or opens the reports folder. The window
   is the agent's own Chromium showing a local page: nothing is fetched for it, in either edition. Each research runs
   as its own process, with its console text saved as console.txt in its run folder.
 - **Classic mode stays one switch away**: "Classic console" in the UI opens the console and keeps it as the choice;

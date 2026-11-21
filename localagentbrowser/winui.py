@@ -26,7 +26,7 @@ from . import settings, watch, windows
 from .config import BASE_URL, CHROMIUM_ARGS
 from .events import read_line
 from .reportpage import page as report_page, to_html
-from .tray import Tray
+from .tray import Tray, shorten_label
 
 EDITION = "LocalAgentBrowser Clean Room"
 # cloud:start
@@ -149,10 +149,25 @@ class App:
         self.remote = remote  # Opened from the second shortcut ("--remote"): its model starts ticked; never saved
         self.watching = watching  # The watch window of a test run (watch.py): it follows tasks, it starts none
 
-    async def tray_command(self, command):
+    def recent_for_tray(self):
+        """The tray menu's "Recent reports": (label, folder) pairs, newest first."""
+        return [(f"{r['when']} · {shorten_label(r['objective'])}", r["folder"])
+                for r in recent_reports(self.choices.get("folder") or settings.runs_folder())]
+
+    async def tray_command(self, command, argument=None):
         """A choice from the tray icon's menu (or a click on the icon: "open")."""
         if command == "open":
             windows.show(ui_window())
+        elif command == "new" and not self.run:
+            windows.show(ui_window())
+            await self.send("new_research")
+        elif command == "recent":
+            whole = report_page_for(argument or "")
+            if whole and self.run:  # A run is going: its live view stays, and the report opens as a page
+                open_outside(os.path.join(argument, "research_report.html"))
+            elif whole:
+                windows.show(ui_window())
+                await self.send("report", page=whole, folder=argument, past=True)
         elif command == "stop":
             self.request_stop("stopped by you")
         elif command == "folder":
@@ -345,8 +360,9 @@ async def show_ui(profile, remote):
             await page.set_content(f.read())
         place_window("center")
         loop = asyncio.get_running_loop()
-        app.tray = Tray(EDITION, lambda command: loop.call_soon_threadsafe(
-            asyncio.ensure_future, app.tray_command(command)), running=lambda: app.run is not None)
+        app.tray = Tray(EDITION, lambda command, argument=None: loop.call_soon_threadsafe(
+            asyncio.ensure_future, app.tray_command(command, argument)), running=lambda: app.run is not None,
+            recent=app.recent_for_tray)
         if not app.tray.start():
             app.tray = None  # No tray (no taskbar, as in a service session): minimizing works as usual
         asyncio.ensure_future(to_tray_when_minimized(app))
