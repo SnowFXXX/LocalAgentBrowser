@@ -23,7 +23,7 @@ from .pages import build_environment, count_search_results, determine_url, is_se
 from .checklist import after_discovery_advice, check_parts, checklist_lines, link_discovery, split_objective
 from .coverage import amounts_not_found, coverage_refusal, not_found_items, record_install_line, remember_install_lines
 from .checks import check_decision, escalation_message, numbered_discoveries, numbered_lines, refusal_correction, source_note
-from . import follow, windows
+from . import colors, follow, windows
 from .events import LISTENERS as EVENT_LISTENERS, Stopped, emit, listen, print_line, stop_requested
 from . import settings
 from .report import compact_journal, compose_final_result, visited_summary, write_report, write_research_log
@@ -806,6 +806,7 @@ async def main():
 
 def run():
     """Command-line entry point (installed as `localagentbrowser`)."""
+    colors.colour_console()  # Classic mode in a person's console window; piped output stays plain
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

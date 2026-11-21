@@ -135,3 +135,47 @@ def test_a_ui_run_places_its_browser_without_a_console(monkeypatch):
     assert windows.enabled()  # No console (stdin is a pipe), but still placed beside the UI
     monkeypatch.setenv("LAB_SIDE_BY_SIDE", "0")
     assert not windows.enabled()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="the tray is Windows only")
+def test_the_tray_icon_opens_the_window_when_clicked():
+    import ctypes
+    from localagentbrowser import tray
+    commands = []
+    icon = tray.Tray("LocalAgentBrowser test", commands.append)
+    if not icon.start():
+        pytest.skip("no taskbar to put an icon in (a service session)")
+    try:
+        ctypes.windll.user32.SendMessageW(icon.hwnd, tray.CALLBACK, 1, tray.WM_LBUTTONUP)
+    finally:
+        icon.stop()
+    assert commands == ["open"] and not icon.thread.is_alive()
+
+
+class TestClassicColours:
+    LINES = ("[TURN 3/100] Active reasoning cycle executing...\nChosen Action: [DISCOVER] -> Parameter: 5,895 m\n"
+             "Warning: The model server failed the call.\nAction refused: Already on this page.\n")
+
+    def test_known_line_starts_are_coloured_and_the_text_is_unchanged(self):
+        import io
+        import re
+        from localagentbrowser import colors
+        out = io.StringIO()
+        colors.Colored(out).write(self.LINES)
+        coloured = out.getvalue()
+        assert colors.paint(colors.MINT, "[DISCOVER]", bold=True) in coloured
+        assert colors.paint(colors.AMBER, "Warning:", bold=True) in coloured
+        assert re.sub(r"\x1b\[[0-9;]*m", "", coloured) == self.LINES
+
+    def test_piped_output_and_no_color_stay_plain(self, monkeypatch):
+        import io
+        from localagentbrowser import colors
+
+        class Console(io.StringIO):
+            def isatty(self):
+                return True
+        monkeypatch.setattr(colors, "terminal_takes_colours", lambda: True)
+        assert not colors.wanted(io.StringIO())  # A file or a pipe (console.txt, the UI's runs)
+        assert colors.wanted(Console())
+        monkeypatch.setenv("NO_COLOR", "1")
+        assert not colors.wanted(Console())

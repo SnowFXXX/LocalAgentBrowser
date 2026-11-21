@@ -103,6 +103,25 @@ def place(hwnd, side):
     ctypes.windll.user32.MoveWindow(hwnd, *half(side), True)
 
 
+SW_HIDE = 0
+
+
+def minimized(hwnd):
+    return bool(hwnd) and bool(ctypes.windll.user32.IsIconic(hwnd))
+
+
+def hide(hwnd):
+    """Off the screen and the taskbar (the Windows UI, minimized to the tray)."""
+    if hwnd:
+        ctypes.windll.user32.ShowWindow(hwnd, SW_HIDE)
+
+
+def show(hwnd):
+    if hwnd:
+        ctypes.windll.user32.ShowWindow(hwnd, SW_RESTORE)
+        ctypes.windll.user32.SetForegroundWindow(hwnd)
+
+
 CENTERED_SHARE = 0.8  # The Windows UI's start screen: this share of the work area's width and height, centered
 
 

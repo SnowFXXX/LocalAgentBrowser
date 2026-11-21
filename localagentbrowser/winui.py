@@ -25,6 +25,7 @@ from . import settings, windows
 from .config import BASE_URL, CHROMIUM_ARGS
 from .events import read_line
 from .reportpage import page as report_page, to_html
+from .tray import Tray
 
 EDITION = "LocalAgentBrowser Clean Room"
 # cloud:start
@@ -142,8 +143,19 @@ class Run:
 
 class App:
     def __init__(self, page):
-        self.page, self.run, self.done = page, None, asyncio.Event()
+        self.page, self.run, self.done, self.tray = page, None, asyncio.Event(), None
         self.choices = settings.load()
+
+    async def tray_command(self, command):
+        """A choice from the tray icon's menu (or a click on the icon: "open")."""
+        if command == "open":
+            windows.show(ui_window())
+        elif command == "stop":
+            self.request_stop("stopped by you")
+        elif command == "folder":
+            open_outside(self.choices.get("folder") or settings.runs_folder())
+        elif command == "quit":
+            await self.quit()
 
     async def send(self, kind, **data):
         try:
@@ -278,15 +290,33 @@ def open_outside(target):
         os.startfile(target)
 
 
+WINDOW = {}
+TRAY_CHECK_SECONDS = 0.5  # How often the UI window is checked for being minimized (it then goes to the tray)
+
+
+def ui_window():
+    """The UI window's handle, found once by its title and window class (a hidden window cannot be found so)."""
+    if sys.platform == "win32" and not WINDOW.get("hwnd"):
+        WINDOW["hwnd"] = windows.window_titled(TITLE, class_name=windows.CHROMIUM_WINDOW_CLASS)
+    return WINDOW.get("hwnd") or 0
+
+
 def place_window(side):
     """The UI window on the left half (beside the agent's browser on the right), or centered before a run."""
     if sys.platform != "win32":
         return
-    hwnd = windows.window_titled(TITLE, class_name=windows.CHROMIUM_WINDOW_CLASS)
     if side == "left":
-        windows.place(hwnd, "left")
+        windows.place(ui_window(), "left")
     else:
-        windows.center(hwnd)
+        windows.center(ui_window())
+
+
+async def to_tray_when_minimized(app):
+    """A minimized UI window leaves the taskbar for the tray, where a click brings it back."""
+    while not app.done.is_set():
+        if app.tray and windows.minimized(ui_window()):
+            windows.hide(ui_window())
+        await asyncio.sleep(TRAY_CHECK_SECONDS)
 
 
 async def main():
@@ -302,7 +332,15 @@ async def main():
         with open(PAGE_FILE, encoding="utf-8") as f:
             await page.set_content(f.read())
         place_window("center")
+        loop = asyncio.get_running_loop()
+        app.tray = Tray(EDITION, lambda command: loop.call_soon_threadsafe(
+            asyncio.ensure_future, app.tray_command(command)), running=lambda: app.run is not None)
+        if not app.tray.start():
+            app.tray = None  # No tray (no taskbar, as in a service session): minimizing works as usual
+        asyncio.ensure_future(to_tray_when_minimized(app))
         await app.done.wait()
+        if app.tray:
+            app.tray.stop()
         try:
             await context.close()
         except Exception:
