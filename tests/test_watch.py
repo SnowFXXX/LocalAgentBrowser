@@ -58,6 +58,10 @@ class TestTasks:
         assert second["LAB_EVENTS"] != env["LAB_EVENTS"] and watch.read_state(str(watched))["n"] == 2
 
     def test_a_task_begun_already_keeps_its_file(self, watched, monkeypatch):
+        # begin() sets both in this process's environment: put back after the test (they leaked into later tests'
+        # child processes, which then placed windows as a UI run would)
+        monkeypatch.setenv("LAB_EVENTS", "")
+        monkeypatch.setenv("LAB_UI", "")
         events_file = watch.begin("qwen2.5-7b-instruct", "out", "qwen2.5-7b-instruct")
         assert os.environ["LAB_EVENTS"] == events_file
         assert watch.task_env(dict(os.environ), "factual", "out")["LAB_EVENTS"] == events_file

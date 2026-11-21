@@ -87,8 +87,9 @@ def to_html(markdown):
             out.append("<p>" + "<br>".join(inline(line) for line in para) + "</p>")
             para = []
         if items:
-            tag = items[0]
-            out.append(f"<{tag}>" + "".join(f"<li>{inline(i)}</li>" for i in items[1:]) + f"</{tag}>")
+            tag, start = items[0], items[1]
+            opening = f'<{tag} start="{start}">' if start > 1 else f"<{tag}>"
+            out.append(opening + "".join(f"<li>{inline(i)}</li>" for i in items[2:]) + f"</{tag}>")
             items = None
 
     for line in markdown.splitlines():
@@ -105,7 +106,7 @@ def to_html(markdown):
             continue
         heading = re.match(r"(#{1,6})\s+(.*)", line)
         bullet = re.match(r"\s*[-*]\s+(.*)", line)
-        number = re.match(r"\s*\d+[.)]\s+(.*)", line)
+        number = re.match(r"\s*(\d+)[.)]\s+(.*)", line)
         if heading:
             flush()
             level = len(heading.group(1))
@@ -114,8 +115,10 @@ def to_html(markdown):
             tag = "ul" if bullet else "ol"
             if para or (items and items[0] != tag):
                 flush()
-            items = items or [tag]
-            items.append((bullet or number).group(1))
+            # A numbered list broken up (an indented answer under each question, as models write it) goes on from its
+            # own number: each piece started again at 1 (seen in the Windows UI, Nov 21)
+            items = items or [tag, int(number.group(1)) if number else 1]
+            items.append(bullet.group(1) if bullet else number.group(2))
         elif line.startswith(">"):
             flush()
             out.append(f"<blockquote>{inline(line.lstrip('> '))}</blockquote>")

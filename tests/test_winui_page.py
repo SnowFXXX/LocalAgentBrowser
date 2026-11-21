@@ -187,6 +187,31 @@ async def watch_mode():
         return state
 
 
+async def opened_window(tmp_path, monkeypatch):
+    import os
+    from playwright.async_api import async_playwright
+    monkeypatch.setattr(winui, "server_status", lambda: (True, ["gemma-3-4b-it"], ""))
+    monkeypatch.setattr(winui.settings, "settings_folder", lambda: str(tmp_path / "settings"))
+    async with async_playwright() as p:
+        if not os.path.exists(p.chromium.executable_path):
+            pytest.skip("no Chromium for Playwright")
+        app = winui.App(None)
+        context = await winui.open_window(p, str(tmp_path / "profile"), app, headless=True)
+        await app.page.wait_for_function("() => document.getElementById('folder').textContent", timeout=15000)
+        state = {"url": app.page.url, "folder": await app.page.inner_text("#folder"),
+                 "server": await app.page.inner_text("#server-text"), "model": await app.page.input_value("#model")}
+        await context.close()
+        return state
+
+
+def test_the_real_window_opens_on_the_ui_page_and_gets_its_setup(tmp_path, monkeypatch):
+    """Seen live (Nov 21): the page says hello as it loads, and the answer was lost when the app was given its page
+    only after the load: the start screen stayed at "Checking LM Studio..." with no reports folder."""
+    state = asyncio.run(opened_window(tmp_path, monkeypatch))
+    assert state["url"].endswith("/winui.html")
+    assert state["folder"] and state["server"] == "LM Studio is ready (1 model)." and state["model"] == "gemma-3-4b-it"
+
+
 def test_the_watch_window_follows_tasks_and_starts_none():
     state = asyncio.run(watch_mode())
     assert "waiting for the first task" in state["waiting"]

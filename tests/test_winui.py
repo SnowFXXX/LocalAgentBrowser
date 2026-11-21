@@ -247,3 +247,57 @@ class TestClassicColours:
         assert colors.wanted(Console())
         monkeypatch.setenv("NO_COLOR", "1")
         assert not colors.wanted(Console())
+
+
+def test_the_window_opens_in_app_mode_on_the_ui_page():
+    """Seen live (Nov 21): Playwright's own start page (about:blank, added for a saved profile) made Chromium open an
+    ordinary browser window, with tabs and an address bar, whose title did not find it: the window was never placed,
+    sized or sent to the tray. The page is now opened by the app switch itself, and that start page left out."""
+    import pathlib
+    arguments = winui.window_arguments()
+    assert arguments["ignore_default_args"] == ["about:blank"]
+    assert arguments["args"][0] == "--app=" + pathlib.Path(winui.PAGE_FILE).as_uri()
+    assert not any(a == "about:blank" or a.startswith("--app=about") for a in arguments["args"])
+    assert not any(a.startswith("--app") for a in winui.window_arguments(headless=True)["args"])
+
+
+# cloud:start
+def test_a_cloud_run_names_its_own_model_not_the_one_in_lm_studio_s_list(monkeypatch, tmp_path):
+    """Seen live (Nov 21): the START card said "with <the model picked in LM Studio's list>" on a cloud run."""
+    monkeypatch.setattr(settings, "settings_folder", lambda: str(tmp_path / "settings"))
+    monkeypatch.setattr(winui, "remote_option", lambda: {"model": "microsoft/phi-4", "ready": True})
+    monkeypatch.setattr(winui, "place_window", lambda side: None)
+
+    class Stdin:
+        def write(self, data):
+            pass
+
+        async def drain(self):
+            pass
+
+        def close(self):
+            pass
+
+    class Process:
+        stdin = Stdin()
+
+    async def start_process(*args, **kwargs):
+        return Process()
+    monkeypatch.setattr(winui.asyncio, "create_subprocess_exec", start_process)
+    app = winui.App(page=None)
+    sent = []
+
+    async def send(kind, **data):
+        sent.append((kind, data))
+
+    async def follow(run):
+        pass
+    monkeypatch.setattr(app, "send", send)
+    monkeypatch.setattr(app, "follow", follow)
+    for remote, model in ((True, "microsoft/phi-4"), (False, "qwen2.5-7b-instruct")):
+        app.run = None
+        asyncio.run(app.start({"objective": "How tall is Kilimanjaro?", "model": "qwen2.5-7b-instruct",
+                               "folder": str(tmp_path / "runs"), "remote": remote}))
+        assert sent[-1] == ("started", {"objective": "How tall is Kilimanjaro?", "folder": app.run.folder,
+                                        "model": model})
+# cloud:end

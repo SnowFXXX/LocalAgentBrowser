@@ -73,6 +73,8 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
   56 saved results asked for steps, it flags those two and no other.
 
 ### Fixed
+- **A numbered list in the report page keeps its numbers** when an indented answer follows each item, as models
+  often write a final result: each item was shown as "1.".
 - **Models that think before they answer get room to think.** A reply stopped at its length limit with no answer in
   it is a model that spent the whole limit thinking: Granite 4.2 8B, Nemotron 3.5 Lightning, Mistral Large 4 and
   Command A+ used all 300 tokens of the checklist split on it, and their tasks failed or lost steps. From the first

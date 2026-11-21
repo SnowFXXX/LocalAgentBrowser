@@ -15,6 +15,7 @@ import datetime
 import html
 import json
 import os
+import pathlib
 import shutil
 import subprocess
 import sys
@@ -238,7 +239,12 @@ class App:
         process.stdin.close()
         self.run = Run(folder, process, stop_file, choices)
         place_window("left")
-        await self.send("started", objective=objective, folder=folder, model=choices.get("model") or "")
+        model = choices.get("model") or ""
+        # cloud:start
+        if choices["remote"]:  # The run uses setup's cloud model, not the one picked in LM Studio's list
+            model = (remote_option() or {}).get("model") or ""
+        # cloud:end
+        await self.send("started", objective=objective, folder=folder, model=model)
         asyncio.ensure_future(self.follow(self.run))
         if choices.get("minutes"):
             asyncio.ensure_future(self.time_limit(self.run, choices["minutes"]))
@@ -347,17 +353,37 @@ async def main(remote=False):
         shutil.rmtree(profile, ignore_errors=True)
 
 
+def window_arguments(headless=False):
+    """How the UI's window is opened: Chromium in app mode (a window of its own, without tabs or an address bar)
+    showing the UI's page, with Playwright's own start page left out. Playwright adds that page (about:blank) for a
+    saved profile, and with it Chromium opens an ordinary browser window instead, whose title the UI window is not
+    found by: it was then never placed, sized or sent to the tray. Headless (the tests) has no app windows: there
+    Playwright's start page stays, and open_window takes it to the UI's page."""
+    if headless:
+        return {"args": list(CHROMIUM_ARGS)}
+    return {"args": [f"--app={pathlib.Path(PAGE_FILE).as_uri()}", *CHROMIUM_ARGS], "ignore_default_args": ["about:blank"]}
+
+
+async def open_window(p, profile, app, headless=False):
+    """The UI's window, with its page given to the app (app.page) and the page's messages going to it. (Headless only
+    in the tests.)"""
+    context = await p.chromium.launch_persistent_context(profile, headless=headless, no_viewport=True,
+                                                         **window_arguments(headless))
+    app.page = context.pages[0] if context.pages else await context.wait_for_event("page")
+    await context.expose_binding("labSend", app.on_message)
+    # Loaded (again, in app mode) with labSend there: the page says hello as it loads, and the app answers it on
+    # app.page, so that is set first (the answer was lost when it was set after the load)
+    await app.page.goto(pathlib.Path(PAGE_FILE).as_uri())
+    return context
+
+
 async def show_ui(profile, remote):
     from playwright.async_api import async_playwright
     async with async_playwright() as p:
-        context = await p.chromium.launch_persistent_context(
-            profile, headless=False, no_viewport=True, args=["--app=about:blank", *CHROMIUM_ARGS])
-        page = context.pages[0] if context.pages else await context.new_page()
-        app = App(page, remote)
-        await context.expose_binding("labSend", app.on_message)
+        app = App(None, remote)
+        context = await open_window(p, profile, app)
+        page = app.page
         page.on("close", lambda _: asyncio.ensure_future(app.quit()))
-        with open(PAGE_FILE, encoding="utf-8") as f:
-            await page.set_content(f.read())
         place_window("center")
         loop = asyncio.get_running_loop()
         app.tray = Tray(EDITION, lambda command, argument=None: loop.call_soon_threadsafe(
@@ -419,14 +445,10 @@ async def follow_watch(app, folder):
 async def show_watch(profile, folder):
     from playwright.async_api import async_playwright
     async with async_playwright() as p:
-        context = await p.chromium.launch_persistent_context(
-            profile, headless=False, no_viewport=True, args=["--app=about:blank", *CHROMIUM_ARGS])
-        page = context.pages[0] if context.pages else await context.new_page()
-        app = App(page, watching=True)
-        await context.expose_binding("labSend", app.on_message)
+        app = App(None, watching=True)
+        context = await open_window(p, profile, app)
+        page = app.page
         page.on("close", lambda _: app.done.set())
-        with open(PAGE_FILE, encoding="utf-8") as f:
-            await page.set_content(f.read())
         place_window("left")
         await app.send("watch", title=watch.read_state(folder).get("title") or "Test run")
         await follow_watch(app, folder)

@@ -104,7 +104,7 @@ textarea:focus, select:focus { border-color: var(--mint-line); box-shadow: 0 0 0
 a { color: var(--blue); text-underline-offset: 3px; word-break: break-all; }
 a:hover { color: var(--mint-hi); }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 18px 0 10px; }
-iframe.report { width: 100%; border: none; border-radius: 12px; background: var(--bg); min-height: 300px; }
+iframe.report { width: 100%; border: none; border-radius: 12px; background: transparent; min-height: 300px; }
 details.steps > summary, details.console > summary { cursor: pointer; color: var(--blue); margin: 14px 0 6px; }
 pre.console { font-family: var(--mono); font-size: 12px; color: var(--sub); background: #070b12; border: 1px solid var(--blue-bg);
   border-radius: 8px; padding: 10px; max-height: 340px; overflow: auto; white-space: pre-wrap; }
@@ -228,7 +228,7 @@ function fillSetup(s) {
   server(s);
   if (s.remote) {
     $("remote-row").hidden = false;
-    $("remote-label").textContent = s.remote.label + (s.remote.model ? " (" + s.remote.model + ")" : "");
+    $("remote-label").textContent = s.remote.label + (s.remote.model ? ": " + s.remote.model : "");
     $("remote-note").textContent = s.remote.note || s.remote.warning || "";
     $("remote").checked = !!s.remote_chosen && s.remote.ready;
     $("remote").disabled = !s.remote.ready;
@@ -286,6 +286,12 @@ function showRun(e) {
     const s = Math.round((Date.now() - run.started) / 1000);
     $("elapsed").textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
   }, 1000);
+}
+
+function showDone() {
+  // The report's top just below the sticky bar and run heading (scrollIntoView put it underneath them)
+  const below = document.querySelector(".head").getBoundingClientRect().bottom;
+  scrollTo({ top: $("done").getBoundingClientRect().top + scrollY - below - 8, behavior: "smooth" });
 }
 
 const handlers = {
@@ -405,6 +411,8 @@ const handlers = {
     const frame = $("report");
     frame.onload = () => {
       const doc = frame.contentDocument;
+      // The report page's own backdrop (its glow and colour) off inside the window, where the window's shows through
+      doc.body.style.background = "transparent";
       frame.style.height = (doc.documentElement.scrollHeight + 20) + "px";
       doc.addEventListener("click", ev => {
         const a = ev.target.closest("a"); if (!a) return;
@@ -413,7 +421,7 @@ const handlers = {
     };
     frame.srcdoc = e.page;
     $("done-note").textContent = "";
-    setTimeout(() => $("done").scrollIntoView({ behavior: "smooth" }), 150);
+    setTimeout(showDone, 150);
   },
   exited(e) {
     clearInterval(clock); stopTimer(); $("stop").hidden = true; run.ended = true;
