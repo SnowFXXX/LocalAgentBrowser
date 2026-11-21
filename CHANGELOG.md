@@ -38,6 +38,11 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
 - **The agent's browser follows what the agent reads**: on READ_MORE it scrolls to the part now read, and each recorded
   discovery is highlighted on the page in mint. The page's text is unchanged (the browser's own highlights), so what
   the agent reads is the same with it on or off (`LAB_FOLLOW=0`).
+- **A watch window for test runs**: the regression suite, the compatibility test and SimpleQA show the Windows UI's
+  live view of each task on the left, beside the agent's browser on the right (the compatibility test's quick checks
+  too), then each task's report. Until now only the browser was seen: the console text was there, behind it. Each
+  task's events go to a file in Temp, so its output and run folder are unchanged; it opens only from a launcher's
+  console window, and `LAB_WATCH=0` turns it off (the test-run browser then stays as before, for timed runs).
 - **Classic mode in colour**: turn headers, action tags, discoveries, warnings and refusals in the website's palette,
   in a console window only (piped output is plain; `NO_COLOR` or `LAB_COLOR=0` turns it off).
 - **A compatibility test for any model** (`tools/compat.py`), quick and cheap: about ten model calls on a fixed page
