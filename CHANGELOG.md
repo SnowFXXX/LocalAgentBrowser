@@ -8,6 +8,10 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
 
 ## [Unreleased]
 ### Changed
+- **Setup's shortcuts open the Windows UI**; a "(classic console)" Start menu entry opens the console. The cloud
+  shortcut opens the UI with the cloud model ticked for that window only: nothing leaves the PC unless that shortcut
+  was the one opened. Uninstalling also removes the UI's saved choices.
+- **The Clean Room check also reads .html, .js and .css files** for cloud wording.
 - **The regression suite gives every task 90 minutes by default** (`--minutes` still sets another limit), and each
   run records its limit in run_info.json, summary.json and the summary's first line. The tasks' own limits of 25 to
   60 minutes are gone: a 1.67 run started without `--minutes 90` by mistake was cut short by them.
@@ -20,6 +24,22 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
 - **The regression suite waits up to 30 seconds for the model list, and tries once more** if it doesn't come.
 
 ### Added
+- **The Windows UI, on by default on Windows**: LocalAgentBrowser in a window of its own, in the website's colours,
+  instead of a console. The start screen takes the objective and the choices (model from LM Studio's list, time
+  limit, reports folder) and lists recent reports. While the agent works, the live view shows what it is doing (the
+  checklist as chips that light up as items are found, a card per action, refusals by the checks included, and a
+  timer while the model thinks), and when it ends the report appears in place. Stop, and the time limit, end a run
+  even while the model is working, and its report says why. Minimized, it goes to the notification area. The window
+  is the agent's own Chromium showing a local page: nothing is fetched for it, in either edition. Each research runs
+  as its own process, with its console text saved as console.txt in its run folder.
+- **Classic mode stays one switch away**: "Classic console" in the UI opens the console and keeps it as the choice;
+  typing `/ui` as the objective there switches back. `pip install` (Linux, macOS) gets classic mode, as before;
+  `localagentbrowser-ui` opens the Windows UI.
+- **The agent's browser follows what the agent reads**: on READ_MORE it scrolls to the part now read, and each recorded
+  discovery is highlighted on the page in mint. The page's text is unchanged (the browser's own highlights), so what
+  the agent reads is the same with it on or off (`LAB_FOLLOW=0`).
+- **Classic mode in colour**: turn headers, action tags, discoveries, warnings and refusals in the website's palette,
+  in a console window only (piped output is plain; `NO_COLOR` or `LAB_COLOR=0` turns it off).
 - **A compatibility test for any model** (`tools/compat.py`), quick and cheap: about ten model calls on a fixed page
   (split the question, choose an action on search results, record a finding that passes the grounding check, check
   coverage, write a cited result, write a view, and a reply cut off at its limit retried), then one live task with
