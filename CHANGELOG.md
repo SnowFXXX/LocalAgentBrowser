@@ -9,8 +9,8 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
 ## [Unreleased]
 ### Changed
 - **Setup's shortcuts open the Windows UI**; a "(classic console)" Start menu entry opens the console. The cloud
-  shortcut opens the UI with the cloud model ticked for that window only: nothing leaves the PC unless that shortcut
-  was the one opened. Uninstalling also removes the UI's saved choices.
+  shortcut opens the UI with the cloud box ticked. The tick is never kept, so nothing leaves the PC unless the box
+  is ticked in that window (by the cloud shortcut, or by you). Uninstalling also removes the UI's saved choices.
 - **The Clean Room check also reads .html, .js and .css files** for cloud wording.
 - **The regression suite gives every task 90 minutes by default** (`--minutes` still sets another limit), and each
   run records its limit in run_info.json, summary.json and the summary's first line. The tasks' own limits of 25 to

@@ -7,12 +7,14 @@ you can check, or says honestly what it couldn't find.**
 **L.A.B.** for short, and it wears a LAB COAT: **Citations Over Assumed Truth.** Every claim in an answer points to the
 page it came from, and code checks it is there, because the project's principle is **Verification Over Trust**.
 
-**New in 1.67: [Clean Room](#clean-room-a-private-edition), a private edition.** The same agent with the cloud option
-not just off but gone: the code for it is removed before the edition is built, and the build fails if any is left.
-It talks to a model only on your own PC or network. **In 1.66:** sturdier cloud runs, more of every answer checked in
-code, and the console and browser [side by side](#first-run) on Windows. **In 1.65:** a
-[Windows installer](#windows-the-installer-recommended) with a choice of tested models, and optional cloud models
-through [OpenRouter](https://openrouter.ai) for fast answers.
+**New in 1.68: [a window of its own](#first-run) on Windows.** Type your question on a start screen, then watch the
+agent work in a live view beside its browser. The browser scrolls to the part being read and marks each finding.
+The report appears in the same window, and the classic console is one click away. Also new: a
+[compatibility test](#compatible-models) that has tried 79 cloud models and 18 local ones, and a menu of cloud
+models with our recommendations. **In 1.67:** [Clean Room](#clean-room-a-private-edition), a private edition with
+the cloud code removed before it is built. **In 1.66:** sturdier cloud runs and more of every answer checked in code.
+**In 1.65:** a [Windows installer](#windows-the-installer-recommended) with a choice of tested models, and optional
+cloud models through [OpenRouter](https://openrouter.ai) for fast answers.
 
 [![Tests](https://github.com/SnowFXXX/LocalAgentBrowser/actions/workflows/tests.yml/badge.svg)](https://github.com/SnowFXXX/LocalAgentBrowser/actions/workflows/tests.yml)
 [![PyPI](https://img.shields.io/pypi/v/localagentbrowser.svg)](https://pypi.org/project/localagentbrowser/)
@@ -41,8 +43,9 @@ can use a cloud model instead. Every claim in its answer points to the page it c
   when every part of the objective is covered.
 - 📝 **A report every time.** The final result with numbered citations and every finding with its source, written
   however the run ends.
-- 🪟 **Easy on Windows.** An installer with its own Python, a choice of tested models during setup, Start-menu
-  shortcuts, and the report opening by itself when a run ends.
+- 🪟 **Easy on Windows.** An installer with its own Python and a choice of tested models, and a window of its own: a
+  start screen, a live view beside the agent's browser, the report in place, and a tray icon for new research and
+  recent reports.
 
 📖 [Project site](https://snowfxxx.github.io/LocalAgentBrowser/) ·
 [Article: We Can Do Better: A Small AI That Can't Cover Up](https://snowfxxx.github.io/LocalAgentBrowser/article.html) ·
@@ -51,7 +54,8 @@ can use a cloud model instead. Every claim in its answer points to the page it c
 
 ## Contents
 
-[Two editions](#two-editions) · [Tested on four models](#tested-on-four-models) · [Install](#install) · [First run](#first-run) ·
+[Two editions](#two-editions) · [Tested on four models](#tested-on-four-models) · [Compatible models](#compatible-models) ·
+[Install](#install) · [First run](#first-run) ·
 [What a run looks like](#what-a-run-looks-like) · [How it works](#how-it-works) · [Settings](#settings) ·
 [FAQ](#faq) · [Limitations](#limitations) · [Roadmap](#roadmap) · [Testing](#testing) · [Contributing](#contributing)
 
@@ -222,6 +226,37 @@ provider serves now.
 **Which to pick:** the 7B for most PCs, Llama if you have the same 8 GB and want it to finish more often, the 3B for
 a PC with little memory. Any instruction-tuned model LM Studio serves should work.
 
+## Compatible models
+
+The suite above measures a few models closely. The **compatibility test** (`tools/compat.py`, new in 1.68) asks a
+simpler question of many: does a model work with the agent at all? It makes about ten model calls on a fixed page
+(split the question, choose an action on search results, record a finding that passes the grounding check, check
+coverage, write a cited result, write a view, retry a reply cut off at its limit), then runs one live task with the
+browser, the suite's factual question. A model is **compatible** when every check passes and the live task ends with
+a cited result of its own; **compatible, with limits** when the live task passes but a quick check failed (named in
+the table); **did not finish in N minutes** when the live task's time limit stopped it with no other failure (too
+slow on that computer, which says nothing about the model working with the agent; the limit is 90 minutes in LM
+Studio and 30 in the cloud); and **not compatible** on an error, a reply with no valid JSON, no result, a refused
+retry, or a failed live task.
+
+Tested on the pre-release 1.68 code, November 20 and 21, 2026:
+
+- **79 cloud models on OpenRouter:** 61 compatible, 14 compatible with limits, 1 not compatible (Command R7B,
+  which finished from what it had read without recording it), and 3 not settled because their providers failed the
+  calls. The 79 tests cost $3.70 together. The window's cloud model menu lists the 61, with our recommendations first.
+- **18 local models in LM Studio, on the same CPU as the suite:** <!-- local results to add when the run ends -->
+
+<details>
+<summary>All 79 cloud models</summary>
+
+<!-- cloud table: drafts/compat_section.py, regenerated after the retest -->
+
+</details>
+
+A model that fails here may still be fine for other work; a model that passes is a good start, not a guarantee. Any
+model can be tried: `python tools/compat.py MODEL` for one in LM Studio, or `--cloud` for OpenRouter (see
+[Testing](#testing)).
+
 ## Install
 
 ### Windows: the installer (recommended)
@@ -236,9 +271,10 @@ a PC with little memory. Any instruction-tuned model LM Studio serves should wor
 3. Setup asks what to install (LocalAgentBrowser, and optionally the test suite), which of the five tested models to
    download through LM Studio, and whether to use cloud models (off unless you tick it). It then downloads the
    Chromium browser the agent uses (about 150 MB, once).
-4. Open **LocalAgentBrowser** from the Start menu or the desktop. If you turned on cloud models, setup also adds
-   **LocalAgentBrowser (cloud)**. The plain shortcut always uses the model in LM Studio; only the (cloud) one sends
-   your runs to OpenRouter.
+4. Open **LocalAgentBrowser** from the Start menu or the desktop: it opens in a window of its own (see
+   [First run](#first-run)). If you turned on cloud models, setup also adds **LocalAgentBrowser (cloud)**, which opens
+   with the cloud model ticked. Nothing goes to OpenRouter unless that box is ticked, and the tick is never kept from
+   one window to the next. **LocalAgentBrowser (classic console)** in the Start menu opens the console instead.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/installer/3-model.png" alt="Setup: choose one of the tested models, with its size, memory and results" width="400">
@@ -303,24 +339,30 @@ your browser when the run ends.
    set your OpenRouter key in the `OPENROUTER_API_KEY` environment variable instead (without the installer, see
    the [FAQ](#faq) for the other settings).
 2. Start LocalAgentBrowser: the Start-menu shortcut on Windows (**LocalAgentBrowser (cloud)** for cloud models), or
-   `localagentbrowser` in a terminal.
-3. Type your objective, for example *What is the tallest mountain in Africa, and how tall is it in meters and in
-   feet?* A Chromium window opens and the agent starts working. The first step takes a minute or two on a CPU. On
-   Windows (1.66), the console and the browser sit side by side, the console on the left and the browser on the
-   right, so you can watch both without switching windows (`LAB_SIDE_BY_SIDE=0` turns this off).
-4. When it finishes, the report opens in your browser (on the right, on Windows), or read `research_report.md` in the
-   folder you ran it from. Runs from the shortcut each get their own folder under **Documents\LocalAgentBrowser runs**.
-5. On Windows, the console then asks for another objective, so you can run one after another in the same window;
-   press Enter on an empty line to close it.
+   `localagentbrowser` in a terminal on other systems.
+3. **On Windows, a window opens on a start screen.** Type your objective, for example *What is the tallest mountain
+   in Africa, and how tall is it in meters and in feet?* Check the model: LM Studio's list, or, with the cloud box
+   ticked, a menu of cloud models with our recommendations first (see [Compatible models](#compatible-models)). Then
+   click **Start research**.
+4. **The window moves to the left and the agent's browser opens on the right.** The live view shows the parts of
+   the objective as chips that light up as each is answered, a card for each action (searches, pages, findings, and
+   the checks' refusals), and a timer while the model thinks. The first step takes a minute or two on a CPU. In the
+   browser, the page scrolls to the part being read and marks each finding in mint, so you can see where every claim
+   comes from (`LAB_FOLLOW=0` turns this off). **Stop** ends a run at any time.
+5. **When it finishes, the report appears in the same window**, with buttons to open it as a page or open its
+   folder. **New research** starts another. The start screen lists recent reports, and each run gets its own folder
+   under **Documents\LocalAgentBrowser runs**. Minimized, the window goes to the notification area; its icon's menu
+   has New research, Recent reports, Stop the run and Quit.
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/side-by-side-run.png" alt="A run on Windows: the console on the left shows each turn (a search, then the Mount Kilimanjaro page and the finding recorded from it), and the browser on the right shows the Wikipedia page the agent is reading" width="400">
-  <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/side-by-side-report.png" alt="The same run finished: the report on the right with the cited answer, 5,895 meters (19,341 feet), and the console on the left asking for another objective" width="400">
-</p>
-<p align="center"><sub>1.66 with Qwen2.5-7B on a CPU: the run, then its report. The file paths in the second shot are blurred.</sub></p>
+<!-- Screenshots of 1.68 to add: the start screen, a run with the browser beside it, the report in the window -->
 
-A run takes about 10 to 60 minutes on a CPU, and a few minutes with a cloud model. Press Ctrl+C at any time to stop; the report is still written with
-everything found so far.
+**The classic console** is one click away: **Classic console** at the top of the window (or the Start menu's
+**LocalAgentBrowser (classic console)**) opens it, with the console and the browser side by side as in 1.66, and
+keeps it as your choice. Type `/ui` as the objective there to come back. `pip install` on Linux and macOS gives the
+console, which asks for an objective and opens the report in your browser when the run ends.
+
+A run takes about 10 to 60 minutes on a CPU, and a few minutes with a cloud model. Stop it at any time (**Stop** in
+the window, Ctrl+C in the console): the report is still written with everything found so far.
 
 **Good objectives** are questions you'd research by reading pages: a fact, a list with conditions ("three free,
 open-source alternatives to Photoshop"), a comparison, a how-to, an explanation, or what several sources say.
@@ -432,9 +474,15 @@ The full details, code layout, timings and known limits:
 | `OPENROUTER_API_KEY` | none | Your OpenRouter key for cloud models, read by the Windows launcher and the test suite's `--cloud` |
 | `LAB_RUNS_DIR` | `regression_runs/` | Where the test suite puts its run folders |
 | `LAB_SIDE_BY_SIDE` | on | On Windows, `0` keeps the console and the browser from being placed side by side |
+| `LAB_FOLLOW` | on | `0` keeps the agent's browser from scrolling to the part read and marking findings |
+| `LAB_WATCH` | on | `0` keeps test runs started from a console from opening the watch window |
+| `NO_COLOR`, `LAB_COLOR` | colour on | `NO_COLOR` set, or `LAB_COLOR=0`, keeps the classic console's text plain |
 
 The Windows installer writes the model you chose, and the cloud setting if you turned it on, to small files in its
-`settings` folder. Behaviour limits are named constants in `localagentbrowser/config.py`, each with a comment.
+`settings` folder. The window keeps its own choices (the model, the time limit, the reports folder, the cloud model
+picked, and whether you prefer the classic console) in `%APPDATA%\LocalAgentBrowser\settings.json`; uninstalling
+removes it. The cloud tick is never kept. Behaviour limits are named constants in `localagentbrowser/config.py`, each
+with a comment.
 
 ## FAQ
 
@@ -463,10 +511,21 @@ content is shared); to turn that off, delete the `LMSTUDIO_EXTRA_HEADERS` line i
 `settings\cloud.cmd`.
 
 **How do I switch between local and cloud models?** With cloud models turned on in setup, you get two shortcuts
-(from 1.67): **LocalAgentBrowser** always uses the model in LM Studio, and **LocalAgentBrowser (cloud)** uses the
-cloud model through OpenRouter. Open whichever you want for that run; nothing else changes. To add or remove the
-cloud shortcut, run setup again and tick or untick cloud models: your reports are kept. (Up to 1.66, turning on cloud
-models made the one shortcut use the cloud; after updating, that shortcut uses LM Studio.)
+(from 1.67): **LocalAgentBrowser** opens with the model in LM Studio, and **LocalAgentBrowser (cloud)** opens with the
+cloud box ticked. In the window (1.68) you can also tick or untick the box before a run; the tick is never kept, so
+each window starts as its shortcut says. To add or remove the cloud shortcut, run setup again and tick or untick
+cloud models: your reports are kept.
+
+**Which cloud model should I use?** With the cloud box ticked, the start screen's **Model** menu lists our
+recommendations first: models that passed every compatibility check and also finished the whole test suite
+(Phi-4, the default, also answered 85% of 200 SimpleQA questions). Then come the other models that passed every
+compatibility check, each with what its test cost, and **Another model...** for any model ID OpenRouter lists. Your
+pick is kept for next time. The classic console uses the model setup chose (`LMSTUDIO_MODEL` in the installer's
+`settings\cloud.cmd`).
+
+**How do I get the console back?** Click **Classic console** at the top of the window, or open **LocalAgentBrowser
+(classic console)** from the Start menu. The window remembers the choice; type `/ui` as the objective in the console
+to switch back.
 
 **How do I turn on cloud models without the installer?** Set your key in `OPENROUTER_API_KEY`, then these, in
 the same window before you start the agent. In Windows' command prompt:
@@ -493,9 +552,10 @@ OpenRouter lists can go in `LMSTUDIO_MODEL`; this one is the cloud version of th
 **Can I use another OpenAI-compatible server?** Probably: point `LMSTUDIO_BASE_URL` at it. The speed tricks rely
 on the server reusing cached prompt prefixes (llama.cpp-based servers do).
 
-**Where are the results?** When a run started from the Windows shortcut or the installed app ends, the report opens
-in your browser by itself. The files are `research_report.md` (the answer and every finding with its source) and
-`research_log.txt` (every action and reason), in the run's folder.
+**Where are the results?** In the window, the report appears when the run ends, with buttons to open it as a page
+or open its folder; recent reports are on the start screen and in the tray icon's menu. From the classic console,
+the report opens in your browser by itself. The files are `research_report.md` (the answer and every finding with its
+source), `research_log.txt` (every action and reason) and, from the window, `console.txt`, in the run's folder.
 
 ## Limitations
 
@@ -517,13 +577,14 @@ More in [docs/how-it-works.md](https://github.com/SnowFXXX/LocalAgentBrowser/blo
 - [x] Parts of the objective no longer dropped silently as often; the Windows launcher (1.64)
 - [x] A Windows installer with its own Python and a choice of tested models, and optional cloud models (1.65)
 - [x] Sturdier cloud runs, more of each answer checked in code, and the console and browser side by side (1.66)
-- [ ] **Clean Room (1.67):** a privacy edition with the cloud code removed entirely, released alongside every
+- [x] **Clean Room (1.67):** a privacy edition with the cloud code removed entirely, released alongside every
   standard version from then on
-- [ ] Count silent omissions in the regression suite, so [issue #11](https://github.com/SnowFXXX/LocalAgentBrowser/issues/11) can close on a number
+- [x] **The Windows UI (1.68):** a window of its own with a live view, a browser that follows the agent, a tray icon,
+  and a choice of cloud model; a compatibility test for any model; silent omissions counted in the regression suite
+  ([issue #11](https://github.com/SnowFXXX/LocalAgentBrowser/issues/11))
 - [ ] Decide in code, not by asking the model, whether a finding answers the part it's credited to
 - [ ] Refuse a finding that changes one of the page's key words (1.66's SimpleQA run recorded "men's foil" from a
   page that says "épée")
-- [ ] A tray app on Windows: new research, progress, a notification when done
 - [ ] Rewind dead ends: return to a saved point instead of carrying an unused page in every later prompt
 - [ ] Interacting with pages (clicking, forms) for tasks beyond reading
 
@@ -553,6 +614,22 @@ python tools/regression.py --model qwen2.5-7b-instruct --baseline regression_run
 
 With `--cloud --model microsoft/phi-4` the same suite runs on OpenRouter, with your key in
 `OPENROUTER_API_KEY` (those runs are listed under LocalAgentBrowser in OpenRouter's app rankings).
+
+To check whether a model works with the agent at all (see [Compatible models](#compatible-models)), in minutes on a
+cloud model or about an hour on a CPU:
+
+```bash
+python tools/compat.py qwen2.5-7b-instruct
+python tools/compat.py --cloud --budget 0.50 microsoft/phi-4 openai/gpt-4o-mini
+```
+
+In LM Studio it downloads a model it doesn't have for the test, and deletes it afterwards. `--models FILE` tests a
+list, `--no-live` runs the quick checks only, and `--minutes` changes the live task's limit. Results go to
+`C:\LocalAgentBrowser-compat-runs` (or the folder `LAB_COMPAT_DIR` names), with a `summary.md` for the list.
+
+On Windows, a test run started from a console (the suite, the compatibility test or SimpleQA) opens a **watch
+window**: the same live view as the app's, on the left, following each task beside its browser (`LAB_WATCH=0` turns
+it off).
 
 Each run gets a folder in `regression_runs/` (or in the folder `LAB_RUNS_DIR` names; the installer's "Run the test
 suite" shortcut uses Documents\LocalAgentBrowser test-suite runs) with every task's report, journal and prompt
