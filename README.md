@@ -246,9 +246,9 @@ retry, or a failed live task.
 
 Tested on the pre-release 1.68 code, November 20 and 21, 2026:
 
-- **79 cloud models on OpenRouter:** 61 compatible, 14 compatible with limits, 1 not compatible (Command R7B,
+- **79 cloud models on OpenRouter:** 62 compatible, 13 compatible with limits, 1 not compatible (Command R7B,
   which finished from what it had read without recording it), and 3 not settled because their providers failed the
-  calls. The 79 tests cost $3.70 together. The window's cloud model menu lists the 61, with our recommendations first:
+  calls. The 79 tests cost $3.67 together. The window's cloud model menu lists the 62, with our recommendations first:
 
   <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/ui/cloud-model-menu.png" alt="The start screen with the cloud box ticked: a Model menu showing microsoft/phi-4, and under it the note: The default. Finished all 7 test tasks on 1.67 in 4.9 minutes, for about $0.03; 85% right on 200 SimpleQA questions." width="600">
 - **18 local models in LM Studio, on the same CPU as the suite, with 30 minutes for the live task:** 2 compatible
@@ -288,7 +288,7 @@ Tested on the pre-release 1.68 code, November 20 and 21, 2026:
 <details>
 <summary>All 79 cloud models</summary>
 
-<!-- Built by drafts/compat_section.py from the runs' results; regenerated after the retest -->
+<!-- Built by drafts/compat_section.py from the runs' results, the retest of Nov 21 included -->
 | Model | Result | Quick checks | Live task | Cost |
 |---|---|---|---|---|
 | `anthropic/claude-fable-5.2` | compatible | 7 of 7 | passed | $0.995 |
@@ -300,6 +300,7 @@ Tested on the pre-release 1.68 code, November 20 and 21, 2026:
 | `deepseek/deepseek-v4-flash` | compatible | 7 of 7 | passed | $0.002 |
 | `deepseek/deepseek-v4-pro` | compatible | 7 of 7 | passed | $0.028 |
 | `google/gemini-3.5-flash-lite` | compatible | 7 of 7 | passed | $0.005 |
+| `google/gemini-3.8-flash` | compatible | 7 of 7 | passed | $0.061 |
 | `google/gemini-4-hydrogen` | compatible | 7 of 7 | passed | $0.185 |
 | `google/gemini-4-neon` | compatible | 7 of 7 | passed | $0.485 |
 | `google/gemma-3-12b-it` | compatible | 7 of 7 | passed | $0.002 |
@@ -354,12 +355,11 @@ Tested on the pre-release 1.68 code, November 20 and 21, 2026:
 | `z-ai/glm-5.3-flash` | compatible | 7 of 7 | passed | $0.004 |
 | `cohere/command-r-08-2024` | compatible, with limits (discover) | 6 of 7 | passed | $0.011 |
 | `deepseek/deepseek-v3.2` | compatible, with limits (coverage) | 6 of 7 | passed | $0.006 |
-| `google/gemini-3.8-flash` | compatible, with limits (final result) | 6 of 7 | passed | $0.078 |
 | `google/gemma-3-4b-it` | compatible, with limits (coverage) | 6 of 7 | passed | $0.001 |
 | `ibm-granite/granite-4.2-8b` | compatible, with limits (split) | 6 of 7 | passed | $0.007 |
 | `inclusionai/ling-3.0-flash` | compatible, with limits (coverage) | 6 of 7 | passed | $0.009 |
 | `meta-llama/llama-3.1-8b-instruct` | compatible, with limits (final result) | 6 of 7 | passed | $0.019 |
-| `minimax/minimax-m2.7` | compatible, with limits (split, final result) | 5 of 7 | passed | $0.020 |
+| `meta-llama/llama-3.2-3b-instruct` | compatible, with limits (final result) | 6 of 7 | passed | $0.007 |
 | `mistralai/mistral-nemo` | compatible, with limits (discover) | 6 of 7 | passed | $0.002 |
 | `mistralai/mistral-small-2603` | compatible, with limits (discover) | 6 of 7 | passed | $0.005 |
 | `moonshotai/kimi-k2.6` | compatible, with limits (split, coverage) | 5 of 7 | passed | $0.140 |
@@ -368,7 +368,7 @@ Tested on the pre-release 1.68 code, November 20 and 21, 2026:
 | `tencent/hy4-flash` | compatible, with limits (coverage) | 6 of 7 | passed | $0.005 |
 | `cohere/command-r7b-12-2024` | not compatible (live task failed) | 7 of 7 | failed | $0.003 |
 | `liquid/lfm-2.5-24b-a2b` | not settled: its provider failed the calls | 7 of 7 | failed | $0.034 |
-| `meta-llama/llama-3.2-3b-instruct` | not settled: its provider failed the calls | 4 of 7 | - | $0.002 |
+| `minimax/minimax-m2.7` | not settled: its provider failed the calls | 0 of 7 | - | $0.000 |
 | `mistralai/mistral-medium-3.1` | not settled: its provider failed the calls | 0 of 7 | - | $0.000 |
 
 </details>
