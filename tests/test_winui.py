@@ -189,6 +189,26 @@ class TestTrayMenu:
             icon.stop()
         assert commands == [("recent", "C:\\Runs\\a")]
 
+    @pytest.mark.skipif(sys.platform != "win32", reason="the tray is Windows only")
+    def test_each_icon_has_a_window_class_of_its_own_gone_with_it(self):
+        # Two icons once shared a class, so the second got the first one's window procedure, freed with it: Windows
+        # calling it ended the process (0xC000041D, the Clean Room suite on Python 3.10)
+        import ctypes
+        from localagentbrowser import tray
+        def registered(name):
+            return bool(tray.user32.GetClassInfoW(ctypes.c_void_p(tray.kernel32.GetModuleHandleW(None)), name,
+                                                  ctypes.byref(tray.WNDCLASSW())))
+        names = []
+        for _ in range(2):
+            icon = tray.Tray("LocalAgentBrowser test", lambda command, argument=None: None)
+            if not icon.start():
+                pytest.skip("no taskbar to put an icon in (a service session)")
+            names.append(icon.class_name)
+            assert registered(icon.class_name)
+            icon.stop()
+            assert not registered(icon.class_name)
+        assert names[0] != names[1]
+
 
 class TestTrayCommands:
     def ui(self, monkeypatch, tmp_path, running):

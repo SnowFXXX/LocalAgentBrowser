@@ -4,6 +4,7 @@ it back, and its menu opens the window, stops the run, opens the reports folder,
 Nothing is shown when a run ends. Does nothing elsewhere than Windows.
 """
 import ctypes
+import itertools
 import os
 import sys
 import threading
@@ -28,6 +29,8 @@ if sys.platform == "win32":
     user32.DestroyMenu.argtypes = [wintypes.HMENU]
     user32.TrackPopupMenu.argtypes = [wintypes.HMENU, wintypes.UINT, ctypes.c_int, ctypes.c_int, ctypes.c_int,
                                       wintypes.HWND, wintypes.LPVOID]
+    user32.RegisterClassW.restype = wintypes.ATOM
+    user32.UnregisterClassW.argtypes = [wintypes.LPCWSTR, wintypes.HINSTANCE]
     kernel32.GetModuleHandleW.restype = wintypes.HMODULE
 
     class WNDCLASSW(ctypes.Structure):
@@ -55,6 +58,7 @@ CALLBACK = WM_APP + 1
 MF_POPUP = 0x10
 ICON = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools", "windows", "localagentbrowser.ico")
 RECENT_LABEL_CHARS = 60  # A recent report's objective, shortened in its menu line
+CLASS_NUMBERS = itertools.count(1)  # Each icon's window class has a name of its own (see Tray.create)
 
 
 def menu_items(running, recent):
@@ -106,14 +110,20 @@ class Tray:
         while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
             user32.TranslateMessage(ctypes.byref(msg))
             user32.DispatchMessageW(ctypes.byref(msg))
+        user32.UnregisterClassW(self.class_name, self.instance)  # The window is gone
 
     def create(self):
-        instance = kernel32.GetModuleHandleW(None)
+        self.instance = instance = kernel32.GetModuleHandleW(None)
         self.proc = WNDPROC(self.window_proc)  # Kept: Windows calls it for as long as the window lives
-        cls = WNDCLASSW(lpfnWndProc=self.proc, hInstance=instance, lpszClassName=f"LocalAgentBrowserTray{os.getpid()}")
-        user32.RegisterClassW(ctypes.byref(cls))
+        # A class of its own, unregistered when its window is gone: a second icon in the same process given the first
+        # one's class would get its window procedure too, freed with it, and Windows calling it ends the process
+        self.class_name = f"LocalAgentBrowserTray{os.getpid()}-{next(CLASS_NUMBERS)}"
+        cls = WNDCLASSW(lpfnWndProc=self.proc, hInstance=instance, lpszClassName=self.class_name)
+        if not user32.RegisterClassW(ctypes.byref(cls)):
+            return
         self.hwnd = user32.CreateWindowExW(0, cls.lpszClassName, self.tooltip, 0, 0, 0, 0, 0, None, None, instance, None)
         if not self.hwnd:
+            user32.UnregisterClassW(self.class_name, instance)
             return
         icon = (user32.LoadImageW(None, ICON, IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE)
                 if os.path.exists(ICON) else None) or user32.LoadIconW(None, ctypes.c_void_p(IDI_APPLICATION))
@@ -123,6 +133,7 @@ class Tray:
         if not shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(self.data)):
             user32.DestroyWindow(self.hwnd)
             self.hwnd = None
+            user32.UnregisterClassW(self.class_name, instance)
 
     def window_proc(self, hwnd, message, wparam, lparam):
         if message == CALLBACK:
