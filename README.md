@@ -251,12 +251,125 @@ Tested on the pre-release 1.68 code, November 20 and 21, 2026:
   calls. The 79 tests cost $3.70 together. The window's cloud model menu lists the 61, with our recommendations first:
 
   <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/ui/cloud-model-menu.png" alt="The start screen with the cloud box ticked: a Model menu showing microsoft/phi-4, and under it the note: The default. Finished all 7 test tasks on 1.67 in 4.9 minutes, for about $0.03; 85% right on 200 SimpleQA questions." width="600">
-- **18 local models in LM Studio, on the same CPU as the suite:** <!-- local results to add when the run ends -->
+- **18 local models in LM Studio, on the same CPU as the suite, with 30 minutes for the live task:** 2 compatible
+  (Qwen2.5 7B and Qwen3-VL 8B), 3 compatible with limits (Gemma 3 4B, Llama 3.1 8B and Gemma 4 E2B), 10 that
+  didn't finish in the 30 minutes, 2 too slow on this CPU (a single reply took over 30 minutes: Qwen3.5 9B and
+  DeepSeek R1 0528 Qwen3 8B), and 1 not compatible (Gemma 3 1B, which never found the answer). Only that last one
+  failed: the rest ran out of time on a CPU, which is why 1.68 gives a model in LM Studio 90 minutes. The ten are
+  retested with 90 minutes in a point release.
+
+<details>
+<summary>All 18 local models</summary>
+
+<!-- Built by drafts/compat_section.py from the run's results -->
+| Model | Result | Quick checks | Live task | Minutes |
+|---|---|---|---|---|
+| `qwen2.5-7b-instruct` | compatible | 7 of 7 | passed | 33.6 |
+| `qwen3-vl-8b-instruct` | compatible | 7 of 7 | passed | 40.5 |
+| `gemma-3-4b-it` | compatible, with limits (coverage, view) | 5 of 7 | passed | 24.1 |
+| `gemma-4-e2b-it` | compatible, with limits (split, final result) | 5 of 7 | passed | 28.6 |
+| `meta-llama-3.1-8b-instruct` | compatible, with limits (coverage, view) | 5 of 7 | passed | 37.7 |
+| `gemma-4-12b-it-qat` | did not finish within 30 minutes | 6 of 7 | out of time | 159.1 |
+| `gemma-4-e4b-it` | did not finish within 30 minutes | 7 of 7 | out of time | 68.7 |
+| `gpt-oss-20b` | did not finish within 30 minutes | 7 of 7 | out of time | 75.5 |
+| `hermes-3-llama-3.1-8b` | did not finish within 30 minutes | 5 of 7 | out of time | 46.3 |
+| `microsoft/phi-4` | did not finish within 30 minutes | 6 of 7 | out of time | 67.4 |
+| `qwen2.5-14b-instruct` | did not finish within 30 minutes | 7 of 7 | out of time | 58.0 |
+| `qwen2.5-3b-instruct` | did not finish within 30 minutes | 5 of 7 | out of time | 42.0 |
+| `qwen3-4b-instruct-2507` | did not finish within 30 minutes | 6 of 7 | out of time | 42.5 |
+| `qwen3.5-2b` | did not finish within 30 minutes | 5 of 7 | out of time | 121.8 |
+| `qwen3.5-4b` | did not finish within 30 minutes | 7 of 7 | out of time | 88.0 |
+| `deepseek-r1-0528-qwen3-8b` | too slow on this CPU: a single reply took over 30 minutes | - | - | - |
+| `qwen3.5-9b` | too slow on this CPU: a single reply took over 30 minutes | 5 of 7 | - | 154.3 |
+| `gemma-3-1b-it` | not compatible (live task failed) | 5 of 7 | failed | 8.8 |
+
+</details>
 
 <details>
 <summary>All 79 cloud models</summary>
 
-<!-- cloud table: drafts/compat_section.py, regenerated after the retest -->
+<!-- Built by drafts/compat_section.py from the runs' results; regenerated after the retest -->
+| Model | Result | Quick checks | Live task | Cost |
+|---|---|---|---|---|
+| `anthropic/claude-fable-5.2` | compatible | 7 of 7 | passed | $0.995 |
+| `anthropic/claude-haiku-5.5` | compatible | 7 of 7 | passed | $0.004 |
+| `anthropic/claude-sonnet-5.5` | compatible | 7 of 7 | passed | $0.214 |
+| `cohere/command-a-plus` | compatible | 7 of 7 | passed | $0.037 |
+| `deepseek/deepseek-chat-v3.1` | compatible | 7 of 7 | passed | $0.009 |
+| `deepseek/deepseek-r1-0528` | compatible | 7 of 7 | passed | $0.081 |
+| `deepseek/deepseek-v4-flash` | compatible | 7 of 7 | passed | $0.002 |
+| `deepseek/deepseek-v4-pro` | compatible | 7 of 7 | passed | $0.028 |
+| `google/gemini-3.5-flash-lite` | compatible | 7 of 7 | passed | $0.005 |
+| `google/gemini-4-hydrogen` | compatible | 7 of 7 | passed | $0.185 |
+| `google/gemini-4-neon` | compatible | 7 of 7 | passed | $0.485 |
+| `google/gemma-3-12b-it` | compatible | 7 of 7 | passed | $0.002 |
+| `google/gemma-3-27b-it` | compatible | 7 of 7 | passed | $0.003 |
+| `google/gemma-4-26b-a4b-it` | compatible | 7 of 7 | passed | $0.002 |
+| `google/gemma-4-31b-it` | compatible | 7 of 7 | passed | $0.003 |
+| `meta-llama/llama-3.3-70b-instruct` | compatible | 7 of 7 | passed | $0.003 |
+| `meta-llama/llama-4-maverick` | compatible | 7 of 7 | passed | $0.004 |
+| `meta-llama/llama-4-scout` | compatible | 7 of 7 | passed | $0.001 |
+| `meta/muse-spark-1.3` | compatible | 7 of 7 | passed | $0.132 |
+| `microsoft/phi-4` | compatible | 7 of 7 | passed | $0.003 |
+| `minimax/minimax-m3` | compatible | 7 of 7 | passed | $0.008 |
+| `minimax/minimax-m3.1-flash` | compatible | 7 of 7 | passed | $0.003 |
+| `mistralai/codestral-2508` | compatible | 7 of 7 | passed | $0.008 |
+| `mistralai/ministral-3b-2512` | compatible | 7 of 7 | passed | $0.002 |
+| `mistralai/ministral-8b-2512` | compatible | 7 of 7 | passed | $0.002 |
+| `mistralai/mistral-large-4-0` | compatible | 7 of 7 | passed | $0.043 |
+| `moonshotai/kimi-k3.1-pro` | compatible | 7 of 7 | passed | $0.132 |
+| `nousresearch/hermes-4-405b` | compatible | 7 of 7 | passed | $0.019 |
+| `nvidia/nemotron-3-super-120b-a12b` | compatible | 7 of 7 | passed | $0.012 |
+| `nvidia/nemotron-3.5-lightning` | compatible | 7 of 7 | passed | $0.009 |
+| `openai/gpt-4.1-mini` | compatible | 7 of 7 | passed | $0.012 |
+| `openai/gpt-4o-mini` | compatible | 7 of 7 | passed | $0.005 |
+| `openai/gpt-5.4-mini` | compatible | 7 of 7 | passed | $0.022 |
+| `openai/gpt-5.4-nano` | compatible | 7 of 7 | passed | $0.006 |
+| `openai/gpt-5.6-terra` | compatible | 7 of 7 | passed | $0.068 |
+| `openai/gpt-6-luna` | compatible | 7 of 7 | passed | $0.004 |
+| `openai/gpt-6.1-terra` | compatible | 7 of 7 | passed | $0.035 |
+| `openai/gpt-6.2-sol` | compatible | 7 of 7 | passed | $0.061 |
+| `openai/gpt-oss-120b` | compatible | 7 of 7 | passed | $0.003 |
+| `openai/gpt-oss-20b` | compatible | 7 of 7 | passed | $0.004 |
+| `qwen/qwen-2.5-72b-instruct` | compatible | 7 of 7 | passed | $0.013 |
+| `qwen/qwen3-235b-a22b-2507` | compatible | 7 of 7 | passed | $0.007 |
+| `qwen/qwen3-30b-a3b-instruct-2507` | compatible | 7 of 7 | passed | $0.005 |
+| `qwen/qwen3-32b` | compatible | 7 of 7 | passed | $0.007 |
+| `qwen/qwen3-coder` | compatible | 7 of 7 | passed | $0.007 |
+| `qwen/qwen3.5-9b` | compatible | 7 of 7 | passed | $0.004 |
+| `qwen/qwen3.6-35b-a3b` | compatible | 7 of 7 | passed | $0.024 |
+| `qwen/qwen3.7-plus` | compatible | 7 of 7 | passed | $0.031 |
+| `qwen/qwen3.8-flash` | compatible | 7 of 7 | passed | $0.018 |
+| `qwen/qwen4-max` | compatible | 7 of 7 | passed | $0.040 |
+| `stepfun/step-3.7-flash` | compatible | 7 of 7 | passed | $0.071 |
+| `thinkingmachines/inkling-2-small` | compatible | 7 of 7 | passed | $0.022 |
+| `upstage/solar-pro4` | compatible | 7 of 7 | passed | $0.007 |
+| `x-ai/grok-4.3` | compatible | 7 of 7 | passed | $0.064 |
+| `x-ai/grok-4.7` | compatible | 7 of 7 | passed | $0.141 |
+| `xiaomi/mimo-v2.6-flash` | compatible | 7 of 7 | passed | $0.004 |
+| `z-ai/glm-4.7` | compatible | 7 of 7 | passed | $0.030 |
+| `z-ai/glm-4.7-flash` | compatible | 7 of 7 | passed | $0.014 |
+| `z-ai/glm-5.2` | compatible | 7 of 7 | passed | $0.015 |
+| `z-ai/glm-5.3` | compatible | 7 of 7 | passed | $0.055 |
+| `z-ai/glm-5.3-flash` | compatible | 7 of 7 | passed | $0.004 |
+| `cohere/command-r-08-2024` | compatible, with limits (discover) | 6 of 7 | passed | $0.011 |
+| `deepseek/deepseek-v3.2` | compatible, with limits (coverage) | 6 of 7 | passed | $0.006 |
+| `google/gemini-3.8-flash` | compatible, with limits (final result) | 6 of 7 | passed | $0.078 |
+| `google/gemma-3-4b-it` | compatible, with limits (coverage) | 6 of 7 | passed | $0.001 |
+| `ibm-granite/granite-4.2-8b` | compatible, with limits (split) | 6 of 7 | passed | $0.007 |
+| `inclusionai/ling-3.0-flash` | compatible, with limits (coverage) | 6 of 7 | passed | $0.009 |
+| `meta-llama/llama-3.1-8b-instruct` | compatible, with limits (final result) | 6 of 7 | passed | $0.019 |
+| `minimax/minimax-m2.7` | compatible, with limits (split, final result) | 5 of 7 | passed | $0.020 |
+| `mistralai/mistral-nemo` | compatible, with limits (discover) | 6 of 7 | passed | $0.002 |
+| `mistralai/mistral-small-2603` | compatible, with limits (discover) | 6 of 7 | passed | $0.005 |
+| `moonshotai/kimi-k2.6` | compatible, with limits (split, coverage) | 5 of 7 | passed | $0.140 |
+| `qwen/qwen3.7-flash` | compatible, with limits (split, coverage) | 5 of 7 | passed | $0.004 |
+| `tencent/hy4` | compatible, with limits (split, coverage, view) | 4 of 7 | passed | $0.120 |
+| `tencent/hy4-flash` | compatible, with limits (coverage) | 6 of 7 | passed | $0.005 |
+| `cohere/command-r7b-12-2024` | not compatible (live task failed) | 7 of 7 | failed | $0.003 |
+| `liquid/lfm-2.5-24b-a2b` | not settled: its provider failed the calls | 7 of 7 | failed | $0.034 |
+| `meta-llama/llama-3.2-3b-instruct` | not settled: its provider failed the calls | 4 of 7 | - | $0.002 |
+| `mistralai/mistral-medium-3.1` | not settled: its provider failed the calls | 0 of 7 | - | $0.000 |
 
 </details>
 
