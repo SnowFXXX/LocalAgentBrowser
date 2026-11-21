@@ -30,7 +30,8 @@ own folder.
      shortcuts, so you can have both.
 3. Setup asks which of the tested models to download through LM Studio, then downloads the Chromium browser the agent
    uses (about 150 MB, once).
-4. Open **LocalAgentBrowser Clean Room** from the Start menu or the desktop.
+4. Open **LocalAgentBrowser Clean Room** from the Start menu or the desktop: from 1.68 it opens in a window of its
+   own. **LocalAgentBrowser Clean Room (classic console)** in the Start menu opens the console instead.
 
 To remove it: **Start menu → LocalAgentBrowser Clean Room → Uninstall**, or Windows Settings → Apps. Your reports in
 Documents are kept.
@@ -53,14 +54,32 @@ command and module as the full edition, so install one or the other in a given e
 
 1. In LM Studio, load your model with a **context length of 8192** and start the local server (Developer tab → Start
    Server).
-2. Start LocalAgentBrowser Clean Room: the Start-menu shortcut on Windows, or `localagentbrowser` in a terminal.
-3. Type your objective, for example *What is the tallest mountain in Africa, and how tall is it in meters and in
-   feet?* A Chromium window opens and the agent starts working. The first step takes a minute or two on a CPU.
-4. When it finishes, the report opens in your browser, or read `research_report.md` in the folder you ran it from.
-   Runs from the shortcut each get their own folder under **Documents\LocalAgentBrowser runs**.
+2. Start LocalAgentBrowser Clean Room: the Start-menu shortcut on Windows, or `localagentbrowser` in a terminal on
+   other systems.
+3. **On Windows, a window opens on a start screen.** Type your objective, for example *What is the tallest mountain
+   in Africa, and how tall is it in meters and in feet?*, check the model from LM Studio's list, and click
+   **Start research**.
+4. **The window moves to the left and the agent's browser opens on the right.** The live view shows the parts of the
+   objective as chips that light up as each is answered, a card for each action (the checks' refusals included), and
+   a timer while the model thinks. The first step takes a minute or two on a CPU. In the browser, the page scrolls to
+   the part being read and marks each finding in mint (`LAB_FOLLOW=0` turns this off). **Stop** ends a run at any
+   time.
+5. **When it finishes, the report appears in the same window**, with buttons to open it as a page or open its
+   folder. Runs each get their own folder under **Documents\LocalAgentBrowser runs**, and the start screen lists
+   recent ones. Minimized, the window goes to the notification area.
 
-A run takes about 10 to 60 minutes on a CPU. Press Ctrl+C at any time to stop; the report is still written with
-everything found so far.
+<p align="center">
+  <img src="https://raw.githubusercontent.com/SnowFXXX/LocalAgentBrowser/main/docs/assets/ui/run-beside-browser.png" alt="The window on the left follows a run: the parts of the question as chips, a card for reading part 20 of 32, the finding recorded, and the checks asking the model again before finishing. On the right, the agent's browser shows the Eiffel Tower article with the recorded sentence marked in mint." width="820">
+</p>
+<p align="center"><sub>The window beside the agent's browser, shown in the full edition: Clean Room's is the same, titled
+LocalAgentBrowser Clean Room.</sub></p>
+
+**The classic console** is one click away: **Classic console** at the top of the window opens it and keeps it as your
+choice; type `/ui` as the objective there to come back. On other systems, the console asks for an objective and
+opens the report in your browser when the run ends.
+
+A run takes about 10 to 60 minutes on a CPU. Stop it at any time (**Stop** in the window, Ctrl+C in the console): the
+report is still written with everything found so far.
 
 ## Settings
 
@@ -71,6 +90,11 @@ everything found so far.
 | `LMSTUDIO_API_KEY` | `lm-studio` | A key, if your LM Studio server requires one |
 | `LMSTUDIO_CONTEXT_LENGTH` | `8192` | Context length the model is loaded with |
 | `LAB_SIDE_BY_SIDE` | on | On Windows, `0` keeps the console and the browser from being placed side by side |
+| `LAB_FOLLOW` | on | `0` keeps the agent's browser from scrolling to the part read and marking findings |
+| `NO_COLOR`, `LAB_COLOR` | colour on | `NO_COLOR` set, or `LAB_COLOR=0`, keeps the classic console's text plain |
+
+The window keeps its choices (the model, the time limit, the reports folder, and whether you prefer the classic
+console) in `%APPDATA%\LocalAgentBrowser\settings.json`; uninstalling removes it.
 
 ## More
 

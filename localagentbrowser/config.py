@@ -118,6 +118,9 @@ RATE_LIMIT_WAITS = (20, 30, 60, 60, 90, 120)
 # cloud:end
 
 STALL_TURNS = 4          # Turns without a new discovery before the model is asked to check its progress
+# Tokens added to every reply limit once a thinking model has spent a whole reply on thinking (agent.with_retries):
+# Granite 4.2 8B thought for 3,426 tokens before answering one checklist split
+THINKING_ALLOWANCE = 4000
 
 COMPOSE_MAX_TOKENS = 900  # Length limit for the separately written final result
 COMPOSE_RETRY_MAX_TOKENS = 2500  # A rewrite of a result cut off at that limit (or rewritten to add citations): Opus

@@ -30,6 +30,20 @@ class TestSplitObjective:
         checklist, _ = split(json.dumps({"parts": [f"part {n}" for n in range(20)]}))
         assert len(checklist) == ab.MAX_CHECKLIST_ITEMS
 
+    def test_a_fragment_that_only_continues_a_part_is_joined_back_to_it(self):
+        checklist, _ = split(json.dumps({"parts": ["What is the boiling point of water?", "at the summit of Mount Everest",
+                                                   "Give it in degrees Fahrenheit"]}))
+        assert [i["text"] for i in checklist] == ["What is the boiling point of water at the summit of Mount Everest?",
+                                                  "Give it in degrees Fahrenheit"]
+        # Llama's SimpleQA split, three parts of one question
+        assert ab.with_fragments_joined(["Who won the gold medal", "in men's foil",
+                                         "at the first European Fencing Championships"]) == \
+            ["Who won the gold medal in men's foil at the first European Fencing Championships"]
+        # A part that asks something of its own stays, even when it starts with such a word
+        assert ab.with_fragments_joined(["Name three tools", "In which year was each released?"]) == \
+            ["Name three tools", "In which year was each released?"]
+        assert ab.with_fragments_joined(["at the summit"]) == ["at the summit"]
+
 
 def checklist(*texts):
     return [{"text": t, "discoveries": []} for t in texts]
@@ -339,6 +353,19 @@ class TestNotFound:
         assert "Write nothing about the NOT FOUND items" in request
         assert text == "Result [1].\n\nNot found in the pages read:\n- Care"
 
+    def test_an_item_the_result_answers_from_a_cited_discovery_is_not_also_listed_as_not_found(self):
+        # Phi-4 gave both dates from discovery [1], and the code then listed both as not found
+        said = "He served as the 17th Chief Justice of India from 12 July 1985 until his retirement on 20 December 1986 [1]."
+        client, _ = fake_client([said])
+        items = checklist("Find the start date of his tenure as the Chief Justice of India",
+                          "Find the end date of his tenure as the Chief Justice of India", "Find his birthplace")
+        found = discoveries("The 17th Chief Justice of India, from 12 July 1985 until his retirement on 20 December 1986.")
+        text = asyncio.run(ab.compose_final_result(client, "objective", found, items, [1, 2, 3]))
+        assert text == said + "\n\nNot found in the pages read:\n- Find his birthplace"
+        # A cited sentence that says the thing was not found answers nothing
+        assert not ab.answered_in_result("Find his birthplace", "His birthplace was not found [1].")
+        assert not ab.answered_in_result("Find his birthplace", "His birthplace was Bombay.")
+
 
 class TestConditionsOnlyOnCountedItems:
     def test_a_question_s_own_wording_is_not_a_condition(self):
@@ -510,6 +537,16 @@ def test_a_result_the_checks_left_alone_has_no_extra_section(tmp_path, monkeypat
     assert "Checked by the code" not in report and ab.CHECKED_POINTER not in report
 
 
+def test_a_result_asked_for_steps_that_gives_none_is_flagged_in_the_report(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    journal = [{"action": "DISCOVER", "turn": 1, "extracted_data": "Stir the coffee into the water. Keep it two weeks."},
+               {"action": "FINISH", "turn": 2, "finding": "You need coffee and water [1]. It keeps two weeks [1]."}]
+    ab.write_report("How do I make cold brew? Give the steps in order.", journal)
+    report = (tmp_path / ab.REPORT_FILE).read_text(encoding="utf-8")
+    assert "## Checked by the code" in report and "asks for steps, and this result gives none" in report
+    assert ab.CHECKED_POINTER in report
+
+
 def test_items_asking_for_amounts_with_none_recorded_are_reported_by_the_code():
     items = checklist("List what I need with the quantities", "Say how long it keeps in the fridge")
     journal = discoveries("You need coffee beans, water, and a strainer.", "It keeps in the fridge for two weeks.")
@@ -528,6 +565,28 @@ def test_a_view_paragraph_repeating_the_whole_result_is_left_out():
     text = asyncio.run(ab.compose_final_result(client, "Compare them, then recommend one for my hobby project.",
                                                discoveries("SQLite suits small projects; PostgreSQL handles many writers with MVCC.")))
     assert len(model.calls) == 2 and text.count("I recommend SQLite") == 1 and "My view:" not in text
+
+
+def test_a_short_view_sharing_the_objectives_words_is_kept():
+    # GPT-4o-mini's and the 7B's views shared "for a hobby project with a few hundred users" with their results and
+    # were dropped as repeats, leaving no view; the objective's own words don't count
+    goal = "Compare SQLite and PostgreSQL, then recommend one for a hobby project with a few hundred users."
+    result = "SQLite is a file; PostgreSQL is a server with MVCC for many writers [1]."
+    view = "My view: For a hobby project with a few hundred users, PostgreSQL is the better choice for its many writers."
+    client, _ = fake_client([result, view])
+    text = asyncio.run(ab.compose_final_result(client, goal, discoveries("SQLite is a file. PostgreSQL is a server "
+                                                                         "with MVCC for many writers.")))
+    assert text.endswith(view)
+
+
+def test_a_view_copied_from_a_later_paragraph_labels_that_paragraph():
+    goal = "Compare SQLite and PostgreSQL, then recommend one."
+    advice = "PostgreSQL is recommended because its MVCC lets many app servers write at once [1]."
+    result = "SQLite is a file; PostgreSQL is a server [1].\n\n" + advice
+    client, _ = fake_client([result, "My view: " + advice])
+    text = asyncio.run(ab.compose_final_result(client, goal, discoveries("SQLite is a file. PostgreSQL is a server; "
+                                                                         "its MVCC lets many app servers write at once.")))
+    assert text.count("PostgreSQL is recommended") == 1 and "\n\nMy view: PostgreSQL is recommended" in text
 
 
 def test_a_caveat_finds_the_thing_by_its_distinctive_word():
@@ -569,6 +628,19 @@ class TestUnfinishedResults:
     def test_an_opening_line_repeating_the_objective_is_left_out(self):
         assert ab.without_echoed_objective("Explain it.\n\nIt works [1].", "explain  it") == "It works [1]."
         assert ab.without_echoed_objective("Explain it.", "Explain it.") == "Explain it."
+
+    def test_an_opening_sentence_of_the_objective_is_left_out(self):
+        goal = "How do I make cold brew coffee at home? List what I need with the quantities."
+        # Gemma's cold brew results: the objective's question first, a citation stuck to it
+        assert ab.without_echoed_objective("How do I make cold brew coffee at home? [2] The steps: grind the coffee "
+                                           "coarsely [2].", goal) == "The steps: grind the coffee coarsely [2]."
+        assert ab.without_echoed_objective("# How do I make cold brew coffee at home?\nGrind the coffee coarsely and "
+                                           "steep it [1].", goal) == "Grind the coffee coarsely and steep it [1]."
+        # Nothing of substance after it: left as it is; another opening question is not the objective's
+        assert ab.without_echoed_objective("How do I make cold brew coffee at home? [1]", goal) == \
+            "How do I make cold brew coffee at home? [1]"
+        other = "Why cold brew? It is smoother and keeps longer in the fridge [1]."
+        assert ab.without_echoed_objective(other, goal) == other
 
     def test_an_unfinished_result_is_written_again(self):
         client, model = fake_client([self.CUT, "It takes in water and gives out glucose [1]."])
@@ -743,6 +815,29 @@ def test_digits_in_names_and_code_are_not_numbers_to_check():
     assert ab.unverified_numbers(text, found) == []
     assert ab.without_invented_numbers(text, found) == text
     assert ab.unverified_numbers("Steep 40g for 12 hours.", found) == ["40", "12"]
+    assert ab.unverified_numbers("Encode it as utf_8 [1].", found) == []
+
+
+def test_a_number_in_underscore_emphasis_is_read_whole():
+    # Nemotron 3 Super's "_5,895 m_" was read as "895", "__19,341 ft__" as "9,341", and both heights were cut
+    found = discoveries("It is 5,895 m (19,341 ft) above sea level, and it took 10 minutes.")
+    text = "Kilimanjaro is _5,895 m_ (__19,341 ft__) high, reached in _10 minutes_ [1]."
+    assert ab.unverified_numbers(text, found) == []
+    assert ab.without_invented_numbers(text, found) == text
+    assert ab.unverified_numbers("It is _6,000 m_ high [1].", found) == ["6,000"]
+    # A season in an episode code still confirms the season (Phi-4's right "Season 2" from a page's "S02E09")
+    assert ab.unverified_numbers("They found it in Season 2 [1].", discoveries("Party Pete: S02E09.")) == []
+
+
+def test_a_numbered_list_written_on_one_line_keeps_its_item_numbers():
+    # Gemini 3.8 Flash's "2" and "3" were cut as invented, with a note that no discovery gives them
+    found = discoveries("It is 5,895 m (19,341 ft) above sea level.")
+    text = ("1. Tallest mountain in Africa: Mount Kilimanjaro [1]. 2. Height in meters: 5,895 m [1]. "
+            "3. Height in feet: 19,341 ft [1].")
+    assert ab.unverified_numbers(text, found) == []
+    assert ab.without_invented_numbers(text, found) == text
+    # A number at the end of a sentence, or one that starts a sentence without a list item after it, is still checked
+    assert ab.unverified_numbers("It rose 3. 4 more were found [1].", found) == ["3", "4"]
 
 
 class TestUncitedResults:
@@ -894,12 +989,56 @@ def test_a_recommendation_section_is_labelled_as_the_models_view():
     assert with_view_labelled(text) == "#### Features\n- Small [1]\n\nMy view: PostgreSQL is recommended.\n"
     assert with_view_labelled("### Recommendation\n- **PostgreSQL**: best") == "### Recommendation\n- **PostgreSQL**: best"
     assert with_view_labelled("No heading here.") == "No heading here."
+    # Numbered (Phi-4, 1.66), and a list first with the advice after it (Phi-4, 1.67)
+    assert with_view_labelled("#### 4. Recommendation for a Hobby Project\n\nSQLite is recommended [3].") == \
+        "My view: SQLite is recommended [3]."
+    listed = ("### Recommendation for a Hobby Project\n- **SQLite**: simple [3].\n- **PostgreSQL**: scales [1].\n\n"
+              "Given the requirements, **PostgreSQL** is recommended [1, 3].\n\n## Next\nOther text.")
+    assert with_view_labelled(listed) == listed.replace("Given the", "My view: Given the")
+    # Not a paragraph past the section's end, nor one already labelled
+    assert with_view_labelled("### Recommendation\n- a\n- b\n\n## Next\nOther text.") == "### Recommendation\n- a\n- b\n\n## Next\nOther text."
+    labelled = "### Recommendation\n- a\n\nMy view: b."
+    assert with_view_labelled(labelled) == labelled
 
 
 def test_a_time_needs_the_same_number_given_as_a_time():
     found = discoveries("Use a 2L mason jar. Refrigerate for 16 hours (minimum 12, maximum 24). Steep 12 to 24 hours.")
     text = "Refrigerate for 16 hours [1]. Steep 12 hours [1]. It keeps for up to 2 weeks [1]."
     assert ab.unverified_numbers(text, found) == ["2 weeks"]
+
+
+def test_a_short_unit_is_the_same_time():
+    found = discoveries("Steep for 10 mins, stir, then rest 2 hrs. It keeps 2 wks.")
+    text = "Steep for 10 minutes [1], then rest 2 hours [1]. It keeps for 2 weeks [1]."
+    assert ab.unverified_numbers(text, found) == []
+    # "10 min" is not "10 hours", and "minimum" is not a unit
+    assert ab.unverified_numbers("Steep for 10 hours [1].", discoveries("Steep for 10 min.")) == ["10 hours"]
+    assert ab.unverified_numbers("Steep for 10 hours [1].", discoveries("A minimum of 10 hours.")) == []
+
+
+def test_a_number_keeps_the_unit_its_discovery_gives():
+    # Gemma 3 4B gave a page's "173.8 °F" as "173.8 °C"
+    found = discoveries("Ethanol boils at 173.8 °F. Kilimanjaro is 5,895 m (19,341 ft) tall. Use 40 g of coffee.")
+    assert ab.unverified_numbers("Ethanol boils at 173.8 °C [1].", found) == ["173.8 °C"]
+    assert ab.unverified_numbers("It is 5,895 feet tall [1].", found) == ["5,895 ft"]
+    assert ab.unverified_numbers("Use 40 ounces of coffee [1].", found) == ["40 oz"]
+    # The same unit in other words, the other figure the page gives, and units of another kind are all fine
+    assert ab.unverified_numbers("It boils at 173.8 degrees Fahrenheit [1]. It is 19,341 feet, 5,895 metres "
+                                 "tall [1]. Use 40 grams [1].", found) == []
+    # A number the discoveries give without a unit is not held to one
+    assert ab.unverified_numbers("It is 5,895 feet tall [1].", discoveries("Kilimanjaro: 5,895.")) == []
+
+
+def test_the_checks_own_left_out_notes_are_not_numbers_missing_from_the_discoveries():
+    found = discoveries("Steep for 12 hours.")
+    text = ("Steep for 12 hours [1].\n\nLeft out, because no discovery gives these numbers (the pages read may still "
+            "have them): 33 years, 80")
+    assert ab.unverified_numbers(text, found) == []
+
+
+def test_control_characters_are_taken_out_of_a_result_but_not_line_breaks():
+    raw = json.dumps({"result": "Use \bthe \x00venv module [1].\n\tThen\x7f activate it [1]."})
+    assert ab.result_text(raw) == "Use the venv module [1].\n\tThen activate it [1]."
 
 
 def test_one_sentence_given_for_several_items_counts_only_where_it_has_their_words():

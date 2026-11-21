@@ -1,0 +1,256 @@
+{
+ "about": "The start screen's cloud models, built from the compatibility test's results (tools/compat.py): recommended ones also finished the whole test suite; the others passed every compatibility check.",
+ "tested": "November 21, 2026",
+ "recommended": [
+  {
+   "id": "microsoft/phi-4",
+   "note": "The default. Finished all 7 test tasks on 1.67 in 4.9 minutes, for about $0.03; 85% right on 200 SimpleQA questions."
+  },
+  {
+   "id": "openai/gpt-4o-mini",
+   "note": "Finished all 7 test tasks on 1.67 in 5.6 minutes, for about $0.10."
+  },
+  {
+   "id": "google/gemini-3.8-flash",
+   "note": "Finished all 7 test tasks on 1.65.1 in 6.1 minutes, for $0.24."
+  },
+  {
+   "id": "openai/gpt-5.6-terra",
+   "note": "Finished all 7 test tasks on 1.65.1 in 4.9 minutes, for $0.47."
+  }
+ ],
+ "compatible": [
+  {
+   "id": "anthropic/claude-fable-5.2",
+   "cost": 0.995
+  },
+  {
+   "id": "anthropic/claude-haiku-5.5",
+   "cost": 0.004
+  },
+  {
+   "id": "anthropic/claude-sonnet-5.5",
+   "cost": 0.214
+  },
+  {
+   "id": "cohere/command-a-plus",
+   "cost": 0.037
+  },
+  {
+   "id": "deepseek/deepseek-chat-v3.1",
+   "cost": 0.009
+  },
+  {
+   "id": "deepseek/deepseek-r1-0528",
+   "cost": 0.081
+  },
+  {
+   "id": "deepseek/deepseek-v4-flash",
+   "cost": 0.002
+  },
+  {
+   "id": "deepseek/deepseek-v4-pro",
+   "cost": 0.028
+  },
+  {
+   "id": "google/gemini-3.5-flash-lite",
+   "cost": 0.005
+  },
+  {
+   "id": "google/gemini-4-hydrogen",
+   "cost": 0.185
+  },
+  {
+   "id": "google/gemini-4-neon",
+   "cost": 0.485
+  },
+  {
+   "id": "google/gemma-3-12b-it",
+   "cost": 0.002
+  },
+  {
+   "id": "google/gemma-3-27b-it",
+   "cost": 0.003
+  },
+  {
+   "id": "google/gemma-4-26b-a4b-it",
+   "cost": 0.002
+  },
+  {
+   "id": "google/gemma-4-31b-it",
+   "cost": 0.003
+  },
+  {
+   "id": "meta-llama/llama-3.3-70b-instruct",
+   "cost": 0.003
+  },
+  {
+   "id": "meta-llama/llama-4-maverick",
+   "cost": 0.004
+  },
+  {
+   "id": "meta-llama/llama-4-scout",
+   "cost": 0.001
+  },
+  {
+   "id": "meta/muse-spark-1.3",
+   "cost": 0.132
+  },
+  {
+   "id": "minimax/minimax-m3",
+   "cost": 0.008
+  },
+  {
+   "id": "minimax/minimax-m3.1-flash",
+   "cost": 0.003
+  },
+  {
+   "id": "mistralai/codestral-2508",
+   "cost": 0.008
+  },
+  {
+   "id": "mistralai/ministral-3b-2512",
+   "cost": 0.002
+  },
+  {
+   "id": "mistralai/ministral-8b-2512",
+   "cost": 0.002
+  },
+  {
+   "id": "mistralai/mistral-large-4-0",
+   "cost": 0.043
+  },
+  {
+   "id": "moonshotai/kimi-k3.1-pro",
+   "cost": 0.132
+  },
+  {
+   "id": "nousresearch/hermes-4-405b",
+   "cost": 0.019
+  },
+  {
+   "id": "nvidia/nemotron-3-super-120b-a12b",
+   "cost": 0.012
+  },
+  {
+   "id": "nvidia/nemotron-3.5-lightning",
+   "cost": 0.009
+  },
+  {
+   "id": "openai/gpt-4.1-mini",
+   "cost": 0.012
+  },
+  {
+   "id": "openai/gpt-5.4-mini",
+   "cost": 0.022
+  },
+  {
+   "id": "openai/gpt-5.4-nano",
+   "cost": 0.006
+  },
+  {
+   "id": "openai/gpt-6-luna",
+   "cost": 0.004
+  },
+  {
+   "id": "openai/gpt-6.1-terra",
+   "cost": 0.035
+  },
+  {
+   "id": "openai/gpt-6.2-sol",
+   "cost": 0.061
+  },
+  {
+   "id": "openai/gpt-oss-120b",
+   "cost": 0.003
+  },
+  {
+   "id": "openai/gpt-oss-20b",
+   "cost": 0.004
+  },
+  {
+   "id": "qwen/qwen-2.5-72b-instruct",
+   "cost": 0.013
+  },
+  {
+   "id": "qwen/qwen3-235b-a22b-2507",
+   "cost": 0.007
+  },
+  {
+   "id": "qwen/qwen3-30b-a3b-instruct-2507",
+   "cost": 0.005
+  },
+  {
+   "id": "qwen/qwen3-32b",
+   "cost": 0.007
+  },
+  {
+   "id": "qwen/qwen3-coder",
+   "cost": 0.007
+  },
+  {
+   "id": "qwen/qwen3.5-9b",
+   "cost": 0.004
+  },
+  {
+   "id": "qwen/qwen3.6-35b-a3b",
+   "cost": 0.024
+  },
+  {
+   "id": "qwen/qwen3.7-plus",
+   "cost": 0.031
+  },
+  {
+   "id": "qwen/qwen3.8-flash",
+   "cost": 0.018
+  },
+  {
+   "id": "qwen/qwen4-max",
+   "cost": 0.04
+  },
+  {
+   "id": "stepfun/step-3.7-flash",
+   "cost": 0.071
+  },
+  {
+   "id": "thinkingmachines/inkling-2-small",
+   "cost": 0.022
+  },
+  {
+   "id": "upstage/solar-pro4",
+   "cost": 0.007
+  },
+  {
+   "id": "x-ai/grok-4.3",
+   "cost": 0.064
+  },
+  {
+   "id": "x-ai/grok-4.7",
+   "cost": 0.141
+  },
+  {
+   "id": "xiaomi/mimo-v2.6-flash",
+   "cost": 0.004
+  },
+  {
+   "id": "z-ai/glm-4.7",
+   "cost": 0.03
+  },
+  {
+   "id": "z-ai/glm-4.7-flash",
+   "cost": 0.014
+  },
+  {
+   "id": "z-ai/glm-5.2",
+   "cost": 0.015
+  },
+  {
+   "id": "z-ai/glm-5.3",
+   "cost": 0.055
+  },
+  {
+   "id": "z-ai/glm-5.3-flash",
+   "cost": 0.004
+  }
+ ]
+}

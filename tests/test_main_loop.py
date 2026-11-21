@@ -43,13 +43,13 @@ SCRIPT = [
 CHECKLIST_REPLY = json.dumps({"parts": ["the setup", "the fact"]})  # the objective split, before turn 1
 
 
-def run_agent(monkeypatch, tmp_path, objective_check_every=None, script=SCRIPT):
+def run_agent(monkeypatch, tmp_path, objective_check_every=None, script=SCRIPT, typed="test objective"):
     client, model = fake_client([CHECKLIST_REPLY] + script, prompt_tokens=None)
     real_sleep = asyncio.sleep
     monkeypatch.setattr(agent, "async_playwright", SITE.playwright)
     monkeypatch.setattr(agent, "AsyncOpenAI", lambda **kwargs: client)
     monkeypatch.setattr(ab.asyncio, "sleep", lambda seconds, *a, **k: real_sleep(0, *a, **k))
-    monkeypatch.setattr(builtins, "input", lambda prompt="": "test objective")
+    monkeypatch.setattr(builtins, "input", lambda prompt="": typed)
     monkeypatch.chdir(tmp_path)
     if objective_check_every:
         monkeypatch.setattr(agent, "OBJECTIVE_CHECK_EVERY", objective_check_every)
@@ -60,6 +60,12 @@ def run_agent(monkeypatch, tmp_path, objective_check_every=None, script=SCRIPT):
 
 def last_message(call):
     return call[-1]["content"]
+
+
+def test_a_byte_order_mark_before_a_piped_objective_is_dropped(monkeypatch, tmp_path):
+    calls, _ = run_agent(monkeypatch, tmp_path, typed="﻿test objective\n")
+    assert "### HIGH-LEVEL OBJECTIVE\ntest objective\n" in calls[0][1]["content"]
+    assert "﻿" not in json.dumps(calls, ensure_ascii=False)
 
 
 def test_full_run(monkeypatch, tmp_path):
@@ -187,3 +193,54 @@ def test_a_site_that_refuses_the_browser_is_not_visited_again(monkeypatch, tmp_p
     assert second not in site.visits, "the second address on the refusing site was never loaded"
     assert any("refused this browser" in e.get("reason", "") for e in journal)
     pages.REFUSING_SITES.clear()
+
+
+def test_a_run_sends_events_a_view_can_draw(monkeypatch, tmp_path):
+    from localagentbrowser import events
+    seen = []
+    listener = events.listen(lambda kind, data: seen.append((kind, data)))
+    try:
+        run_agent(monkeypatch, tmp_path)
+    finally:
+        events.stop_listening(listener)
+    kinds = [kind for kind, _ in seen]
+    first = {kind: data for kind, data in reversed(seen)}  # Each kind's first event
+    json.dumps(seen)  # Plain values only: a view sends them to a page as JSON
+    assert kinds[0] == "objective" and first["objective"]["objective"] == "test objective"
+    assert [i["text"] for i in first["checklist"]["items"]] == ["the setup", "the fact"]
+    assert kinds.count("waiting") == kinds.count("replied") > 0  # Every model call, for the view's own timer
+    assert first["decision"]["action"] == "SEARCH" and first["turn"] == {"number": 1, "of": 100}
+    assert first["page"]["search"] and first["page"]["results"][0][1] == A
+    assert first["discovery"]["number"] == 1 and "Fact from page A" in first["discovery"]["text"]
+    assert first["discovery"]["source"] == A and first["read_more"] == {"part": 2, "parts": 3}
+    assert first["retried"]["action"] == "NAVIGATE" and first["refused"]["check"]
+    assert kinds.index("checking") < kinds.index("writing") < kinds.index("result") < kinds.index("stopped")
+    assert first["result"]["text"].startswith("Composed final result")
+    assert kinds[-1] == "stopped" and seen[-1][1]["reason"] is None
+    assert seen[-1][1]["report"].endswith("research_report.md")
+
+
+def test_the_browser_follows_the_agent_without_changing_what_it_reads(monkeypatch, tmp_path):
+    SITE.followed.clear()
+    calls, journal = run_agent(monkeypatch, tmp_path)
+    followed = list(SITE.followed)
+    SITE.followed.clear()
+    # The discovery highlighted in mint, and kept; READ_MORE scrolled to part 2 and tinted its first words
+    assert (A, ["Fact from page A"], "lab-found", True, 0) in followed
+    part_two = [f for f in followed if f[2] == "lab-reading"]
+    assert len(part_two) == 1 and part_two[0][0] == A and part_two[0][3] is True
+    assert part_two[0][1][0].split()[0] == "Long"  # The first words of part 2, as the agent reads it
+    # The same run as without it: every model call and the journal unchanged
+    monkeypatch.setenv("LAB_FOLLOW", "0")
+    calls_without, journal_without = run_agent(monkeypatch, tmp_path)
+    assert SITE.followed == [] and calls_without == calls
+    assert [e["action"] for e in journal_without] == [e["action"] for e in journal]
+
+
+def test_a_discovery_is_looked_for_whole_and_by_sentence():
+    from localagentbrowser import follow
+    text = '(Under the heading "Geology") Kibo is the highest cone. It rises to 5,895 m. Ok.'
+    assert follow.quote_pieces(text) == ["Kibo is the highest cone. It rises to 5,895 m. Ok.",
+                                         "Kibo is the highest cone.", "It rises to 5,895 m."]
+    assert follow.first_words("  one two\nthree four five six seven eight nine ten") == \
+        "one two three four five six seven eight"

@@ -21,6 +21,14 @@ def test_the_report_becomes_a_page_with_its_headings_lists_code_and_warnings():
     assert "<pre>pip install x</pre>" in page
 
 
+def test_a_numbered_list_broken_up_by_answers_goes_on_from_its_own_number():
+    # As Phi-4 wrote its final result (Windows UI, Nov 21): every question was shown as "1."
+    page = show_report.to_html("1. What is the tallest mountain?\n   - Kilimanjaro [1].\n\n2. How high is it?\n"
+                               "   - 5,895 m [1].\n\n3. In feet?\n   - 19,341 ft [1].")
+    assert [page.count(f'<ol start="{n}">') for n in (2, 3)] == [1, 1] and page.count("<ol>") == 1
+    assert page.count("<ul><li>") == 3
+
+
 def test_a_run_without_a_report_opens_nothing(tmp_path, monkeypatch):
     opened = []
     monkeypatch.setattr(show_report.webbrowser, "open", opened.append)

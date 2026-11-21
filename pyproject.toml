@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "localagentbrowser"
-version = "1.67.2"
+version = "1.68"
 description = "An autonomous web research agent with checked answers: a local LLM (LM Studio) by default, cloud models optional, and Playwright."
 readme = "README.md"
 license = "MIT"
@@ -40,6 +40,10 @@ dev = ["pytest>=8", "ruff>=0.15"]
 [project.scripts]
 localagentbrowser = "localagentbrowser.agent:run"
 
+[project.gui-scripts]
+# The Windows UI (classic mode, the console, everywhere else)
+localagentbrowser-ui = "localagentbrowser.winui:run"
+
 [project.urls]
 Homepage = "https://github.com/SnowFXXX/LocalAgentBrowser"
 Website = "https://snowfxxx.github.io/LocalAgentBrowser/"
@@ -49,6 +53,9 @@ Issues = "https://github.com/SnowFXXX/LocalAgentBrowser/issues"
 [tool.setuptools]
 py-modules = ["agent_browser"]
 packages = ["localagentbrowser"]
+
+[tool.setuptools.package-data]
+localagentbrowser = ["*.html", "*.json"]  # The Windows UI's page, and the models its start screen lists
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

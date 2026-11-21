@@ -35,6 +35,16 @@ class TestStrip:
         with pytest.raises(ValueError):
             cr.strip(text, "#")
 
+    def test_the_launcher_window_is_titled_by_edition(self):
+        text = cr.read(os.path.join(ROOT, "tools", "windows", "LocalAgentBrowser.cmd"))
+
+        def title(launcher):
+            return [line.split("=", 1)[1].rstrip('"') for line in launcher.splitlines() if line.startswith('set "LAB_TITLE=')][-1]
+
+        assert title(text) == "LocalAgentBrowser"
+        assert title(cr.strip(text, "rem")) == "LocalAgentBrowser Clean Room"
+        assert "title %LAB_TITLE%" in text
+
     def test_the_package_gets_clean_rooms_name_and_description(self):
         with open(os.path.join(ROOT, "pyproject.toml"), encoding="utf-8") as f:
             settings = cr.clean_room_pyproject(f.read())

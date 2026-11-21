@@ -134,6 +134,20 @@ RESULT_RETRY = ("That reply was not the final result: it repeated the prompt or 
 CUT_OFF = ("Your reply was cut off at {limit} tokens because it was too long. Reply again with only the JSON object, "
            "with thought_process in two or three short sentences and a short parameter (a search query is 3 to 10 "
            "words).")
+# A DISCOVER that copied a long passage was cut off, and asked as above, about half the time the model copied as
+# much again: the parameter's own length is what has to change
+CUT_OFF_DISCOVER = ("Your DISCOVER was cut off at {limit} tokens because it copied too much. Reply again with only the "
+                    "JSON object: thought_process in one short sentence, and a DISCOVER of only the few sentences that "
+                    "answer an item of the OBJECTIVE CHECKLIST, at most {words} words, copied word for word. Leave the "
+                    "rest for another DISCOVER.")
+CUT_OFF_DISCOVER_WORDS = 150
+# The cut reply is not shown back (a model shown its long reply wrote it again), but the conversation must still
+# alternate: a correction straight after the prompt made two user messages in a row, which Gemma's chat template
+# refuses ("Conversation roles must alternate"), and every Gemma task that hit it ended
+CUT_REPLY = "(My reply was cut off at the length limit.)"
+# An empty reply is not sent back as it was: Mistral's and Cohere's services refuse an assistant turn with no text
+# ("Assistant message must have either content or tool_calls"), and every retry after an empty reply failed
+EMPTY_REPLY = "(My reply was empty.)"
 # The 7B's photosynthesis result ended "...from the light-dependent reactions to", by itself, with two parts unwritten
 RESULT_UNFINISHED = ("That result stops partway through a sentence (\"{ending}\"). Write the complete final result "
                      "again, following the rules above: finish every sentence and cover every part. " + RESULT_REPLY)

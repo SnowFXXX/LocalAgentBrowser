@@ -65,13 +65,31 @@ class TestCheapRetries:
         decision, _ = turn(client)
         assert decision["action"] == "DISCOVER" and "not a valid JSON object" in model.calls[1][-1]["content"]
 
+    def test_an_empty_reply_is_sent_back_as_a_stand_in_not_as_nothing(self, scrapes):
+        # Mistral's and Cohere's services refuse a turn with no text (the fake does too)
+        client, model = fake_client(["", reply("DISCOVER", "a new fact")])
+        decision, _ = turn(client)
+        assert decision["action"] == "DISCOVER" and model.calls[1][-2]["content"] == ab.EMPTY_REPLY
+
+    def test_an_empty_coverage_or_result_reply_is_asked_again_with_a_stand_in(self):
+        verdict = '{"answered": true, "evidence": "5,895 m", "things": [], "missing": []}'
+        client, model = fake_client(["", verdict])
+        asyncio.run(ab.coverage_reply(client, [{"role": "system", "content": "s"}, {"role": "user", "content": "check"}]))
+        assert model.calls[1][-2]["content"] == ab.EMPTY_REPLY
+        client, model = fake_client(["", '{"result": "Kilimanjaro is 5,895 m high [1]."}'])
+        text = asyncio.run(ab.compose_final_result(client, "the height", discoveries("Kilimanjaro is 5,895 m high.")))
+        assert "5,895" in text and model.calls[1][-2]["content"] == ab.EMPTY_REPLY
+
     def test_cut_off_reply_asks_for_a_short_thought_process_without_repeating_it(self, scrapes):
         cut = '{"thought_process": "' + "long reasoning " * 40
         client, model = fake_client([(cut, "length"), reply("DISCOVER", "a new fact")])
         decision, _ = turn(client)
         assert decision["action"] == "DISCOVER" and len(model.calls) == 2
         first, second = model.calls
-        assert second[:len(first)] == first and len(second) == len(first) + 1  # the cut reply is not shown again
+        # The cut reply is not shown again: a short stand-in takes its place, so the turns still alternate (the fake
+        # refuses any request whose turns don't, as Gemma's chat template does)
+        assert second[:len(first)] == first and len(second) == len(first) + 2
+        assert second[-2] == {"role": "assistant", "content": ab.CUT_REPLY}
         assert "cut off at 600 tokens" in second[-1]["content"] and "3 to 10 words" in second[-1]["content"]
 
     def test_reply_cut_off_inside_a_search_query_searches_with_its_start(self, scrapes):
@@ -91,7 +109,22 @@ class TestCheapRetries:
         decision, _ = turn(client)
         assert ab.cut_decision(cut) is None
         assert ab.cut_decision(cut, on_search_page=True)["action"] == "DISCOVER"  # refused there, never recorded
-        assert len(model.calls) == 2 and decision["action"] == "SEARCH" and "cut off" in model.calls[1][-1]["content"]
+        assert len(model.calls) == 2 and decision["action"] == "SEARCH"
+        # Asked for a shorter DISCOVER itself, not a generic "shorter reply" (half of the cut DISCOVERs were copied
+        # as long again)
+        correction = model.calls[1][-1]["content"]
+        assert "Your DISCOVER was cut off at 600 tokens" in correction and "at most 150 words" in correction
+        assert model.calls[1][-2] == {"role": "assistant", "content": ab.CUT_REPLY}
+
+    def test_reply_cut_off_inside_a_finish_finishes(self, scrapes):
+        # Opus 5.5 wrote whole answers into FINISH's parameter and was cut off; the final result is written in a
+        # step of its own, so the FINISH stands (its first FINISH in a turn is still asked to confirm, as always)
+        cut = '{"thought_process": "Every item is covered.", "action": "FINISH", "parameter": "' + "A long answer. " * 80
+        client, model = fake_client([(cut, "length"), (cut, "length")])
+        decision, refused = turn(client)
+        assert [r["journal_action"] for r in refused] == ["CONFIRM_FINISH"]  # the usual one check, no cut-off retry
+        assert len(model.calls) == 2 and decision["action"] == "FINISH" and decision["parameter"] == ""
+        assert ab.cut_action(cut) == "FINISH" and ab.cut_action('{"thought_process": "long') == ""
 
     def test_valid_first_reply_costs_one_call(self, scrapes):
         client, model = fake_client([reply("SEARCH", "fresh query")])
@@ -242,8 +275,41 @@ class TestServerFailures:
             waits.append(seconds)
 
         monkeypatch.setattr(agent.asyncio, "sleep", fake_sleep)
+        monkeypatch.setattr(agent, "THINKING_ROOM", {"tokens": 0})
         client = types.SimpleNamespace(chat=types.SimpleNamespace(completions=types.SimpleNamespace(create=create)))
         return agent.with_retries(client), calls, waits
+
+    @staticmethod
+    def answer(content, finish_reason="stop"):
+        message = types.SimpleNamespace(content=content)
+        return types.SimpleNamespace(choices=[types.SimpleNamespace(message=message, finish_reason=finish_reason)])
+
+    def test_a_reply_with_no_reply_in_it_is_tried_again(self, monkeypatch):
+        # DeepSeek V3.2's failing provider answered so, and reading it crashed the task
+        client, calls, waits = self.client([types.SimpleNamespace(choices=[]), "reply"], monkeypatch)
+        assert asyncio.run(client.chat.completions.create(model="m", messages=[])) == "reply"
+        assert len(calls) == 2 and waits == [ab.MODEL_RETRY_WAITS[0]]
+        assert ab.extract_message_content(types.SimpleNamespace(choices=[])) == ""
+        empty = [types.SimpleNamespace(choices=None)] * (len(ab.MODEL_RETRY_WAITS) + 1)
+        client, calls, waits = self.client(empty, monkeypatch)
+        with pytest.raises(agent.NoReply):
+            asyncio.run(client.chat.completions.create(model="m", messages=[]))
+
+    def test_a_reply_spent_on_thinking_gets_room_to_think_from_then_on(self, monkeypatch):
+        # Granite 4.2 8B and Nemotron 3.5 Lightning spent all 300 tokens thinking, and answered given 4,000
+        thought = self.answer("", "length")
+        client, calls, waits = self.client([thought, "reply", "reply"], monkeypatch)
+        create = client.chat.completions.create
+        assert asyncio.run(create(model="m", messages=[], max_tokens=300)) == "reply"
+        assert asyncio.run(create(model="m", messages=[], max_tokens=600)) == "reply"
+        assert [c["max_tokens"] for c in calls] == [300, 300 + ab.THINKING_ALLOWANCE, 600 + ab.THINKING_ALLOWANCE]
+        assert waits == []
+
+    def test_a_cut_off_reply_with_text_is_not_taken_for_thinking(self, monkeypatch):
+        cut = self.answer('{"thought_process": "a long', "length")
+        client, calls, waits = self.client([cut], monkeypatch)
+        assert asyncio.run(client.chat.completions.create(model="m", messages=[], max_tokens=300)) is cut
+        assert agent.THINKING_ROOM["tokens"] == 0 and len(calls) == 1
 
     def test_a_server_failure_is_tried_again_after_a_wait(self, monkeypatch):
         client, calls, waits = self.client(["down", "500", "reply"], monkeypatch)
@@ -339,6 +405,7 @@ class TestCloudFailures:
         monkeypatch.setattr(agent.asyncio, "sleep", fake_sleep)
         monkeypatch.setattr(agent, "BASE_URL", "https://openrouter.ai/api/v1" if cloud else "http://localhost:1234/v1")
         monkeypatch.setattr(agent, "UNSUPPORTED_PARAMETERS", set())
+        monkeypatch.setattr(agent, "THINKING_ROOM", {"tokens": 0})
         client = types.SimpleNamespace(chat=types.SimpleNamespace(completions=types.SimpleNamespace(create=create)))
         return agent.with_retries(client), calls, waits
 
@@ -378,6 +445,25 @@ class TestCloudFailures:
         assert "temperature" in calls[0] and "temperature" not in calls[1] and "temperature" not in calls[2]
         assert waits == []
 
+    def test_a_json_schema_no_provider_takes_falls_back_to_plain_json(self, monkeypatch):
+        # Qwen3.7 Flash's only provider takes JSON replies but not a JSON schema
+        schema = {"type": "json_schema", "json_schema": {"name": "x", "schema": {}}}
+        client, calls, waits = self.client(["404-params", "404-params", "reply", "reply"], monkeypatch)
+        create = client.chat.completions.create
+        assert asyncio.run(create(model="m", messages=[], temperature=0.2, response_format=schema)) == "reply"
+        assert asyncio.run(create(model="m", messages=[], temperature=0.2, response_format=schema)) == "reply"
+        assert calls[0]["response_format"] == schema and "temperature" not in calls[1]
+        assert calls[2]["response_format"] == {"type": "json_object"} == calls[3]["response_format"]
+
+    def test_a_404_that_dropping_parameters_does_not_cure_still_raises(self, monkeypatch):
+        import openai
+
+        client, calls, waits = self.client(["404-params"] * 3, monkeypatch)
+        with pytest.raises(openai.NotFoundError):
+            asyncio.run(client.chat.completions.create(model="m", messages=[], temperature=0.2,
+                                                        response_format={"type": "json_schema", "json_schema": {}}))
+        assert len(calls) == 3
+
     def test_a_404_on_lm_studio_is_not_taken_for_a_parameter_problem(self, monkeypatch):
         import openai
 
@@ -412,3 +498,68 @@ class TestCloudFailures:
         monkeypatch.setattr(agent, "BASE_URL", "http://localhost:1234/v1")
         assert "LM Studio" in agent.failure_advice(RuntimeError("x"))
 # cloud:end
+
+
+class TestTimer:
+    """A timer counts a long model call's seconds on a person's console, and nowhere else."""
+
+    class Console:
+        def __init__(self, tty):
+            self.tty, self.written = tty, []
+
+        def isatty(self):
+            return self.tty
+
+        def write(self, text):
+            self.written.append(text)
+
+        def flush(self):
+            pass
+
+    def run(self, monkeypatch, tty, seconds):
+        console = self.Console(tty)
+        monkeypatch.setattr(agent.sys, "stdout", console)
+        monkeypatch.setattr(agent, "TIMER_TICK_SECONDS", 0.01)
+        monkeypatch.setattr(agent, "TIMER_AFTER_SECONDS", 0)
+
+        async def call():
+            await asyncio.sleep(seconds)
+            return "reply"
+        assert asyncio.run(agent.ticking(call())) == "reply"
+        return "".join(console.written)
+
+    def test_a_long_call_shows_its_seconds_and_clears_the_line(self, monkeypatch):
+        shown = self.run(monkeypatch, tty=True, seconds=0.1)
+        assert "\r   Waiting for the model: 0 s" in shown and shown.endswith("\r" + " " * 40 + "\r")
+
+    def test_output_to_a_file_gets_no_timer(self, monkeypatch):
+        assert self.run(monkeypatch, tty=False, seconds=0.1) == ""
+
+    def test_a_failed_call_still_raises(self, monkeypatch):
+        monkeypatch.setattr(agent.sys, "stdout", self.Console(True))
+        monkeypatch.setattr(agent, "TIMER_TICK_SECONDS", 0.01)
+
+        async def call():
+            raise ValueError("server down")
+        with pytest.raises(ValueError):
+            asyncio.run(agent.ticking(call()))
+
+
+class TestFencedReplies:
+    """MiniMax M2.7 wrapped every JSON reply in a markdown code fence: its checklist split could not be read, and its
+    final result kept the whole reply as text, which the code check then cut to nothing."""
+
+    def test_a_json_reply_in_a_code_fence_is_read_without_the_fence(self):
+        fenced = types.SimpleNamespace(choices=[types.SimpleNamespace(message=types.SimpleNamespace(
+            content='```json\n{"parts": ["the height"]}\n```'))])
+        assert ab.extract_message_content(fenced) == '{"parts": ["the height"]}'
+        assert ab.without_json_fence('```\n{"result": "cut off at the li') == '{"result": "cut off at the li'
+        command = "```bash\npip install requests\n```"
+        assert ab.without_json_fence(command) == command
+
+    def test_the_split_and_the_final_result_read_a_fenced_reply(self):
+        client, _ = fake_client(['```json\n{"parts": ["the mountain", "its height"]}\n```'])
+        assert [i["text"] for i in asyncio.run(ab.split_objective(client, "objective"))] == ["the mountain", "its height"]
+        client, _ = fake_client(['```json\n{"result": "Kilimanjaro is 5,895 m high [1]."}\n```'])
+        text = asyncio.run(ab.compose_final_result(client, "the height", discoveries("Kilimanjaro is 5,895 m high.")))
+        assert text == "Kilimanjaro is 5,895 m high [1]."

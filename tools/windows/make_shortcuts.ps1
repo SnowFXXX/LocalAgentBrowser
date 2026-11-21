@@ -17,9 +17,18 @@ function New-Shortcut($folder, $name, $target, $arguments, $workdir, $icon, $des
     $link.Save()
 }
 
+# The Windows UI runs without a console window (pythonw): the clone's venv if it has one, else the Python on PATH. It
+# opens classic mode instead when that is the saved choice
+$pythonw = Join-Path $repo "venv\Scripts\pythonw.exe"
+if (-not (Test-Path $pythonw)) { $pythonw = "pythonw.exe" }
+
 foreach ($folder in @($programs, $desktop)) {
-    New-Shortcut $folder "LocalAgentBrowser" (Join-Path $here "LocalAgentBrowser.cmd") "" $repo `
+    New-Shortcut $folder "LocalAgentBrowser" $pythonw "-m localagentbrowser.winui" $repo `
         (Join-Path $here "localagentbrowser.ico") "Research the web with a local model; every claim cited"
+    if ($folder -eq $programs) {
+        New-Shortcut $folder "LocalAgentBrowser (classic console)" (Join-Path $here "LocalAgentBrowser.cmd") "" $repo `
+            (Join-Path $here "localagentbrowser.ico") "Research the web in a console window (classic mode)"
+    }
     if ($Radio) {
         New-Shortcut $folder "Radio Lookout" (Join-Path $Radio ".venv\Scripts\pythonw.exe") "tray.py" $Radio `
             (Join-Path $Radio "radio-lookout.ico") "Radio Lookout in the taskbar"

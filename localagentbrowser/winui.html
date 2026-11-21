@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LocalAgentBrowser</title>
+<style>
+/* The Windows UI (winui.py): the project website's colours, system fonts only, nothing fetched */
+:root { color-scheme: dark;
+  --bg: #0b111b; --bg-2: #0e1624; --bg-3: #111c2c; --ink: #e8eef5; --sub: #b9c7d6; --muted: #8191a5;
+  --mint: #5fd3a6; --mint-hi: #8ff0c8; --mint-bg: #12312b; --mint-line: #3fae86;
+  --blue: #7fb3e6; --blue-bg: #122438; --chip-line: #2f5577; --glow: #1e3a5a;
+  --amber: #f0a860; --amber-bg: #2b2112; --amber-line: #8a6232;
+  --mono: Consolas, "Cascadia Mono", monospace; --sans: "Segoe UI", system-ui, sans-serif; }
+* { box-sizing: border-box; }
+/* The body grows with the page (a body of the window's height let the sticky bar scroll away once the live view
+   was longer than the window) */
+html, body { margin: 0; min-height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans);
+  background-image: radial-gradient(900px 420px at 85% 0%, rgba(30,58,90,.75), transparent 70%);
+  background-repeat: no-repeat; background-attachment: fixed; }
+button, select, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 18px;
+  background: rgba(11,17,27,.92); border-bottom: 1px solid var(--chip-line); backdrop-filter: blur(6px); }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: .01em; }
+.logo { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--mint-hi); background: var(--mint-bg);
+  border: 1px solid var(--mint-line); border-radius: 6px; padding: 2px 7px; }
+.spacer { flex: 1; }
+.link { background: none; border: none; color: var(--blue); padding: 4px 6px; border-radius: 6px; }
+.link:hover { color: var(--mint-hi); background: var(--blue-bg); }
+main { max-width: 58rem; margin: 0 auto; padding: 22px 18px 60px; }
+h1 { font-size: clamp(24px, 4.2vw, 34px); font-weight: 800; letter-spacing: -.01em; margin: 6px 0 14px; }
+h2 { font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--blue); margin: 26px 0 10px; }
+textarea { width: 100%; min-height: 110px; resize: vertical; background: var(--bg-2); border: 1px solid var(--chip-line);
+  border-radius: 10px; padding: 12px 14px; color: var(--ink); outline: none; }
+textarea:focus, select:focus { border-color: var(--mint-line); box-shadow: 0 0 0 3px rgba(95,211,166,.15); }
+.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 16px; margin: 14px 0; }
+.choice { display: flex; flex-direction: column; gap: 5px; color: var(--sub); font-size: 13px; }
+.choice select { background: var(--bg-2); border: 1px solid var(--chip-line); border-radius: 8px; padding: 7px 9px; }
+.pick { margin: 8px 0 4px 26px; max-width: 560px; display: flex; flex-direction: column; gap: 6px; }
+.pick .other { background: var(--bg-2); border: 1px solid var(--chip-line); border-radius: 8px; padding: 7px 9px;
+  font-family: var(--mono); font-size: 13px; outline: none; }
+.pick .other:focus { border-color: var(--mint-line); box-shadow: 0 0 0 3px rgba(95,211,166,.15); }
+.pick .other.bad { border-color: var(--amber-line); }
+.path { font-family: var(--mono); font-size: 12px; color: var(--muted); word-break: break-all; }
+.check { display: flex; gap: 8px; align-items: flex-start; color: var(--sub); }
+.note { font-size: 13px; color: var(--muted); }
+.server { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 10px; margin: 12px 0;
+  border: 1px solid var(--chip-line); background: var(--bg-2); font-size: 14px; }
+.server.bad { border-color: var(--amber-line); background: var(--amber-bg); }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--mint); flex: none; }
+.server.bad .dot { background: var(--amber); }
+.primary { background: var(--mint); color: #062018; border: none; border-radius: 10px; padding: 11px 22px;
+  font-weight: 700; font-size: 16px; }
+.primary:disabled { opacity: .4; cursor: default; }
+.secondary { background: var(--blue-bg); color: var(--ink); border: 1px solid var(--chip-line); border-radius: 8px;
+  padding: 6px 12px; }
+.secondary:hover { border-color: var(--blue); }
+.danger { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-line); border-radius: 8px;
+  padding: 6px 14px; font-weight: 600; }
+.recent { list-style: none; padding: 0; margin: 0; }
+.recent li { display: flex; gap: 12px; align-items: baseline; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.recent li:hover { background: var(--bg-3); }
+.recent .when { font-family: var(--mono); font-size: 12px; color: var(--muted); flex: none; }
+/* The live view */
+.head { position: sticky; top: 49px; z-index: 4; background: rgba(11,17,27,.94); padding: 12px 0 10px;
+  border-bottom: 1px solid var(--blue-bg); backdrop-filter: blur(6px); }
+.objective { font-size: 19px; font-weight: 700; margin-bottom: 8px; }
+.status { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 13px; color: var(--muted); }
+.state { font-family: var(--mono); font-weight: 700; font-size: 12px; letter-spacing: .08em; text-transform: uppercase;
+  border-radius: 6px; padding: 3px 9px; border: 1px solid var(--chip-line); color: var(--blue); background: var(--blue-bg); }
+.state.mint { color: var(--mint-hi); background: var(--mint-bg); border-color: var(--mint-line); }
+.state.amber { color: var(--amber); background: var(--amber-bg); border-color: var(--amber-line); }
+.timer { color: var(--blue); }
+.timer.on::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px;
+  background: var(--blue); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .25; } }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 4px; }
+.chip { font-size: 12.5px; border-radius: 999px; padding: 3px 11px; border: 1px solid var(--chip-line);
+  background: var(--bg-2); color: var(--sub); transition: background .4s, border-color .4s, color .4s; }
+.chip.found { background: var(--mint-bg); border-color: var(--mint-line); color: var(--mint-hi); }
+.chip.missing { background: var(--amber-bg); border-color: var(--amber-line); color: var(--amber); }
+.chip b { font-family: var(--mono); font-weight: 700; margin-right: 4px; }
+.timeline { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.card { background: var(--bg-2); border: 1px solid var(--chip-line); border-left: 4px solid var(--blue);
+  border-radius: 10px; padding: 9px 14px 10px; animation: arrive .35s ease-out; }
+@keyframes arrive { from { opacity: 0; transform: translateY(6px); } }
+.card.mint { border-left-color: var(--mint); }
+.card.amber { border-left-color: var(--amber); }
+.card.quiet { border-left-color: var(--chip-line); color: var(--sub); }
+.card .label { font-family: var(--mono); font-size: 11.5px; font-weight: 700; letter-spacing: .08em; color: var(--blue);
+  margin-right: 8px; }
+.card.mint .label { color: var(--mint-hi); }
+.card.amber .label { color: var(--amber); }
+.card .main { word-break: break-word; }
+.card .more { margin-top: 6px; font-size: 13px; color: var(--sub); }
+.card details.whole { margin-top: 6px; font-size: 13px; color: var(--sub); }
+.card details.whole > summary { cursor: pointer; color: var(--muted); }
+.card details.whole > div { margin-top: 4px; white-space: pre-wrap; }
+.card .thought { margin-top: 6px; font-size: 13px; color: var(--muted); font-style: italic; }
+.card ol, .card ul { margin: 6px 0 0; padding-left: 20px; }
+.card .site { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.bar-track { height: 6px; border-radius: 3px; background: var(--blue-bg); margin-top: 7px; overflow: hidden; }
+.bar-fill { height: 100%; background: var(--blue); border-radius: 3px; transition: width .4s; }
+.cite { font-family: var(--mono); font-size: .8em; font-weight: 700; color: var(--mint-hi); background: var(--mint-bg);
+  border: 1px solid var(--mint-line); border-radius: 5px; padding: 0 5px; white-space: nowrap; }
+.quote { margin-top: 4px; }
+.items { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+.items span { font-size: 11.5px; border: 1px solid var(--mint-line); color: var(--mint-hi); border-radius: 999px; padding: 0 8px; }
+.result-html h1, .result-html h2 { display: none; }
+.result-html h3 { font-size: 16px; color: var(--mint-hi); margin: 10px 0 4px; }
+.result-html p { margin: 6px 0; }
+.result-html code, .result-html pre { font-family: var(--mono); background: var(--blue-bg); border: 1px solid var(--chip-line);
+  border-radius: 5px; }
+.result-html pre { padding: 8px; white-space: pre-wrap; }
+a { color: var(--blue); text-underline-offset: 3px; word-break: break-all; }
+a:hover { color: var(--mint-hi); }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 18px 0 10px; }
+iframe.report { width: 100%; border: none; border-radius: 12px; background: transparent; min-height: 300px; }
+details.steps > summary, details.console > summary { cursor: pointer; color: var(--blue); margin: 14px 0 6px; }
+pre.console { font-family: var(--mono); font-size: 12px; color: var(--sub); background: #070b12; border: 1px solid var(--blue-bg);
+  border-radius: 8px; padding: 10px; max-height: 340px; overflow: auto; white-space: pre-wrap; }
+[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style></head>
+<body>
+<header class="bar">
+  <div class="brand"><span class="logo">LAB</span><span id="edition">LocalAgentBrowser</span></div>
+  <div class="spacer"></div>
+  <button class="link" id="classic" title="Switch to the console (classic mode). Typing /ui as the objective there switches back.">Classic console</button>
+</header>
+
+<main>
+  <section id="start">
+    <h1>What should I research?</h1>
+    <textarea id="objective" placeholder="Ask a question, or describe what to find. Ctrl+Enter starts." autofocus></textarea>
+    <div class="choices">
+      <label class="choice">Model in LM Studio<select id="model"></select></label>
+      <label class="choice">Time limit
+        <select id="minutes"><option value="0">No limit</option><option value="15">15 minutes</option>
+          <option value="30">30 minutes</option><option value="60">60 minutes</option><option value="90">90 minutes</option></select>
+      </label>
+      <div class="choice">Reports go to<span class="path" id="folder"></span>
+        <span><button class="link" id="open-folder">Open the folder</button></span></div>
+    </div>
+    <label class="check" id="remote-row" hidden><input type="checkbox" id="remote">
+      <span><span id="remote-label"></span><br><span class="note" id="remote-note"></span></span></label>
+    <div class="pick" id="remote-pick" hidden>
+      <label class="choice">Model<select id="remote-model"></select></label>
+      <input class="other" id="remote-other" hidden spellcheck="false" autocomplete="off">
+      <div class="note" id="remote-model-note"></div>
+    </div>
+    <div class="server" id="server"><span class="dot"></span><span id="server-text">Checking LM Studio...</span>
+      <span class="spacer"></span><button class="secondary" id="retry" hidden>Retry</button></div>
+    <button class="primary" id="go" disabled>Start research</button>
+    <div id="recent-box" hidden><h2>Recent reports</h2><ul class="recent" id="recent"></ul></div>
+  </section>
+
+  <section id="live" hidden>
+    <div class="head">
+      <div class="note" id="watch-line" hidden></div>
+      <div class="objective" id="live-objective"></div>
+      <div class="status">
+        <span class="state" id="state">Starting</span>
+        <span class="timer" id="timer"></span>
+        <span id="turn"></span><span id="elapsed"></span>
+        <span class="spacer"></span>
+        <button class="danger" id="stop">Stop</button>
+      </div>
+      <div class="chips" id="chips"></div>
+    </div>
+    <details class="steps" id="steps" open><summary id="steps-summary">Steps</summary>
+      <div class="timeline" id="timeline"></div></details>
+    <div id="done" hidden>
+      <div class="actions">
+        <button class="primary" id="again">New research</button>
+        <button class="secondary" id="open-run">Open the run folder</button>
+        <button class="secondary" id="open-page">Open the report as a page</button>
+        <span class="note" id="done-note"></span>
+      </div>
+      <iframe class="report" id="report" title="Research report"></iframe>
+    </div>
+    <details class="console"><summary>Console output</summary><pre class="console" id="console"></pre></details>
+  </section>
+</main>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const send = message => window.labSend && window.labSend(message);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const host = url => { try { return new URL(url).host.replace(/^www\./, ""); } catch (e) { return url; } };
+const STATES = { SEARCH: ["Searching", ""], NAVIGATE: ["Reading", ""], READ_MORE: ["Reading", ""],
+  DISCOVER: ["Recording", "mint"], FINISH: ["Checking", "amber"] };
+let setup = null, run = null, current = null, timer = null, clock = null, lines = 0;
+let watching = null;  // The watch window of a test run (winui.py --watch): its title; it follows tasks, starts none
+
+function setState(text, tone) { const s = $("state"); s.textContent = text; s.className = "state " + (tone || ""); }
+
+function card(tone, label, main) {
+  const c = el("div", "card " + (tone || ""));
+  const head = el("div", "main");
+  head.append(el("span", "label", label));
+  if (main instanceof Node) head.append(main); else head.append(document.createTextNode(main || ""));
+  c.append(head);
+  $("timeline").append(c);
+  $("steps-summary").textContent = "Steps (" + $("timeline").children.length + ")";
+  return c;  // keepUp() brings it into sight, once it is whole
+}
+
+// A check's message to the model can run to a page: its card shows the first sentence (the reason), and the whole
+// message is one click away
+function firstSentence(text) {
+  const m = String(text || "").match(/^[\s\S]{20,300}?[.!?](?=\s|$)/);
+  return m ? m[0] : String(text || "");
+}
+
+function checked(c, whole) {
+  const first = firstSentence(whole);
+  if (String(whole || "").trim().length <= first.length + 1) return;
+  const box = el("details", "whole");
+  box.append(el("summary", null, "The whole message to the model"), el("div", null, whole));
+  c.append(box);
+}
+
+function chips(items, missing) {
+  const box = $("chips");
+  box.textContent = "";
+  (items || []).forEach((item, i) => {
+    const found = (item.discoveries || []).length;
+    const c = el("span", "chip" + (found ? " found" : (missing || []).includes(i + 1) ? " missing" : ""));
+    c.append(el("b", null, String(i + 1)), document.createTextNode(item.text));
+    c.title = found ? "Found in " + item.discoveries.map(n => "[" + n + "]").join(" ") : "Not found yet";
+    box.append(c);
+  });
+}
+
+function startTimer() {
+  const t0 = Date.now();
+  clearInterval(timer);
+  timer = setInterval(() => {
+    const s = Math.round((Date.now() - t0) / 1000);
+    if (s >= 2) { $("timer").textContent = "Waiting for the model: " + s + " s"; $("timer").className = "timer on"; }
+  }, 500);
+}
+function stopTimer() { clearInterval(timer); $("timer").textContent = ""; $("timer").className = "timer"; }
+
+function showStart() {
+  $("start").hidden = false; $("live").hidden = true;
+  $("objective").focus();
+  send({ type: "check" });
+}
+
+function fillSetup(s) {
+  setup = s;
+  $("edition").textContent = s.edition;
+  $("folder").textContent = s.folder;
+  $("minutes").value = String(s.minutes || 0);
+  server(s);
+  if (s.remote) {
+    $("remote-row").hidden = false;
+    $("remote-label").textContent = s.remote.label;
+    $("remote-note").textContent = s.remote.note || s.remote.warning || "";
+    $("remote").checked = !!s.remote_chosen && s.remote.ready;
+    $("remote").disabled = !s.remote.ready;
+    fillRemoteModels(s.remote);
+  }
+  const list = $("recent");
+  list.textContent = "";
+  (s.recent || []).forEach(r => {
+    const li = el("li");
+    li.append(el("span", "when", r.when), el("span", null, r.objective));
+    li.onclick = () => send({ type: "show", folder: r.folder });
+    list.append(li);
+  });
+  $("recent-box").hidden = !(s.recent || []).length;
+  ready();
+}
+
+function server(s) {
+  const box = $("server"), select = $("model");
+  const chosen = select.value || (setup && setup.model);
+  select.textContent = "";
+  (s.models || []).forEach(m => { const o = el("option", null, m); o.value = m; select.append(o); });
+  if (chosen && (s.models || []).includes(chosen)) select.value = chosen;
+  box.className = "server" + (s.ready ? "" : " bad");
+  $("server-text").textContent = s.ready ? "LM Studio is ready (" + (s.models || []).length + " model" +
+    ((s.models || []).length === 1 ? "" : "s") + ")." : s.note;
+  $("retry").hidden = s.ready;
+  if (setup) { setup.ready = s.ready; setup.models = s.models; }
+  ready();
+}
+
+// The second kind of model: our recommended ones, then the others tested, then any other typed in
+const OTHER = "__other__";
+const MODEL_ID = /^[\w.~-]+\/[\w.:~-]+$/;
+let remoteNotes = {};
+
+function fillRemoteModels(r) {
+  const select = $("remote-model");
+  select.textContent = ""; remoteNotes = {};
+  const groups = {};
+  (r.models || []).forEach(m => {
+    if (!groups[m.group]) { groups[m.group] = document.createElement("optgroup"); groups[m.group].label = m.group;
+                            select.append(groups[m.group]); }
+    const o = el("option", null, m.id); o.value = m.id; groups[m.group].append(o); remoteNotes[m.id] = m.note;
+  });
+  const other = el("option", null, "Another model..."); other.value = OTHER; select.append(other);
+  $("remote-other").placeholder = r.other_hint || "";
+  remoteNotes[OTHER] = r.other_note || "";
+  if (r.model && remoteNotes[r.model] !== undefined && r.model !== OTHER) select.value = r.model;
+  else if (r.model) { select.value = OTHER; $("remote-other").value = r.model; }
+  showRemoteModel();
+}
+
+function remoteModel() {
+  return $("remote-model").value === OTHER ? $("remote-other").value.trim() : $("remote-model").value;
+}
+
+function showRemoteModel() {
+  const other = $("remote-model").value === OTHER;
+  $("remote-pick").hidden = !$("remote").checked;
+  $("remote-other").hidden = !other;
+  $("remote-other").classList.toggle("bad", other && !!$("remote-other").value.trim() && !MODEL_ID.test(remoteModel()));
+  $("remote-model-note").textContent = remoteNotes[$("remote-model").value] || "";
+}
+
+function ready() {
+  const remote = $("remote").checked;
+  $("model").disabled = remote;
+  showRemoteModel();
+  $("go").disabled = !$("objective").value.trim() ||
+    !(remote ? MODEL_ID.test(remoteModel()) : (setup && setup.ready && $("model").value));
+}
+
+function start() {
+  if ($("go").disabled) return;
+  send({ type: "start", objective: $("objective").value, model: $("model").value, minutes: +$("minutes").value,
+         folder: setup.folder, remote: $("remote").checked, remote_model: remoteModel() });
+  $("go").disabled = true;
+}
+
+function showRun(e) {
+  run = { started: Date.now(), folder: e.folder, ended: false, checklist: [] };
+  following = true;  // A new run follows its newest card again
+  $("start").hidden = true; $("live").hidden = false; $("done").hidden = true;
+  $("timeline").textContent = ""; $("chips").textContent = ""; $("console").textContent = ""; lines = 0;
+  $("steps").open = true; $("steps-summary").textContent = "Steps";
+  $("live-objective").textContent = e.objective;
+  $("stop").hidden = false; $("stop").disabled = false; $("turn").textContent = "";
+  setState("Starting", "");
+  card("quiet", "START", "Splitting the objective into a checklist" + (e.model ? " with " + e.model : "") + ".");
+  clearInterval(clock);
+  clock = setInterval(() => {
+    const s = Math.round((Date.now() - run.started) / 1000);
+    $("elapsed").textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+  }, 1000);
+}
+
+function showDone() {
+  // The collapsed steps, then the buttons and the report, just below the sticky bar and run heading (scrollIntoView
+  // put them underneath; scrolling to the report itself left "Steps" half hidden under the heading)
+  const below = document.querySelector(".head").getBoundingClientRect().bottom;
+  const top = ($("steps").hidden ? $("done") : $("steps")).getBoundingClientRect().top;
+  scrollTo({ top: top + scrollY - below - 8, behavior: "smooth" });
+}
+
+const handlers = {
+  setup(e) { if (!watching) fillSetup(e); },
+  server: server,
+  started(e) {
+    showRun(e);
+    if (watching) {
+      $("stop").hidden = true;
+      const w = e.watch || {};
+      $("watch-line").hidden = false;
+      $("watch-line").textContent = watching + (w.n ? " · " + w.n + (w.of ? " of " + w.of : "") : "") + " · " + (w.label || "");
+      $("live-objective").textContent = "";
+    }
+  },
+  watch(e) {
+    watching = e.title;
+    $("start").hidden = true; $("live").hidden = false;
+    $("stop").hidden = true; $("classic").hidden = true; $("again").hidden = true;
+    $("watch-line").hidden = false; $("watch-line").textContent = e.title + " · waiting for the first task";
+    setState("Waiting", "");
+  },
+  new_research() { $("objective").value = ""; send({ type: "hello" }); showStart(); },  // From the tray's menu
+  watch_done() {
+    clearInterval(clock); stopTimer(); if (run) run.ended = true;
+    setState("Finished", "mint"); $("watch-line").textContent += " · the run is over";
+  },
+  objective(e) { if (watching || !$("live-objective").textContent) $("live-objective").textContent = e.objective; },
+  note(e) { card(e.tone || "quiet", e.label || "NOTE", e.text); },
+  checklist(e) { run.checklist = e.items; chips(e.items); },
+  turn(e) { $("turn").textContent = "Turn " + e.number; },
+  waiting() { startTimer(); if (!run.ended && $("state").textContent !== "Writing") setState("Thinking", ""); },
+  replied() { stopTimer(); },
+  decision(e) {
+    const [state, tone] = STATES[e.action] || [e.action, ""];
+    setState(state, tone);
+    let c;
+    if (e.action === "SEARCH") c = card("", "SEARCH", e.parameter);
+    else if (e.action === "NAVIGATE") {
+      const a = el("a", null, e.parameter); a.href = e.parameter;
+      c = card("", "NAVIGATE", a);
+    } else if (e.action === "READ_MORE") c = card("", "READ MORE", "");
+    else if (e.action === "DISCOVER") c = null;  // Drawn when it is recorded (it may be refused)
+    else if (e.action === "FINISH") c = card("amber", "FINISH", "The agent says it has what it needs.");
+    else c = card("quiet", e.action, e.parameter);
+    if (c && e.thought) c.append(el("div", "thought", e.thought));
+    current = c;
+  },
+  // Within a turn, before its decision: a reply the code refused, and the model asked again
+  retried(e) { checked(card("amber", "ASKED AGAIN", e.action + " refused by the code: " + firstSentence(e.reason)), e.reason); },
+  refused(e) { checked(card("amber", "REFUSED", e.action + ": " + firstSentence(e.reason)), e.reason); setState("Checked", "amber"); },
+  failed(e) { card("amber", "FAILED", e.action + " " + e.parameter + ": " + e.error); },
+  page(e) {
+    if (!current) return;
+    if (e.search) {
+      const list = el("ol");
+      (e.results || []).slice(0, 6).forEach(([title, url]) => {
+        const li = el("li"); const a = el("a", null, title || url); a.href = url;
+        li.append(a, document.createTextNode(" "), el("span", "site", host(url))); list.append(li);
+      });
+      if (list.children.length) current.append(list);
+    } else {
+      current.append(el("div", "more", host(e.url) + " · " + e.parts + " part" + (e.parts === 1 ? "" : "s")));
+    }
+  },
+  read_more(e) {
+    if (!current) return;
+    current.querySelector(".main").append(document.createTextNode("Part " + e.part + " of " + e.parts));
+    const track = el("div", "bar-track"), fill = el("div", "bar-fill");
+    fill.style.width = Math.round(100 * e.part / Math.max(e.parts, 1)) + "%";
+    track.append(fill); current.append(track);
+  },
+  discovery(e) {
+    const body = el("span");
+    body.append(el("span", "cite", "[" + e.number + "]"));
+    const c = card("mint", "DISCOVER", body);
+    let text = e.text || "", heading = "";
+    const m = text.match(/^\(Under the heading "(.*?)"\) /);
+    if (m) { heading = m[1]; text = text.slice(m[0].length); }
+    if (heading) body.append(document.createTextNode(" " + heading));
+    c.append(el("div", "quote", text));
+    const meta = el("div", "more"); const a = el("a", null, host(e.source)); a.href = e.source; meta.append(a);
+    c.append(meta);
+    if ((e.items || []).length) {
+      const items = el("div", "items");
+      e.items.forEach(n => items.append(el("span", null, "item " + n)));
+      c.append(items);
+    }
+    run.checklist = e.checklist; chips(e.checklist);
+    current = c;
+  },
+  checking() { setState("Checking", "amber"); card("amber", "CHECKING", "Every checklist item, against the discoveries, before finishing."); },
+  not_found(e) { chips(run.checklist, e.items); },
+  writing() { setState("Writing", "mint"); card("mint", "WRITING", "The final result, from the discoveries only."); },
+  result(e) {
+    const c = card("mint", "RESULT", "");
+    const body = el("div", "result-html"); body.innerHTML = e.html || ""; c.append(body);
+  },
+  stopped(e) {
+    run.ended = true; stopTimer();
+    setState(e.reason ? "Stopped" : "Done", e.reason ? "amber" : "mint");
+    if (e.reason) card("amber", "STOPPED", e.reason + ".");
+  },
+  line(e) {
+    const pre = $("console");
+    pre.append(document.createTextNode(e.text + "\n"));
+    if (++lines > 4000) pre.textContent = pre.textContent.slice(-200000);
+  },
+  report(e) {
+    if (e.past) {  // A past report from the start screen
+      run = { started: Date.now(), folder: e.folder, ended: true, checklist: [] };
+      $("start").hidden = true; $("live").hidden = false; $("timeline").textContent = "";
+      $("chips").textContent = ""; $("console").textContent = ""; $("live-objective").textContent = "";
+      $("stop").hidden = true; $("turn").textContent = ""; $("elapsed").textContent = ""; setState("Report", "mint");
+      $("steps").open = false; $("steps-summary").textContent = "Steps (not kept for past reports: see console.txt)";
+    } else {
+      $("steps").open = false;
+    }
+    $("done").hidden = false; $("stop").hidden = true;
+    const frame = $("report");
+    frame.onload = () => {
+      const doc = frame.contentDocument;
+      // The report page's own backdrop (its glow and colour) off inside the window, where the window's shows through
+      doc.body.style.background = "transparent";
+      frame.style.height = (doc.documentElement.scrollHeight + 20) + "px";
+      doc.addEventListener("click", ev => {
+        const a = ev.target.closest("a"); if (!a) return;
+        ev.preventDefault(); send({ type: "open", url: a.href });
+      });
+    };
+    frame.srcdoc = e.page;
+    $("done-note").textContent = "";
+    setTimeout(showDone, 150);
+  },
+  exited(e) {
+    clearInterval(clock); stopTimer(); $("stop").hidden = true; run.ended = true;
+    if (!e.report) {
+      $("done").hidden = false; $("report").srcdoc = "";
+      $("done-note").textContent = "The run ended without a report: see the console output below, saved as console.txt in the run folder.";
+      setState("Ended", "amber");
+    }
+  },
+};
+
+window.lab = { receive(e) { const h = handlers[e.kind]; if (h) h(e); } };
+
+// The live view keeps its newest card in sight as the run goes, unless the person has scrolled up to read an earlier
+// one (scrolling back to the bottom follows again). It acts on every change to the timeline, after the change: cards
+// grow once made (a finding's source and items, a check's whole message), and scrolling each card into view as it was
+// made left the newest ones below the window's edge (seen live, Nov 21). The report, once shown, has its own place.
+let following = true;
+function keepUp() {
+  if (!run || run.ended || $("live").hidden || !$("done").hidden || !following) return;
+  window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "auto" });
+}
+new MutationObserver(() => requestAnimationFrame(keepUp))
+  .observe($("timeline"), { childList: true, subtree: true, characterData: true });
+window.addEventListener("scroll", () => {
+  following = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 120;
+}, { passive: true });
+
+document.addEventListener("click", ev => {
+  const a = ev.target.closest("a");
+  if (a && a.href) { ev.preventDefault(); send({ type: "open", url: a.href }); }
+});
+$("objective").addEventListener("input", ready);
+$("model").addEventListener("change", ready);
+$("remote").addEventListener("change", ready);
+$("remote-model").addEventListener("change", () => { ready(); if ($("remote-model").value === OTHER) $("remote-other").focus(); });
+$("remote-other").addEventListener("input", ready);
+$("objective").addEventListener("keydown", ev => { if (ev.key === "Enter" && ev.ctrlKey) start(); });
+$("go").onclick = start;
+$("retry").onclick = () => { $("server-text").textContent = "Checking LM Studio..."; send({ type: "check" }); };
+$("stop").onclick = () => { $("stop").disabled = true; setState("Stopping", "amber"); send({ type: "stop" }); };
+$("again").onclick = () => { $("objective").value = ""; send({ type: "hello" }); showStart(); };
+$("open-folder").onclick = () => send({ type: "open", path: setup.folder });
+$("open-run").onclick = () => run && send({ type: "open", path: run.folder });
+$("open-page").onclick = () => run && send({ type: "open", path: run.folder + "\\research_report.html" });
+$("classic").onclick = () => send({ type: "classic" });
+send({ type: "hello" });
+</script>
+</body></html>

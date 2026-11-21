@@ -18,7 +18,12 @@ class RECT(ctypes.Structure):
 
 def enabled():
     return (sys.platform == "win32" and os.environ.get("LAB_SIDE_BY_SIDE", "1") != "0"
-            and bool(getattr(sys.stdin, "isatty", lambda: False)()))
+            and (bool(getattr(sys.stdin, "isatty", lambda: False)()) or ui_run()))
+
+
+def ui_run():
+    """A run started by the Windows UI (winui.py): no console window, the UI's own window on the left instead."""
+    return os.environ.get("LAB_UI") == "windows"
 
 
 def work_area():
@@ -41,8 +46,19 @@ def console_title():
     return buffer.value
 
 
-def window_titled(title):
-    """A visible top-level window whose title is the given one (Windows Terminal shows the console's title), or 0."""
+CHROMIUM_WINDOW_CLASS = "Chrome_WidgetWin_1"  # The window class of Chromium's windows (the Windows UI is one)
+
+
+def window_class(hwnd):
+    name = ctypes.create_unicode_buffer(256)
+    ctypes.windll.user32.GetClassNameW(hwnd, name, 256)
+    return name.value
+
+
+def window_titled(title, class_name=None):
+    """A visible top-level window whose title is the given one (Windows Terminal shows the console's title), or 0.
+    With a class name, only a window of that class: the Windows UI's window is told apart from a console window
+    titled the same."""
     found = []
     get_text = ctypes.windll.user32.GetWindowTextW
 
@@ -50,7 +66,8 @@ def window_titled(title):
     def each(hwnd, _):
         text = ctypes.create_unicode_buffer(512)
         get_text(hwnd, text, 512)
-        if text.value == title and ctypes.windll.user32.IsWindowVisible(hwnd) and has_size(hwnd):
+        if (text.value == title and ctypes.windll.user32.IsWindowVisible(hwnd) and has_size(hwnd)
+                and (class_name is None or window_class(hwnd) == class_name)):
             found.append(hwnd)
             return False
         return True
@@ -86,6 +103,37 @@ def place(hwnd, side):
     ctypes.windll.user32.MoveWindow(hwnd, *half(side), True)
 
 
+SW_HIDE = 0
+
+
+def minimized(hwnd):
+    return bool(hwnd) and bool(ctypes.windll.user32.IsIconic(hwnd))
+
+
+def hide(hwnd):
+    """Off the screen and the taskbar (the Windows UI, minimized to the tray)."""
+    if hwnd:
+        ctypes.windll.user32.ShowWindow(hwnd, SW_HIDE)
+
+
+def show(hwnd):
+    if hwnd:
+        ctypes.windll.user32.ShowWindow(hwnd, SW_RESTORE)
+        ctypes.windll.user32.SetForegroundWindow(hwnd)
+
+
+CENTERED_SHARE = 0.8  # The Windows UI's start screen: this share of the work area's width and height, centered
+
+
+def center(hwnd):
+    if not hwnd:
+        return
+    left, top, width, height = work_area()
+    w, h = round(width * CENTERED_SHARE), round(height * CENTERED_SHARE)
+    ctypes.windll.user32.ShowWindow(hwnd, SW_RESTORE)
+    ctypes.windll.user32.MoveWindow(hwnd, left + (width - w) // 2, top + (height - h) // 2, w, h, True)
+
+
 def bring_to_front(hwnd):
     ctypes.windll.user32.SetForegroundWindow(hwnd)
 
@@ -93,7 +141,7 @@ def bring_to_front(hwnd):
 def maximize_console():
     """At the start of a person's first run: the console full size, until the browser opens. From the second run in
     the same window (LAB_RUN_COUNT, set by the Windows launcher) it stays on the left, beside the last report."""
-    if enabled() and int(os.environ.get("LAB_RUN_COUNT") or 1) <= 1:
+    if enabled() and not ui_run() and int(os.environ.get("LAB_RUN_COUNT") or 1) <= 1:
         hwnd = console_window()
         if hwnd:
             # Sized to the whole work area: Windows Terminal ignored a request to maximize from another process
@@ -108,8 +156,9 @@ def browser_args():
     The page is zoomed out to fit, so it is still laid out 1,280 pixels wide, as in every test run."""
     if not enabled():
         return []
-    minimize_previous_report()
-    place(console_window(), "left")
+    if not ui_run():
+        minimize_previous_report()
+        place(console_window(), "left")
     x, y, width, height = half("right")
     # Chromium reads its window's position and size in zoomed units too
     scale = width / LAYOUT_WIDTH

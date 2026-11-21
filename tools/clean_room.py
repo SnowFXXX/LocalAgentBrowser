@@ -25,13 +25,13 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MARKERS = {".py": "#", ".cmd": "rem", ".bat": "rem"}
-TEXT_FILES = (".py", ".cmd", ".bat", ".ps1", ".md", ".txt", ".toml", ".in", ".json", ".yml", ".cfg")
+TEXT_FILES = (".py", ".cmd", ".bat", ".ps1", ".md", ".txt", ".toml", ".in", ".json", ".yml", ".cfg", ".html", ".js", ".css")
 # Words only the cloud code and its documents use (case is ignored): the service, its settings and its failures
 CLOUD_WORDS = re.compile(r"cloud|openrouter|extra_body|extra_headers|data_collection|ratelimit|rate_limit|"
                          r"retry_after|modelrefused|content_filter|unsupported_parameters", re.I)
 # Left out of Clean Room: the build tools, and the documents written for the full edition and its development
 LEFT_OUT = ("tools/clean_room.py", "tests/test_clean_room.py", "cleanroom", "CHANGELOG.md", "SECURITY.md",
-            "CONTRIBUTING.md", "llms.txt")
+            "CONTRIBUTING.md", "llms.txt", "tools/compat_models_cloud.txt", "localagentbrowser/cloud_models.json")
 # The repository's files that are not part of the app or its package (installer\build.ps1 also leaves out tests/)
 NOT_APP = re.compile(r"^(docs|benchmarks|installer|\.github)/|^\.")
 PACKAGE_NAME = "localagentbrowser-cleanroom"

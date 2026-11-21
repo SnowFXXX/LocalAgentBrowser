@@ -1,6 +1,7 @@
 """The objective as a fixed checklist: splitting it once, linking discoveries to items, and the advice drawn from what
 each item has."""
 import json
+import re
 from .config import MAX_CHECKLIST_ITEMS, MAX_CHECKLIST_ITEM_CHARS, MODEL, SPLIT_MAX_TOKENS
 from .prompts import CHECKLIST_FORMAT, CHECKLIST_SPLIT, CHECK_PARTS, SYSTEM_PROMPT
 from .text import OPINION_REQUEST, asked_count, extract_message_content, shorten
@@ -22,11 +23,32 @@ async def split_objective(client, objective):
             messages=[{"role": "system", "content": SYSTEM_PROMPT},
                       {"role": "user", "content": f"### OBJECTIVE\n{objective}\n\n{CHECKLIST_SPLIT}"}])
         parts = json.loads(extract_message_content(response)).get("parts")
-        items = [shorten(p, MAX_CHECKLIST_ITEM_CHARS) for p in parts if isinstance(p, str) and p.strip()] if isinstance(parts, list) else []
+        parts = with_fragments_joined([p for p in parts if isinstance(p, str) and p.strip()]) if isinstance(parts, list) else []
+        items = [shorten(p, MAX_CHECKLIST_ITEM_CHARS) for p in parts]
     except Exception as err:  # A malformed reply or a server problem: the run still works with one item
-        print(f"⚠️ Could not split the objective into a checklist ({err}); using the whole objective.")
+        print(f"Warning: Could not split the objective into a checklist ({err}); using the whole objective.")
         items = []
     return [{"text": text, "discoveries": []} for text in items[:MAX_CHECKLIST_ITEMS]] or [{"text": objective, "discoveries": []}]
+
+FRAGMENT_START = re.compile(r"(?:at|in|on|of|for|from|during|with|by|to|into|near|under|over|between|within|without)\b", re.I)
+ASKING = re.compile(r"\b(?:what|which|how|who|whom|whose|when|where|why|is|are|was|were|does|did|do|can|should|list|give|"
+                    r"name|find|explain|describe|say|compare|recommend)\b", re.I)
+
+def with_fragments_joined(parts):
+    """The split's parts with a fragment that only continues the part before it joined back to it. One question split
+    so that "at the summit of Mount Everest" was an item of its own, which no discovery answers alone, and it blocked
+    finishing; Llama split SimpleQA questions the same way ("Who won the gold medal" / "in men's foil" / "at the first
+    European Fencing Championships"). In 2,443 saved checklist items, the 9 parts starting with such a word and
+    asking nothing were all fragments of this kind."""
+    joined = []
+    for part in (p.strip() for p in parts):
+        if joined and FRAGMENT_START.match(part) and not ASKING.search(part):
+            asked = joined[-1].endswith("?") or part.endswith("?")
+            joined[-1] = joined[-1].rstrip(" ?.,;:") + " " + part.rstrip(" ?.")
+            joined[-1] += "?" if asked else ""
+        else:
+            joined.append(part)
+    return joined
 
 def checklist_lines(checklist, report=False):
     """The checklist with the discoveries linked to each item. In the report (not in prompts), an item whose coverage

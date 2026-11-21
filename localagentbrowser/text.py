@@ -1,6 +1,8 @@
 """Small text helpers shared by the checks: words, word pairs, counts asked for, shortening, and reading a model reply."""
 import re
 
+from .prompts import EMPTY_REPLY
+
 OPINION_REQUEST = re.compile(r"\b(opinion|your (own )?view|recommend\w*|what do you think)\b", re.I)
 
 def word_pairs(text):
@@ -60,6 +62,17 @@ def plain_words(text):
 MISSING_STOPWORDS = {"the", "and", "or", "of", "from", "in", "on", "at", "to", "a", "an", "its", "their", "for", "with",
                      "is", "are", "not", "mentioned", "specific", "exact", "details", "detail", "information"}
 
+# A JSON reply wrapped in a markdown code fence ("```json\n{...}\n```"), the closing fence missing when it was cut off
+FENCED_JSON = re.compile(r"\s*```(?:json)?[ \t]*\n?(\{.*?)\s*(?:```\s*)?", re.S | re.I)
+
+def without_json_fence(text):
+    """A reply that is only a JSON object in a code fence, without the fence. Every model call asks for JSON, and
+    MiniMax M2.7 (on a JSON mode without a schema) wrapped each reply in one: its checklist split could not be read,
+    and its final result kept the whole reply as text, whose `"result": ...` line the code check then cut as code no
+    discovery gives, leaving an empty result. A fence around anything else, such as a command, is kept."""
+    match = FENCED_JSON.fullmatch(text)
+    return match.group(1) if match else text
+
 def extract_message_content(response):
     choices = getattr(response, "choices", None)
     if choices is None and isinstance(response, dict):
@@ -71,17 +84,33 @@ def extract_message_content(response):
         first_choice = choices
 
     if hasattr(first_choice, "message"):
-        return (first_choice.message.content or "").strip()
+        content = first_choice.message.content or ""
     elif isinstance(first_choice, dict) and "message" in first_choice:
         msg = first_choice["message"]
-        return msg.get("content", "").strip() if isinstance(msg, dict) else msg.content.strip()
-    return first_choice.get("message", {}).get("content", "").strip()
+        content = msg.get("content", "") if isinstance(msg, dict) else msg.content
+    else:
+        # A reply with no choice in it (a failing provider's answer): no text, not a crash
+        content = first_choice.get("message", {}).get("content", "") if isinstance(first_choice, dict) else ""
+    return without_json_fence(str(content or "").strip())
+
+def reply_turn(content):
+    """A model's reply, sent back to it as an assistant turn before a correction: never empty (EMPTY_REPLY stands in).
+    Mistral Large 4 and Command A+ spent a whole reply limit thinking and answered nothing; the coverage retry sent
+    that empty reply back, their services refused it, and each item's check failed after about 4 minutes of waits."""
+    return {"role": "assistant", "content": content or EMPTY_REPLY}
 
 def was_cut_off(response):
     """True when the reply stopped at its max_tokens limit instead of ending by itself."""
     choices = getattr(response, "choices", None) or []
     first_choice = choices[0] if choices else None
     return getattr(first_choice, "finish_reason", None) == "length"
+
+CONTROL_CHARACTERS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+def without_control_characters(text):
+    """Text without control characters other than tabs and line breaks. A reply's JSON "\\b" (a regular expression's
+    word boundary, written in a finding) is read as a backspace, which then sat in the finding and the result."""
+    return CONTROL_CHARACTERS.sub("", str(text))
 
 def shorten(text, limit):
     text = " ".join(str(text).split())

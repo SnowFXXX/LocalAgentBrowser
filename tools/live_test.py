@@ -60,7 +60,7 @@ def main():
         try:
             await asyncio.wait_for(ab.main(), timeout=args.minutes * 60)
         except asyncio.TimeoutError:
-            print("\n⏹️ TEST TIME LIMIT REACHED")
+            print("\nTEST TIME LIMIT REACHED")
 
     asyncio.run(run())
 

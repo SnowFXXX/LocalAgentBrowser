@@ -18,10 +18,24 @@ CHECK_WORDING = re.compile(r"\bcovered by\s*\[\d|\bnot covered\b|\bwritten at FI
 
 QUESTION_START = re.compile(r"(?:what|how|where|which|why|when|who|does)\b", re.I)  # Not "do", "can", "is": "Do not grind too fine"
 
-def is_question_discovery(parameter):
-    """True when every sentence of a discovery starts like a question and none gives an answer (a colon or number)."""
+PAGE_STATEMENT_WORDS = 6  # Shorter lines on a page that start like questions are headings or menu items, not facts
+
+def is_question_discovery(parameter, page_state=None):
+    """True when every sentence of a discovery starts like a question and none gives an answer (a colon or number).
+    A sentence copied from the page shown, not ending in "?", is the page's statement, not a question."""
+    # The 7B recorded the venv page's "When used from within a virtual environment, common installation tools such as
+    # pip will install Python packages into a virtual environment..." and it was refused as a question (1.67)
+    shown = " ".join(" ".join(part.split()).lower() for i, part in enumerate((page_state or {}).get("parts") or [])
+                     if i in (page_state or {}).get("seen_parts", {0}))
+
+    def asks(sentence):
+        if not QUESTION_START.match(sentence) or re.search(r"[:\d]", sentence):
+            return False
+        words = " ".join(sentence.split()).lower().rstrip(".!")
+        return sentence.rstrip().endswith("?") or len(words.split()) < PAGE_STATEMENT_WORDS or words not in shown
+
     sentences = [s for line in content_lines(parameter) for s in re.split(r"(?<=[.!?])\s+", line) if s.strip()]
-    return bool(sentences) and all(QUESTION_START.match(s) and not re.search(r"[:\d]", s) for s in sentences)
+    return bool(sentences) and all(asks(s) for s in sentences)
 
 def content_lines(parameter):
     """A discovery's lines with web addresses taken out ("from https://...", "URL: https://..."), empty ones dropped."""
@@ -390,7 +404,7 @@ def check_decision(action, parameter, journal, tried, page_state, current_url, t
         # "what are the quantities needed for cold brew coffee at home, what are the steps in order...": in every suite
         # run a discovery made only of questions was a restated objective or a heading; the one real one gave its
         # answer after a colon ("How to activate a virtual environment on macOS or Linux: $ source ...")
-        if is_question_discovery(parameter):
+        if is_question_discovery(parameter, page_state):
             return "BLOCKED_DISCOVER_QUESTION", ("That DISCOVER only asks questions. DISCOVER the page's answers to "
                                                  f"them, in its own wording.{fact_hint(parameter)}")
         # The finish check's own wording copied into a DISCOVER ("not covered by [1, 2, 3]"): in 471 suite

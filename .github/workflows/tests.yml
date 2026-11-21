@@ -31,6 +31,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
-      # The tests replace the model and the browser with fakes, so no LM Studio or Chromium is needed
+      # The tests replace the model and the browser with fakes, so no LM Studio or Chromium is needed, but for the
+      # Windows UI's page (tests/test_winui_page.py), drawn in a real headless Chromium: one job installs it, and the
+      # others skip that test
+      - name: Install Chromium for the UI page test
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13'
+        run: python -m playwright install --with-deps chromium
       - name: Run tests
         run: python -m pytest

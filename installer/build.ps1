@@ -13,6 +13,10 @@ $build = Join-Path $PSScriptRoot "build"
 $stage = Join-Path $build "app"
 $pyVersion = "3.13.15"
 $version = (Select-String -Path (Join-Path $repo "pyproject.toml") -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+# The build record names a commit, so the files that go in must be that commit's: no uncommitted changes to them
+$changed = git -C $repo status --porcelain --untracked-files=no
+if ($LASTEXITCODE -ne 0) { throw "git status failed" }
+if ($changed) { throw "The code has uncommitted changes; commit them first, so the setup file matches its commit:`n$($changed -join "`n")" }
 $iscc = @("$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe", "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") |
         Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $iscc) { throw "Inno Setup 6 is not installed (winget install JRSoftware.InnoSetup --scope user)" }

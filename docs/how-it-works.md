@@ -43,7 +43,15 @@ The code is in the `localagentbrowser` package, one file per job, each depending
 | `checks.py` | Decisions refused or confirmed before they are carried out (leaving, reading on, finishing, ...) |
 | `report.py` | The journal, the research log, the final result and the report file |
 | `windows.py` | On Windows, placing the console and the browser side by side, and the report beside the console |
+| `events.py` | What the run is doing, as events (a decision, a page, a finding, the result) that the window draws, and a run's stop request |
+| `follow.py` | The agent's browser following the agent: scrolling to the part read and marking findings, with the browser's own highlights |
+| `colors.py` | The classic console's colours |
+| `settings.py` | The window's saved choices (settings.json), and the folders and programs both modes share |
+| `reportpage.py` | The report as a page in the website's colours, for the window and the classic console |
+| `tray.py` | The window's notification-area icon and its menu |
+| `watch.py` | A test run's watch window: each task's events written to a file the window follows |
 | `agent.py` | The loop: each turn's conversation with the model, in-turn retries, and `main()` |
+| `winui.py`, `winui.html` | The Windows UI: the start screen, the live view and the report in a window of its own. Each research runs as its own process, whose events it draws |
 
 `agent_browser.py` keeps `python agent_browser.py` working from a clone. The Windows installer is built from
 `installer/` (see [CONTRIBUTING.md](https://github.com/SnowFXXX/LocalAgentBrowser/blob/main/CONTRIBUTING.md)).

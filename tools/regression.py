@@ -37,6 +37,14 @@ from urllib.parse import urlparse
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 import agent_browser as ab  # noqa: E402
+from localagentbrowser import watch  # noqa: E402
+
+
+def says(word, text):
+    """An expected word is found in the lowercased text: as written, or as a regular expression if it starts with
+    a word boundary (r"\\bo2\\b" is oxygen's formula, not the end of "co2")."""
+    return bool(re.search(word, text)) if word.startswith(r"\b") else word in text
+
 
 # expect: groups of words the final result must contain, one alternative per group being enough
 # forbid: words in the final result that show a condition of the objective was missed
@@ -74,7 +82,7 @@ TASKS = [
     {"id": "explanation", "kind": "Explanation of a topic", "core": True,
      "objective": "Explain how photosynthesis works: what goes in and what comes out, what happens in the "
                   "light-dependent reactions and in the Calvin cycle, and where in the plant cell each stage takes place.",
-     "expect": [["carbon dioxide", "co2", "co₂"], ["oxygen"], ["glucose", "sugar", "carbohydrate", "g3p"],
+     "expect": [["carbon dioxide", "co2", "co₂"], ["oxygen", r"\bo2\b", r"\bo₂\b"], ["glucose", "sugar", "carbohydrate", "g3p"],
                 ["thylakoid"], ["stroma"]]},
     {"id": "opinion", "kind": "Opinion from several sources", "core": True,
      "objective": "Find out how at least three different cultures or religions have viewed owls (for example as wise, "
@@ -83,7 +91,10 @@ TASKS = [
     {"id": "docs", "kind": "Documentation research", "core": True,
      "objective": "Using the official Python documentation, find out how to create a virtual environment with venv, how "
                   "to activate it on Windows and on macOS or Linux, and how to install packages into it.",
-     "expect": [["python -m venv", "python3 -m venv", "py -m venv"], ["activate"], ["pip install"]],
+     # The Windows command too: "activate" alone was met by the macOS and Linux one, and 25 of 55 saved results gave
+     # no Windows command (issue #11's first case)
+     "expect": [["python -m venv", "python3 -m venv", "py -m venv"], ["activate"], ["pip install"],
+                ["scripts\\activate", "scripts/activate", "activate.bat", "activate.ps1"]],
      "source": r"(^|\.)python\.org$"},
     {"id": "docs-strict", "kind": "Documentation research", "core": False,
      "objective": "Locate, analyze, and map out the exact implementation guidelines, parameter schemas, and terminal setup "
@@ -145,7 +156,8 @@ def honesty(score):
     return {"said not found": len(score["gap_statements"]), "caveats": score["caveats"],
             "outside knowledge": len(score["outside_knowledge"]), "numbers not in discoveries": len(score["unverified_numbers"]),
             "commands not in discoveries": len(score.get("unverified_code", [])),
-            "uncited lines": len(score["uncited_lines"]), "cites missing discoveries": len(score["bad_citations"])}
+            "uncited lines": len(score["uncited_lines"]), "cites missing discoveries": len(score["bad_citations"]),
+            "left out without a word": len(score.get("silent_omissions", []))}
 
 
 def cited_numbers(text):
@@ -255,7 +267,8 @@ def score_run(task, journal, console="", checklist=None):
         "gap_statements": [m.group(0) for m in GAP_STATEMENT.finditer(result)],
         "caveats": result.count(CAVEAT),
         "outside_knowledge": outside_knowledge(result),
-        "missing": ["/".join(group[:3]) for group in task.get("expect", []) if not any(word in low for word in group)],
+        "missing": ["/".join(w.replace(r"\b", "") for w in group[:3]) for group in task.get("expect", [])
+                    if not any(says(word, low) for word in group)],
         # A forbidden item marked by the agent's own caveat ("FreeOffice (not shown in the pages read to be ...") is
         # flagged to the reader, so it does not count as a missed condition
         "forbidden": [word for word in task.get("forbid", []) if word in low
@@ -270,6 +283,8 @@ def score_run(task, journal, console="", checklist=None):
         off = [h for h in (host(e.get("source")) for e in found) if not re.search(task["source"], h)]
         score["off_source_discoveries"] = len(off)
     score["view_missing"] = bool(finish and ab.OPINION_REQUEST.search(task["objective"]) and "my view:" not in low)
+    score["steps_missing"] = bool(finish and ab.steps_missing(task["objective"], result))
+    score["silent_omissions"] = silent_omissions(task, result, found) if finish else []
 
     problems = []
     if not finish:
@@ -277,10 +292,15 @@ def score_run(task, journal, console="", checklist=None):
     else:
         if score["missing"]:
             problems.append("result lacks " + ", ".join(score["missing"]))
+        if score["silent_omissions"]:
+            problems.append("left out without a word: " + ", ".join(
+                f"{s['words']} ({'a discovery had it' if s['dropped'] else 'never found'})" for s in score["silent_omissions"]))
         if score["forbidden"]:
             problems.append("condition missed: " + ", ".join(score["forbidden"]))
         if score["view_missing"]:
             problems.append("no 'My view:' paragraph")
+        if score["steps_missing"]:
+            problems.append("asked for steps, gives none")
         if score["bad_citations"]:
             problems.append("cites missing discoveries " + ", ".join(map(str, score["bad_citations"])))
         if score["unverified_numbers"]:
@@ -297,6 +317,31 @@ def score_run(task, journal, console="", checklist=None):
         problems.append(f"{score['off_source_discoveries']} of {len(found)} discoveries outside the named source")
     score["problems"] = problems
     return score
+
+
+# Words a "not found" statement about an expected part may use instead of the part's own words
+EXPECT_TOPICS = {"scripts\\activate": ("windows",)}
+
+
+def silent_omissions(task, result, found):
+    """Issue #11's silent omissions, counted: the expected parts the final result lacks without a sentence saying
+    they were not found. Each is "dropped" when a discovery had it (found, then lost while the result was written,
+    as Gemma 3 4B's 1.67.2 explanation lost oxygen) or "never found" when none did. In 395 saved results, 20 expected
+    words were dropped this way; on the docs task, 22 of 55 results lacked the Windows activation command without
+    saying so."""
+    low = ab.LEFT_OUT_NOTE.sub("", str(result)).lower()
+    said = [s for s in re.split(r"(?<=[.!?])\s+|\n", low) if GAP_STATEMENT.search(s)]
+    found_text = " ".join(str(e.get("extracted_data", "")) for e in found).lower()
+    omitted = []
+    for group in task.get("expect", []):
+        if any(says(word, low) for word in group):
+            continue
+        topics = [w.replace(r"\b", "") for w in group] + list(EXPECT_TOPICS.get(group[0], ()))
+        if any(t in s for t in topics for s in said):
+            continue
+        omitted.append({"words": "/".join(w.replace(r"\b", "") for w in group[:3]),
+                        "dropped": any(says(word, found_text) for word in group)})
+    return omitted
 
 
 def progress(score):
@@ -429,6 +474,8 @@ def write_run_info(folder, meta):
 # have all been measured at 90.
 DEFAULT_MINUTES = 90
 FAILURE_PAUSE_SECONDS = 60  # Wait after a task ended by a failed model call, so a rate limit can clear
+MODEL_LIST_TIMEOUT = 30  # LM Studio can be slow to list its models while it starts or loads one
+MODEL_LIST_RETRY_WAIT = 10
 # cloud:start
 CLOUD_URL = "https://openrouter.ai/api/v1"
 # Only providers that honour the JSON format the agent asks for, and none that store or train on prompts
@@ -477,11 +524,24 @@ def lmstudio_model(model):
         return None
 
 
+def model_list():
+    """The model server's model ids, with a longer wait than other calls and one more try if the list does not come."""
+    url = ab.BASE_URL.rstrip("/") + "/models"
+    try:
+        listed = get_json(url, timeout=MODEL_LIST_TIMEOUT)
+    except OSError as err:
+        print(f"The model server did not list its models ({err}); trying once more in {MODEL_LIST_RETRY_WAIT} s.",
+              flush=True)
+        time.sleep(MODEL_LIST_RETRY_WAIT)
+        listed = get_json(url, timeout=MODEL_LIST_TIMEOUT)
+    return [m["id"] for m in listed.get("data", [])]
+
+
 def prepare_model(model):
     """Checks the model is available, loads it, and returns {"quantization", "context"}; exits with the reason if
     it cannot be used. LM Studio loads a model on the first request that names it, with that model's own default
     context length, which can differ from the one every other run used; a run under other conditions is refused."""
-    available = [m["id"] for m in get_json(ab.BASE_URL.rstrip("/") + "/models").get("data", [])]
+    available = model_list()
     if model not in available:
         sys.exit(f"The model server has no model '{model}'. It has: {', '.join(available)}")
     print(f"Loading {model} (if it is not loaded yet)...", flush=True)
@@ -508,6 +568,7 @@ def run_task(task, folder, minutes, model):
     """Runs one task through the live test runner, copying its console output to the screen and to console.txt."""
     os.makedirs(folder, exist_ok=True)
     env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1", LMSTUDIO_MODEL=model)
+    env = watch.task_env(env, task["id"], folder, model)  # The watch window follows it, when there is one
     command = [sys.executable, "-u", os.path.join(ROOT, "tools", "live_test.py"), task["objective"],
                "--minutes", str(minutes), "--out", folder]
     with open(os.path.join(folder, "console.txt"), "w", encoding="utf-8") as console:
@@ -589,6 +650,8 @@ def main():
     print(f"Run info: {info['pc']}, commit {info['commit']}, changes {str(info['changes_sha256'])[:16]} "
           f"({len(info['changed_files'])} files)", flush=True)
     scores = []
+    # The watch window: each task's live view beside its browser (watch.py; LAB_WATCH=0 for none)
+    watch.start(f"Test suite · {model}", total=len(tasks))
     for number, task in enumerate(tasks, start=1):
         minutes = args.minutes
         print(f"\n===== REGRESSION TASK {number}/{len(tasks)}: {task['id']} ({task['kind']}, up to {minutes:g} min) =====\n",
@@ -602,9 +665,10 @@ def main():
         # One rate-limited task used to end every task after it on its first call (GPT-4o lost 3, Opus 5.5 lost 6):
         # after a task ended by a failed model call, the next one waits for the limit to clear
         with open(os.path.join(folder, task["id"], "console.txt"), encoding="utf-8", errors="replace") as console:
-            if "❌ The model call failed" in console.read() and number < len(tasks):
+            if "The model call failed" in console.read() and number < len(tasks):
                 print(f"The model call failed in this task; waiting {FAILURE_PAUSE_SECONDS} s before the next one.", flush=True)
                 time.sleep(FAILURE_PAUSE_SECONDS)
+    watch.finish()
     print("\n" + summary_markdown(meta, scores, baseline))
     print(f"Summary: {os.path.join(folder, 'summary.md')}")
 

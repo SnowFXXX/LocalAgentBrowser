@@ -6,7 +6,7 @@ import re
 from .config import COMPOSE_MAX_TOKENS, COMPOSE_RETRY_MAX_TOKENS, JOURNAL_BATCH, MAX_EVIDENCE_CHARS, MAX_JOURNAL_DETAIL_CHARS, MAX_JOURNAL_REASON_CHARS, MAX_THOUGHT_CHARS, MODEL, REPORT_FILE, VIEW_MAX_TOKENS
 from .prompts import (COMPOSE_SYSTEM, NO_RESULT, RESULT_FORMAT, RESULT_REPLY, RESULT_RETRY, RESULT_TOO_LONG, RESULT_UNCITED,
                       RESULT_UNFINISHED, UNFINISHED_NOTE)
-from .text import MISSING_STOPWORDS, NUMBER_WORDS, OPINION_REQUEST, SPELLED_NUMBERS, extract_message_content, plain_words, shorten, was_cut_off, with_digits, word_pairs
+from .text import MISSING_STOPWORDS, NUMBER_WORDS, OPINION_REQUEST, SPELLED_NUMBERS, extract_message_content, plain_words, reply_turn, shorten, was_cut_off, with_digits, without_control_characters, word_pairs
 from .pages import normalize_url
 from .grounding import code_text, invented_code
 from .checklist import checklist_lines
@@ -70,9 +70,15 @@ def read_research_log(path="research_log.txt"):
         checklist = json.loads(line.removeprefix("CHECKLIST: "))
     return objective.removeprefix("OBJECTIVE: "), checklist, json.loads(rest) if rest.strip() else []
 
-# Not a digit in a name ("sqlite3", "H2O", "CO2", "IPv6"): cutting invented numbers, a comparison result lost its
-# sentence naming the `sqlite3` tool, reported as the number "3"
-NUMBER_PATTERN = re.compile(r"(?<![A-Za-z_])\d+(?:[.,/]\d+)*")
+# Not a digit in a name ("sqlite3", "H2O", "CO2", "IPv6", "utf_8"): cutting invented numbers, a comparison result
+# lost its sentence naming the `sqlite3` tool, reported as the number "3". An underscore that opens markdown emphasis
+# is not part of a name: Nemotron 3 Super's "_5,895 m_ (_19,341 ft_)" was read as "895" and "9,341", and both heights
+# were cut as invented. (The digits after a name's first one are still read: a page's "S02E09" gives the 2 of a
+# right "Season 2", in Phi-4's SimpleQA answer to q136)
+NUMBER_START = r"(?<![A-Za-z])(?<![A-Za-z0-9]_)"
+NUMBER_PATTERN = re.compile(NUMBER_START + r"\d+(?:[.,/]\d+)*")
+# A list item's number after the end of the item before it on the same line ("... [1]. 2. Height"), not a claim
+INLINE_LIST_LABEL = re.compile(r"([.!?\]]\s+)\d{1,2}[.)]\s+(?=[A-Z*_#\"'(])")
 NAME_PART_BEFORE = re.compile(r"[A-Za-z]{2,}-$")
 NAME_PART_AFTER = re.compile(r"-[A-Za-z]{2,}")
 
@@ -81,8 +87,14 @@ def unverified_numbers(text, discoveries, objective=""):
 
     A small model writing a how-to filled a gap with an invented quantity ("45 grams of lukewarm water (about
     1/4 cup)"); numbers are where such errors do the most harm and the easiest place to check them.
+    The checks' own "Left out, because ..." notes are not the result's claims: the numbers they name as cut were
+    flagged again as numbers missing from the discoveries.
     """
-    text = re.sub(r"\[\d+(?:\s*[-–,;]\s*\d+)*\]", " ", str(text))  # Citation markers: [2], [4, 5], [1-4]
+    text = LEFT_OUT_NOTE.sub("", str(text))
+    # A numbered list written on one line: Gemini 3.8 Flash's "1. Tallest mountain ...: Mount Kilimanjaro [1]. 2.
+    # Height in meters: ..." had its "2" and "3" cut as invented, with a note that no discovery gives them
+    text = INLINE_LIST_LABEL.sub(r"\1 ", text)
+    text = re.sub(r"\[\d+(?:\s*[-–,;]\s*\d+)*\]", " ", text)  # Citation markers: [2], [4, 5], [1-4]
     # Numbered list items and headings ("#### 1. Setup"), bold ones too: "**1. Explain what goes into
     # photosynthesis:**" had its "1" taken for an invented number and cut, mangling the label
     text = re.sub(r"(?m)^\s*(?:#+\s*)?(?:[*_]{1,2})?\d+[.)]\s", " ", text)
@@ -118,16 +130,67 @@ def unverified_numbers(text, discoveries, objective=""):
         if number.replace(",", "") in known and (number.replace(",", ""), unit) not in durations \
                 and amount not in unverified:
             unverified.append(amount)
+    # A number keeps its unit: Gemma 3 4B's result gave a page's "173.8 °F" as "173.8 °C". Only a unit of the same
+    # kind that the discoveries give with that number counts against it; a number given there without a unit does not
+    measured = {(n.replace(",", ""), unit) for t in sources for n, unit in amounts_in(with_digits(t))}
+    for number, unit in amounts_in(with_digits(text)):
+        given = {u for n, u in measured if n == number.replace(",", "") and UNIT_KINDS[u] == UNIT_KINDS[unit]}
+        amount = f"{number} {unit}"
+        if given and unit not in given and amount not in unverified:
+            unverified.append(amount)
     return unverified
 
-DURATION = re.compile(r"(?<![A-Za-z_])(\d+(?:[.,/]\d+)*)((?:\s*(?:-|–|to|or|and)\s*\d+(?:[.,/]\d+)*)*)\s*"
-                      r"(minute|hour|day|week|month|year)s?\b", re.I)
+# Units of the same kind that one number can be mistaken between, each spelling to its symbol
+UNIT_SPELLINGS = {"°C": ("°c", "° c", "degrees c", "degree c", "degrees celsius", "degree celsius", "celsius"),
+                  "°F": ("°f", "° f", "degrees f", "degree f", "degrees fahrenheit", "degree fahrenheit", "fahrenheit"),
+                  "km": ("km", "kilometer", "kilometers", "kilometre", "kilometres"),
+                  "m": ("m", "meter", "meters", "metre", "metres"),
+                  "ft": ("ft", "feet", "foot"),
+                  "mi": ("mi", "mile", "miles"),
+                  "kg": ("kg", "kilogram", "kilograms"),
+                  "g": ("g", "gram", "grams"),
+                  "lb": ("lb", "lbs", "pound", "pounds"),
+                  "oz": ("oz", "ounce", "ounces")}
+UNIT_KINDS = {"°C": "temperature", "°F": "temperature", "km": "length", "m": "length", "ft": "length", "mi": "length",
+              "kg": "mass", "g": "mass", "lb": "mass", "oz": "mass"}
+UNIT_OF = {spelling: unit for unit, spellings in UNIT_SPELLINGS.items() for spelling in spellings}
+AMOUNT = re.compile(NUMBER_START + r"(?<![\d.,])(\d+(?:[.,]\d+)*)\s*(°\s*[CF]|degrees?\s+(?:celsius|fahrenheit|C|F)|"
+                    r"celsius|fahrenheit|kilomet(?:er|re)s?|km|met(?:er|re)s?|m|feet|foot|ft|miles?|mi|"
+                    r"kilograms?|kg|grams?|g|pounds?|lbs?|ounces?|oz)(?![A-Za-z])", re.I)
+
+def amounts_in(text):
+    """(number, unit symbol) for each temperature, length or weight given: "173.8 °F" gives ("173.8", "°F")."""
+    for match in AMOUNT.finditer(text):
+        yield match.group(1), UNIT_OF[" ".join(match.group(2).lower().split())]
+
+ASKS_FOR_STEPS = re.compile(r"\bsteps?\b|step-by-step|\bin order\b", re.I)
+# A numbered or bulleted list, "Step 1", or steps written out in a sentence ("The steps in order are: ...")
+GIVES_STEPS = re.compile(r"(?m)^\s*(?:#+\s*)?(?:[*_]{1,2})?(?:\d+[.)]|[-*•]\s|step\s*\d+)|"
+                         r"\bsteps?\b[^.\n]{0,40}?\b(?:are|is)\b", re.I)
+ORDER_WORDS = re.compile(r"\b(?:first|then|next|afterwards|finally)\b", re.I)
+
+def steps_missing(objective, text):
+    """True when the objective asks for steps and the result gives none: Llama 3.1 8B's cold brew results (1.66 and
+    1.67) gave what is needed and how long it keeps, and no step, without saying the steps were not found."""
+    if not ASKS_FOR_STEPS.search(str(objective)):
+        return False
+    text = LEFT_OUT_NOTE.sub("", str(text))
+    # The bullets of a "Not found in the pages read:" list are not steps
+    text = re.sub(r"(?im)^.*\bnot found\b[^\n]*:[ \t]*\n(?:[ \t]*[-*•][^\n]*\n?)*", "", text)
+    return not (GIVES_STEPS.search(text) or len(ORDER_WORDS.findall(text)) >= 2
+                or re.search(r"\bsteps?\b[^.\n]{0,60}\bnot (?:been )?(?:found|given|shown)", text, re.I))
+
+DURATION = re.compile(NUMBER_START + r"(\d+(?:[.,/]\d+)*)((?:\s*(?:-|–|to|or|and)\s*\d+(?:[.,/]\d+)*)*)\s*"
+                      r"(minute|min|hour|hr|day|week|wk|month|year|yr)s?\b", re.I)
+# A page's "steep for 10 mins" is the result's "10 minutes": the short forms are the same unit
+SHORT_UNITS = {"min": "minute", "hr": "hour", "wk": "week", "yr": "year"}
 
 def durations_in(text):
     """(number, unit) for each time given: "12 to 24 hours" gives both 12 and 24 as hours."""
     for match in DURATION.finditer(text):
+        unit = match.group(3).lower()
         for number in [match.group(1)] + NUMBER_PATTERN.findall(match.group(2)):
-            yield number, match.group(3).lower()
+            yield number, SHORT_UNITS.get(unit, unit)
 
 SPELLED_AMOUNT = re.compile(r"\b(" + "|".join(SPELLED_NUMBERS) + r")\s+(?:minute|hour|day|week|month|year|cup|ounce|"
                             r"gram|tablespoon|teaspoon|liter|litre|quart|pound|meter|metre|foot|feet|mile|kilometer|"
@@ -218,15 +281,71 @@ def without_missing_citations(text, count):
 
 CITATION = re.compile(r"\[\d+(?:\s*[-–,;]\s*\d+)*\]")
 MATCHED_LINE_SHARE = 0.5  # Share of a line's word pairs that must be in one discovery for the code to cite it
+
+# The asking words of a checklist item, not what it is about
+ASKING_WORDS = MISSING_STOPWORDS | {"list", "give", "say", "explain", "describe", "name", "find", "determine", "what",
+                                    "which", "how", "who", "when", "where", "does", "did", "this", "that", "each",
+                                    "your", "own"}
+SAYS_NOT_FOUND = re.compile(r"\bnot (?:been )?(?:found|mentioned|given|stated|specified|provided|shown)\b|"
+                            r"\bno (?:information|mention)\b", re.I)
+
+def answered_in_result(item, text):
+    """True when a sentence of the result that cites a discovery has most of a checklist item's words (by their
+    first five letters) and does not itself say something was not found. The coverage check had called the item
+    unanswered, yet Phi-4's SimpleQA result gave "from 12 July 1985 until his retirement on 20 December 1986 [1]"
+    and then listed the start and end dates as not found (16 such lines in 76 saved results with the list)."""
+    wanted = {w[:5] for w in plain_words(item) if len(w) > 2} - {w[:5] for w in ASKING_WORDS}
+    if len(wanted) < 2:
+        return False
+    for sentence in re.split(r"(?<=[.!?])\s+|\n", LEFT_OUT_NOTE.sub("", str(text))):
+        if CITATION.search(sentence) and not SAYS_NOT_FOUND.search(sentence):
+            if len(wanted & {w[:5] for w in plain_words(sentence)}) >= max(2, (len(wanted) + 1) // 2):
+                return True
+    return False
 MIN_MATCHED_PAIRS = 4  # Shorter lines ("**Setup:**") are not cited by the code
 SENTENCE_OPENERS = {"the", "this", "these", "that", "those", "its", "it's", "both", "each", "here", "there", "they",
                     "you", "your", "for", "with", "when", "while", "after", "before", "then", "also", "and", "but",
                     "however", "use", "using", "all", "some", "most", "one", "two", "three", "step", "note"}
 
 SECTION_START = re.compile(r"\s*(?:#+\s|\d+[.)]\s|\*\*\d)")
-SECTION_SHARE = 0.8  # Share of a line's content words that must be in one discovery its section cites
+# Share of a line's content words that must be in one discovery its section cites. Replayed on 326 saved raw results
+# (headings, questions, views and not-found lines skipped): lines at 0.75-0.8 lacked only joining words ("offer",
+# "while", "including"); lines at 0.70-0.75 added claims of their own ("SQL92", "absorbed by pigments")
+SECTION_SHARE = 0.75
 SECTION_STOPWORDS = {"this", "that", "these", "which", "into", "used", "uses", "also", "such", "process", "details",
                      "inputs", "outputs", "main", "strengths", "supporting", "discovery", "discoveries"}
+
+VIEW_REPEAT_SHARE = 0.9  # Share of a view paragraph's word pairs (the objective's left out) already in the result
+
+def with_repeated_view_labelled(text, view_pairs):
+    """The result with "My view: " before the plain paragraph holding most of a view the model copied from it
+    (on 1.63 the 7B's view repeated its result's own recommendation word for word, which then stayed unlabelled)."""
+    paragraphs = str(text).split("\n\n")
+    shares = [len(view_pairs & word_pairs(p.lower())) / len(view_pairs) if view_pairs else 0 for p in paragraphs]
+    best = max(range(len(paragraphs)), key=shares.__getitem__) if paragraphs else None
+    # Not the first paragraph: that holds the findings, and labelling a one-paragraph result would mark them as opinion
+    if not best or shares[best] < VIEW_REPEAT_SHARE or LIST_OR_TABLE.match(paragraphs[best]) \
+            or re.match(r"\W*my view\b", paragraphs[best], re.I):
+        return text
+    paragraphs[best] = "My view: " + paragraphs[best].lstrip()
+    return "\n\n".join(paragraphs)
+
+# Not "not shown": the code's own caveat ("(not shown in the pages read to be free)") sits on a real, cited claim
+NOT_FOUND_LINE = re.compile(r"\bnot (?:been )?(?:found|mentioned|given|stated|specified|provided)\b|\bno (?:information|"
+                            r"mention)\b", re.I)
+
+def heading_like(line, opens_section=False):
+    """A line that heads or asks rather than states, so the code never cites it: a line all in bold ("**3. Compare
+    SQLite and PostgreSQL ...: features**"), a question ("How do I make cold brew coffee at home?", the objective's
+    own), or a numbered title without a full stop over lines of its own ("2. **Activating a Virtual Environment on
+    Windows**"). Replayed on 326 saved results, such lines got citations whichever SECTION_SHARE was tried."""
+    bare = re.sub(r"^\s*(?:#+\s*|\d+[.)]\s*|[-*]\s+)", "", line).strip()
+    if re.fullmatch(r"(?:\*\*|__)[^*_].*?(?:\*\*|__):?", bare) or bare.rstrip("*_ ").endswith("?"):
+        return True
+    # Nor the model's own view, nor a line saying something was not found: neither comes from a discovery
+    if re.match(r"\W*my view\b", bare, re.I) or NOT_FOUND_LINE.search(bare):
+        return True
+    return opens_section and SECTION_START.match(line) is not None and not re.search(r"[.!]\W*$", bare)
 
 def section_words(text):
     return {w.rstrip("s") for w in plain_words(text) if len(w) > 2 and not w.isdigit()} - MISSING_STOPWORDS - SECTION_STOPWORDS
@@ -247,6 +366,8 @@ def with_section_citations(text, discoveries):
         for i in range(begin, end) if cited else ():
             line = lines[i]
             if CITATION.search(line) or line.strip().rstrip("*_ ").endswith(":") or line.lstrip().startswith("#"):
+                continue
+            if heading_like(line, opens_section=i == begin and any(x.strip() for x in lines[i + 1:end])):
                 continue
             words = section_words(line)
             if len(words) < 3:
@@ -555,6 +676,9 @@ def write_report(objective, journal, checklist=None, stop_reason=None):
         if code:
             warnings.append(f"> ⚠️ Commands not found in the recorded discoveries: {', '.join(f'`{c}`' for c in code)}. "
                             "Check them before running them.")
+        if steps_missing(objective, final):
+            warnings.append("> ⚠️ The objective asks for steps, and this result gives none and does not say they were "
+                            "not found. See the discoveries below.")
         if notes or warnings:
             answer += "\n\n" + CHECKED_POINTER
         lines += [f"**Status:** finished by the agent on turn {finish.get('turn')}", "", "## Final result", "", answer]
@@ -658,7 +782,7 @@ async def compose_final_result(client, objective, journal, checklist=None, not_f
     # Asked once more when the reply is not a result: a 3B model "finished" a how-to with its own prompt repeated
     # back (the objective, the checklist and the discoveries), and a result still in JSON is not one either
     if not usable_result(text):
-        retry = messages + [{"role": "assistant", "content": extract_message_content(response)},
+        retry = messages + [reply_turn(extract_message_content(response)),
                             {"role": "user", "content": RESULT_RETRY}]
         response = await client.chat.completions.create(model=MODEL, messages=retry, temperature=0.3,
                                                         max_tokens=COMPOSE_MAX_TOKENS, response_format=RESULT_FORMAT)
@@ -673,7 +797,7 @@ async def compose_final_result(client, objective, journal, checklist=None, not_f
     if text != NO_RESULT and (was_cut_off(response) or ends_mid_sentence(text)):
         ending = shorten(" ".join(text.split()[-8:]), 80)
         ask = RESULT_TOO_LONG if was_cut_off(response) else RESULT_UNFINISHED
-        retry = messages + [{"role": "assistant", "content": extract_message_content(response)},
+        retry = messages + [reply_turn(extract_message_content(response)),
                             {"role": "user", "content": ask.replace("{ending}", ending)}]
         response = await client.chat.completions.create(model=MODEL, messages=retry, temperature=0.3,
                                                         max_tokens=COMPOSE_RETRY_MAX_TOKENS, response_format=RESULT_FORMAT)
@@ -725,11 +849,19 @@ async def compose_final_result(client, objective, journal, checklist=None, not_f
         if at > 0:
             paragraph = paragraph[at:].strip()
         # Asked for its view after a result that already recommended SQLite ("I recommend using SQLite"), Llama
-        # wrote the whole result again under "My view:"; a paragraph mostly repeating the result is left out
-        mine = word_pairs(paragraph.lower()) if paragraph else set()
-        repeated = bool(mine) and len(mine & word_pairs(text.lower())) >= 0.5 * len(mine)
+        # wrote the whole result again under "My view:"; a paragraph repeating the result is left out. The
+        # objective's own words don't count: real views share them with the result ("for a hobby project with a
+        # few hundred users"), and at 0.5 with them counted, 2 of 34 saved views were dropped and their results
+        # ended with no view at all (Gemma 3 4B's owls on 1.66, the 7B's comparison on 1.67). Repeats score 0.95+.
+        # Nor does the "My view:" label itself, which a short copied paragraph would otherwise be told apart by
+        said = re.sub(r"^\W*my view\W*", "", paragraph, flags=re.I) if paragraph else ""
+        mine = (word_pairs(said.lower()) - word_pairs(objective.lower())) if said else set()
+        repeated = bool(mine) and len(mine & word_pairs(text.lower())) >= VIEW_REPEAT_SHARE * len(mine)
         if paragraph and usable_result(paragraph) and not repeated:
             text += "\n\n" + (paragraph if paragraph.lower().startswith("my view:") else f"My view: {paragraph}")
+        elif repeated:
+            # A view copied from one paragraph of the result says which paragraph is the view: label it there
+            text = with_repeated_view_labelled(text, mine)
     # Before the code's own notes are added: a checklist item's text may hold a number ("Name 5 tools")
     # After the filled gaps are cut, so "does not specify how long it keeps, but ... within 1-2 weeks" keeps its gap
     if text != NO_RESULT:
@@ -745,7 +877,8 @@ async def compose_final_result(client, objective, journal, checklist=None, not_f
         working = span_working(text, found, objective)
         if working:
             text += "\n\n" + working
-    # Reported by the code as well, whatever the result says
+    # Reported by the code as well, unless the result answers the item from a cited discovery anyway
+    unfound = [t for t in unfound if not answered_in_result(t, text)] if text != NO_RESULT else unfound
     unfound_lines = ([f"- {t}" for t in unfound] + [f"- {t}: the amounts it asks for" for t in amountless]
                      + [f"- {t}: none of the {in_words(wanted)} were found" if not k else
                         f"- {t}: {in_words(wanted - k)} more (only {in_words(k)} of the {in_words(wanted)} were found)"
@@ -780,20 +913,36 @@ FILLED_GAP = re.compile(r"((?:not (?:\w+ )?(?:been )?(?:specified|mentioned|stat
                         r"(?:specify|say|mention|state))[^.\n]{0,100}?),?\s+but\b[^\n]*?(?:\.(?=\s+[A-Z]|\s*$)|(?=\n)|$)",
                         re.I)  # The sentence ends at a period before a capital or the end ("e.g., 1 cup" stays inside it)
 
-VIEW_HEADING = re.compile(r"^[ \t]*#+[ \t]*[*_]*[ \t]*(?:my\s+)?(?:recommendation|opinion|view|verdict|conclusion)\b[^\n]*\n+",
-                          re.I | re.M)
+# Numbered too: Phi-4's 1.66 comparison headed its advice "#### 4. Recommendation for a Hobby Project ..."
+VIEW_HEADING = re.compile(r"^[ \t]*#+[ \t]*[*_]*[ \t]*(?:\d+[.)][ \t]*)?(?:my\s+)?(?:recommendation|opinion|view|verdict|"
+                          r"conclusion)\b[^\n]*\n+", re.I | re.M)
+LIST_OR_TABLE = re.compile(r"\s*(?:[-*|#]|\d+[.)]\s)")
 
 def with_view_labelled(text):
     """The result with a section headed as a recommendation or opinion labelled 'My view:' in place of its heading:
     a comparison put "### Recommendation for a Hobby Project" ahead of its uncited advice, and the view paragraph
-    then asked for repeated it and was left out, so the advice stayed unlabelled as the model's own."""
+    then asked for repeated it and was left out, so the advice stayed unlabelled as the model's own. When the
+    heading opens a list, the section's first plain paragraph after it is the view: Phi-4's 1.67 comparison listed
+    both databases and then wrote "Given the requirements ..., PostgreSQL is recommended" under no label."""
     heading = VIEW_HEADING.search(str(text))
     if not heading:
         return text
     rest = text[heading.end():]
-    if not rest.strip() or rest.lstrip().startswith(("#", "-", "*", "|")):
+    if not rest.strip():
         return text
-    return text[:heading.start()] + "My view: " + rest.lstrip()
+    if not LIST_OR_TABLE.match(rest):
+        # A paragraph already labelled keeps its own label ("My view: My view: ..." in five 1.63 results)
+        body = rest.lstrip()
+        return text[:heading.start()] + ("" if re.match(r"\W*my view\b", body, re.I) else "My view: ") + body
+    if re.search(r"(?im)^\W*my view\b", rest):
+        return text
+    section_end = re.search(r"(?m)^[ \t]*#", rest)
+    section = rest[:section_end.start()] if section_end else rest
+    for block in re.finditer(r"[^\n]+(?:\n[^\n]+)*", section):
+        if block.group().strip() and not LIST_OR_TABLE.match(block.group()):
+            at = heading.end() + block.start() + len(block.group()) - len(block.group().lstrip())
+            return text[:at] + "My view: " + text[at:]
+    return text
 
 def without_filled_gaps(text):
     """The final result with what follows "not stated ..., but" cut: the gap stays reported, the filling goes."""
@@ -865,7 +1014,7 @@ def without_echoed_prompt(text):
 def result_text(raw):
     """The text of a final-result reply: the "result" field, read leniently (a server may ignore the format, and a
     reply cut off at the token limit is not valid JSON), without prompt sections the reply repeated back."""
-    return without_repeated_sections(without_echoed_prompt(raw_text(raw)))
+    return without_repeated_sections(without_echoed_prompt(without_control_characters(raw_text(raw))))
 
 LEFTOVER_HEADING = re.compile(r"^#+\s*\**\s*(?:summary|recap|in summary|overview|results?|conclusion)\s*\**:?\s*$", re.I)
 SAME_HEADING_SIZE = 0.75  # The smaller heading's words, as a share of the larger's, for two to be the same part
@@ -986,7 +1135,24 @@ def without_echoed_objective(text, objective):
     line = " ".join(first.split())
     if goal and line.lower().startswith(goal.lower()) and len(line) > len(goal) + 40:
         return (line[len(goal):].lstrip(" .:?") + ("\n" + rest if rest.strip() else "")).strip()
+    # One sentence of the objective as the opening, as a question or a heading, with a citation stuck to it: Gemma's
+    # cold brew results began "How do I make cold brew coffee at home? [2]" (7 of 972 saved results did so)
+    asked = {echo_words(s) for s in re.split(r"(?<=[.!?])\s+", str(objective)) if s.strip()}
+    lead = ECHOED_SENTENCE.match(str(text))
+    if lead and echo_words(lead.group("sentence")) in asked - {""}:
+        after = str(text)[lead.end():].strip()
+        if len(after) >= MIN_ANSWER_AFTER_ECHO:
+            return after
     return text
+
+# A result's first sentence (up to ".", "!" or "?" before a space, or the line's end), a heading mark before it and a
+# citation after it
+ECHOED_SENTENCE = re.compile(r"\s*(?:#+[ \t]*)?(?P<sentence>[^\n]*?[.!?](?=\s|$)|[^\n]+)"
+                             r"(?:[ \t]*\[\d+(?:\s*[-–,;]\s*\d+)*\])?")
+MIN_ANSWER_AFTER_ECHO = 20  # Less is no answer: SimpleQA's "What EP did Rosalía release in 2019? [1]" stays as it was
+
+def echo_words(sentence):
+    return " ".join(re.sub(r"[*_#]", " ", str(sentence)).lower().split()).strip(" .:?")
 
 # "X is not specified", "X was not found": the result saying the discoveries lack something
 # "These reactions do not specify a particular location" slipped past the passive form only

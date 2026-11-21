@@ -15,6 +15,35 @@ def discoveries(*texts):
     return [{"action": "DISCOVER", "extracted_data": t} for t in texts]
 
 
+class RolesDoNotAlternate(Exception):
+    """What a strict chat template answers (LM Studio, Gemma 3: "400 - Conversation roles must alternate")."""
+
+
+def roles_alternate(messages):
+    """Refuses a request whose turns don't go system (optional), user, assistant, user, ... and end with the user,
+    as Gemma's chat template does: the agent's cut-off retry once sent two user messages in a row, and every
+    Gemma task that hit it ended. Checked on every fake call, so no path can do it again unnoticed."""
+    roles = [m["role"] for m in messages if m["role"] != "system" or messages.index(m) > 0]
+    if roles and roles[0] == "system":
+        raise RolesDoNotAlternate(f"a system message after the first: {roles}")
+    expected = ["user" if i % 2 == 0 else "assistant" for i in range(len(roles))]
+    if roles != expected or not roles or roles[-1] != "user":
+        raise RolesDoNotAlternate(f"Conversation roles must alternate user/assistant/user/assistant/...: {roles}")
+
+
+class EmptyTurn(Exception):
+    """What Mistral's and Cohere's services answer to a turn with no text (400 "Assistant message must have either
+    content or tool_calls")."""
+
+
+def no_empty_turns(messages):
+    """Refuses a request with a turn that has no text, as Mistral's and Cohere's services do: the coverage retry sent
+    a thinking model's empty reply back, and every such check failed. Checked on every fake call, like the roles."""
+    empty = [m["role"] for m in messages if not str(m.get("content") or "").strip()]
+    if empty:
+        raise EmptyTurn(f"a turn with no text: {empty}")
+
+
 class FakeCompletions:
     """Scripted replacement for client.chat.completions: returns the given replies in order and records
     the full message list of every call."""
@@ -24,6 +53,8 @@ class FakeCompletions:
         self.limits = []  # max_tokens of every call
 
     async def create(self, **kwargs):
+        roles_alternate(kwargs["messages"])
+        no_empty_turns(kwargs["messages"])
         self.calls.append([dict(m) for m in kwargs["messages"]])
         self.limits.append(kwargs.get("max_tokens"))
         if self.prompt_tokens is None:  # Estimate from the prompt size, like a real server would report
@@ -62,6 +93,7 @@ class FakeSite:
     def __init__(self, pages, results, statuses=None):
         self.pages, self.results = pages, results
         self.statuses = statuses or {}  # {url: HTTP status} for pages that answer with an error
+        self.followed = []  # The browser following the agent (follow.py): (url, texts, highlight, scroll, tint)
         self.visits = []
 
     def playwright(self):
@@ -96,6 +128,9 @@ class FakeSite:
 
             async def evaluate(self, js, *args):
                 text, links = site.pages.get(self.url.split("#")[0].rstrip("/"), ("", []))
+                if "labFollow" in js:  # The browser following the agent: recorded, changes nothing
+                    site.followed.append((self.url, *args[0]))
+                    return True
                 if "result__a" in js:
                     return site.results if "duckduckgo" in self.url else []
                 if "blockStart" in js:

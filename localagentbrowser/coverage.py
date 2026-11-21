@@ -7,13 +7,13 @@ from .config import (COVERAGE_MAX_TOKENS, COVERAGE_RETRY_MAX_TOKENS, MAX_CONDITI
                      MAX_THING_NAME_WORDS, MODEL)
 from .prompts import (CITED_FORMAT, CITED_QUESTION, COVERAGE_FORMAT, COVERAGE_ITEM_CHECK, COVERAGE_QUOTE, COVERAGE_SHORTER,
                       SYSTEM_PROMPT)
-from .text import MISSING_STOPWORDS, OPINION_REQUEST, asked_count, extract_message_content, plain_words, word_pairs
+from .text import MISSING_STOPWORDS, OPINION_REQUEST, asked_count, extract_message_content, plain_words, reply_turn, word_pairs
 from .pages import ITEM_VERBS
 from .dates import SPAN_QUESTION, dates_in
 
 UNANSWERED_GAP = "nothing in DISCOVERIES SO FAR answers it"
 UNCHECKED_NOTE = "not checked (not counted as covered)"
-COVERAGE_RETRY_LINE = "↻ A coverage reply was not complete JSON (cut off or malformed); asking once more, with a higher limit."
+COVERAGE_RETRY_LINE = "A coverage reply was not complete JSON (cut off or malformed); asking once more, with a higher limit."
 # Items asking for amounts, and what an amount looks like: a cold brew result listed "coffee beans, water, a strainer"
 # for "what I need with the quantities" without saying no quantities were found, and the check's own "missing
 # quantities" verdicts were too often wrong to report (they named things the discoveries had)
@@ -176,7 +176,7 @@ async def coverage_reply(client, messages):
         return response, json.loads(text)
     except ValueError:
         print(COVERAGE_RETRY_LINE)
-    retry = messages + [{"role": "assistant", "content": text}, {"role": "user", "content": COVERAGE_SHORTER}]
+    retry = messages + [reply_turn(text), {"role": "user", "content": COVERAGE_SHORTER}]
     response = await client.chat.completions.create(
         model=MODEL, temperature=0.2, max_tokens=COVERAGE_RETRY_MAX_TOKENS, response_format=COVERAGE_FORMAT,
         messages=retry)
@@ -218,7 +218,7 @@ async def coverage_gaps(client, objective, checklist, journal, only=None, eviden
             # it must give words that are in the discoveries, or the item counts as unanswered.
             if is_bare_citation(verdict.get("evidence", "")):
                 bare = str(verdict["evidence"])
-                messages += [{"role": "assistant", "content": extract_message_content(response)},
+                messages += [reply_turn(extract_message_content(response)),
                              {"role": "user", "content": COVERAGE_QUOTE.format(n=n)}]
                 response, verdict = await coverage_reply(client, messages)
                 cited = [found[int(c) - 1]["extracted_data"] for c in re.findall(r"\[(\d+)\]", bare)
@@ -257,7 +257,7 @@ async def coverage_gaps(client, objective, checklist, journal, only=None, eviden
         except Exception as err:
             # Not checked is not covered: it sends no one back and adds no "not found" line (nothing says the item is
             # unanswered), but the report shows it, so a reader knows this part was never verified
-            print(f"⚠️ Coverage check of item {n} failed ({err}); {UNCHECKED_NOTE}.")
+            print(f"Warning: Coverage check of item {n} failed ({err}); {UNCHECKED_NOTE}.")
             item["unchecked"] = True
             if unchecked is not None:
                 unchecked.add(n)
@@ -427,7 +427,7 @@ async def coverage_refusal(client, objective, tried, journal):
     tried["coverage_checked"] = True
     tried["coverage_at"] = len(journal)
     if any(e.get("action") == "DISCOVER" for e in journal):
-        print("🔎 Checking each checklist item against the discoveries before finishing...")
+        print("Checking each checklist item against the discoveries before finishing...")
         gaps, tried["unanswered"], unproven = await coverage_gaps(client, objective, checklist, journal,
                                                                     evidence=tried.setdefault("evidence", {}),
                                                                     unchecked=tried.setdefault("unchecked", set()))
@@ -462,7 +462,7 @@ async def coverage_refusal(client, objective, tried, journal):
             or g.startswith("Nothing has been recorded") or g.endswith(AMOUNT_GAP) or g.startswith("The objective asks")
             or g.endswith(CONFIRMED_MISSING + ")")]
     if gaps:
-        print("⚠️ Gaps found:\n" + "\n".join(f"   - {g}{'' if g in hard else ' (not sent back)'}" for g in gaps))
+        print("Gaps found:\n" + "\n".join(f"   - {g}{'' if g in hard else ' (not sent back)'}" for g in gaps))
     gaps = hard
     if not gaps:
         return None
@@ -577,7 +577,7 @@ async def not_found_items(client, objective, tried, journal):
     rechecked = sorted(set(candidates) | set(tried.get("unproven_items") or []) | set(short))
     if not rechecked or not any(e.get("action") == "DISCOVER" for e in journal):
         return candidates, []
-    print(f"🔎 Checking checklist item(s) {', '.join(map(str, rechecked))} once more before writing the final result...")
+    print(f"Checking checklist item(s) {', '.join(map(str, rechecked))} once more before writing the final result...")
     gaps, unanswered, unproven = await coverage_gaps(client, objective, checklist, journal, only=set(rechecked),
                                                      evidence=tried.setdefault("evidence", {}),
                                                      unchecked=tried.setdefault("unchecked", set()))

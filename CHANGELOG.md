@@ -8,9 +8,154 @@ Q4_K_M in LM Studio), where reading the prompt takes about 90% of every model ca
 
 ## [Unreleased]
 ### Changed
+- **Setup's shortcuts open the Windows UI**; a "(classic console)" Start menu entry opens the console. The cloud
+  shortcut opens the UI with the cloud box ticked. The tick is never kept, so nothing leaves the PC unless the box
+  is ticked in that window (by the cloud shortcut, or by you). Uninstalling also removes the UI's saved choices.
+- **The Clean Room check also reads .html, .js and .css files** for cloud wording.
 - **The regression suite gives every task 90 minutes by default** (`--minutes` still sets another limit), and each
   run records its limit in run_info.json, summary.json and the summary's first line. The tasks' own limits of 25 to
   60 minutes are gone: a 1.67 run started without `--minutes 90` by mistake was cut short by them.
+- **The console shows plain text instead of emoji**, which some Windows consoles draw as boxes. Problems start with
+  "Warning:" or "Error:". The prompts the model reads and the report are unchanged.
+- **Clean Room's console window is titled "LocalAgentBrowser Clean Room"**, so the two editions are told apart.
+- **Setup says when the model may still be downloading** in LM Studio, on its last page.
+- **`installer\build.ps1` stops if the code has uncommitted changes**, so a setup file always matches the commit its
+  build record names.
+- **The regression suite waits up to 30 seconds for the model list, and tries once more** if it doesn't come.
+
+### Added
+- **The Windows UI, on by default on Windows**: LocalAgentBrowser in a window of its own, in the website's colours,
+  instead of a console. The start screen takes the objective and the choices (model from LM Studio's list, time
+  limit, reports folder) and lists recent reports. While the agent works, the live view shows what it is doing (the
+  checklist as chips that light up as items are found, a card per action, refusals by the checks included, and a
+  timer while the model thinks), and when it ends the report appears in place. Stop, and the time limit, end a run
+  even while the model is working, and its report says why. Minimized, it goes to the notification area, whose menu
+  opens the window, starts a new research, opens a recent report, stops the run or opens the reports folder. The window
+  is the agent's own Chromium showing a local page: nothing is fetched for it, in either edition. Each research runs
+  as its own process, with its console text saved as console.txt in its run folder.
+- **A choice of cloud model on the start screen**, when cloud models are on: a menu of our recommendations (models
+  that also finished the whole test suite, Phi-4 first), then the other 58 models that passed every check of the
+  compatibility test, each with a note of what was measured, and "Another model..." for any OpenRouter model ID. The
+  model picked is kept for next time; the cloud tick still never is. Setup's cloud model stays the default.
+- **Classic mode stays one switch away**: "Classic console" in the UI opens the console and keeps it as the choice;
+  typing `/ui` as the objective there switches back. `pip install` (Linux, macOS) gets classic mode, as before;
+  `localagentbrowser-ui` opens the Windows UI.
+- **The agent's browser follows what the agent reads**: on READ_MORE it scrolls to the part now read, and each recorded
+  discovery is highlighted on the page in mint. The page's text is unchanged (the browser's own highlights), so what
+  the agent reads is the same with it on or off (`LAB_FOLLOW=0`).
+- **A watch window for test runs**: the regression suite, the compatibility test and SimpleQA show the Windows UI's
+  live view of each task on the left, beside the agent's browser on the right (the compatibility test's quick checks
+  too), then each task's report. Until now only the browser was seen: the console text was there, behind it. Each
+  task's events go to a file in Temp, so its output and run folder are unchanged; it opens only from a launcher's
+  console window, and `LAB_WATCH=0` turns it off (the test-run browser then stays as before, for timed runs).
+- **Classic mode in colour**: turn headers, action tags, discoveries, warnings and refusals in the website's palette,
+  in a console window only (piped output is plain; `NO_COLOR` or `LAB_COLOR=0` turns it off).
+- **A compatibility test for any model** (`tools/compat.py`), quick and cheap: about ten model calls on a fixed page
+  (split the question, choose an action on search results, record a finding that passes the grounding check, check
+  coverage, write a cited result, write a view, and a reply cut off at its limit retried), then one live task with
+  the browser (the suite's factual question). A model is "compatible" when every check passes and the live task
+  finishes with a cited result; "compatible, with limits" when the live task passes but a quick check failed (named);
+  "did not finish in N minutes" when the live task's time limit stopped it with no other hard failure; and "not
+  compatible" on an error, a reply with no valid JSON, no result, a refused retry, or a failed live task. The live
+  task gets 90 minutes for a model in LM Studio (on a CPU, half the first local run's models needed more than 30) and
+  30 in the cloud; `--minutes` sets another. In LM Studio it downloads a model for the test, and deletes it after unless
+  it was on the PC already; with `--cloud` it tests OpenRouter models within a budget (`--budget`), reading the cost of
+  each from OpenRouter.
+- **The regression suite counts silent omissions** ([issue #11](https://github.com/SnowFXXX/LocalAgentBrowser/issues/11)):
+  an expected part the final result lacks without a sentence saying it was not found. Each is "dropped" when a
+  discovery had it (found, then lost while the result was written) or "never found" when none did. It is a problem
+  line ("left out without a word: ...") and a column of the honesty table. On the 395 saved finished suite results:
+  103 silent omissions in 78 results, 23 dropped and 80 never found; the most common are the Windows activation
+  command (22), "pip install" (13) and the steeping time in hours (11).
+- **The docs task expects the Windows activation command** (`Scripts\activate`), not only "activate", which the
+  macOS and Linux command met: 25 of its 55 saved results gave no Windows command (issue #11's first case).
+- **A timer counts the seconds of a long model call** on the console ("Waiting for the model: 42 s"), so a run on a
+  CPU no longer looks frozen. It shows after 3 seconds, on one line that clears when the reply comes, and only in a
+  console window: a run whose output goes to a file gets no timer lines.
+- **A dialog when LM Studio isn't running**: the Windows shortcut shows what to do, with Retry (check again) and
+  Cancel, instead of a console message and closing.
+- **A result asked for steps that gives none is flagged** in the report's "Checked by the code" section, and the
+  regression suite lists it as a problem ("asked for steps, gives none"). Llama 3.1 8B's cold brew results on 1.66
+  and 1.67 gave what is needed and how long it keeps, but no step, without saying the steps were not found. On the
+  56 saved results asked for steps, it flags those two and no other.
+
+### Fixed
+- **A numbered list in the report page keeps its numbers** when an indented answer follows each item, as models
+  often write a final result: each item was shown as "1.".
+- **Models that think before they answer get room to think.** A reply stopped at its length limit with no answer in
+  it is a model that spent the whole limit thinking: Granite 4.2 8B, Nemotron 3.5 Lightning, Mistral Large 4 and
+  Command A+ used all 300 tokens of the checklist split on it, and their tasks failed or lost steps. From the first
+  such reply on, every call gets 4,000 more tokens, so the limit still bounds the answer, not the thinking. In the
+  compatibility test's complete rerun, those four and Qwen3.6 35B and Qwen3.7 Plus (whose final results had come
+  back empty) all finished the live task.
+- **An empty reply is never sent back empty.** Mistral's and Cohere's services refuse a turn with no text ("Assistant
+  message must have either content or tool_calls"): after a thinking model's empty reply, the coverage retry sent it
+  back, and each check failed after about 4 minutes of retries. A short stand-in takes its place. The tests' fake
+  model now refuses a turn with no text, on every path.
+- **A reply object with no reply in it is tried again** like a server error, then ends the task with a clear reason:
+  DeepSeek V3.2's provider answered so while failing, and reading it crashed the task.
+- **A number in underscore emphasis is read whole**: Nemotron 3 Super's "_5,895 m_ (_19,341 ft_)" was read as "895"
+  and "9,341", and both right heights were cut as invented. On the 894 saved final results, none is flagged
+  differently.
+- **A JSON reply wrapped in a code fence is read** ("```json ... ```"): MiniMax M2.7 wrapped every reply so, its
+  checklist split could not be read, and its final result was cut to nothing. A fence around anything else is kept.
+- **A numbered list written on one line keeps its item numbers**: Gemini 3.8 Flash's "... [1]. 2. Height in
+  meters: ..." had its "2" and "3" cut as invented numbers. On the 929 saved final results, none is flagged
+  differently.
+- **Cloud: a model whose only provider takes JSON but not a JSON schema is asked for plain JSON** (Qwen3.7 Flash),
+  which the agent reads the same way. Its live task finished in the compatibility test.
+- **A reply cut off at the length limit no longer ends the task on models whose chat template needs alternating
+  turns.** The retry put its correction straight after the prompt, two user messages in a row, and LM Studio
+  refused it for Gemma 3 4B (error 400): three of the 1.67.2 Gemma run's tasks ended so. The correction now follows a
+  short stand-in for the cut reply. Checked live on Gemma 3 4B: two user messages in a row are refused, and three
+  cut-off retries in a row are accepted. The tests' fake model now refuses any request whose turns don't alternate,
+  on every path.
+- **A cut-off DISCOVER is asked for a shorter DISCOVER, and a cut-off FINISH stands.** In the saved runs, 34 of 74
+  turn replies cut off at the limit were cut off again after the general "reply again, shorter" note. Opus 5.5 copied
+  long passages into DISCOVER, and wrote whole answers into FINISH's parameter, which is never used (the final result
+  is written from the discoveries in its own step). Checked live on Gemma 3 4B, with the turn limit forced down to
+  200 tokens so its first DISCOVER on an owl page was cut off: answered with the general note, it left the page and
+  searched again 4 times of 4; with the DISCOVER note, it recorded a shorter DISCOVER (56 to 71 words) 4 times of 4.
+- **A finding the page states that starts with "When", "Where" or "How" is no longer refused as "only asks
+  questions"** (the 1.67 7B's "When used from within a virtual environment, ... pip will install ..."). A sentence
+  copied from the page shown, of six words or more and not ending in "?", is the page's statement.
+- **An item the result answers from a cited discovery is no longer also listed as "Not found in the pages read"**.
+  Phi-4's SimpleQA result gave a judge's tenure "from 12 July 1985 until his retirement on 20 December 1986 [1]" and
+  then listed the start and end dates as not found. A cited sentence with most of the item's words, that does not
+  itself say something was not found, counts as the answer: 14 of 69 such lines in the saved results.
+- **A checklist part that only continues the one before it is joined back to it**: one question split so that "at
+  the summit of Mount Everest" was an item of its own, which no discovery answers alone, and it blocked finishing;
+  Llama split SimpleQA questions the same way ("Who won the gold medal" / "in men's foil"). A part starting with a
+  word like "at", "in" or "of" that asks nothing of its own is a fragment: all 9 such parts in 2,443 saved
+  checklist items were.
+- **A result that opens with one of the objective's own sentences has it left out**, as a question or a heading,
+  with a citation stuck to it: Gemma 3 4B's cold brew results began "How do I make cold brew coffee at home? [2]".
+  Kept when nothing of substance follows. 8 of 972 saved results change.
+- **A view asked for after the result is kept unless it repeats the result** (0.9 of its word pairs, not 0.5, and
+  not counting the objective's own words or the "My view:" label). At 0.5, real views that shared the objective's
+  wording ("for a hobby project with a few hundred users") were dropped, and their results ended with no view at all:
+  6 of 34 saved views, among them Gemma 3 4B's owls on 1.66 and the 7B's comparison on 1.67. The 7 views that copied
+  the whole result are still left out. A view copied from a later paragraph of the result labels that paragraph.
+- **The code no longer cites headings, questions, the model's view or "not found" lines to a discovery**, and its
+  threshold for citing a line by its section is 0.75 instead of 0.8. Replayed on 326 saved raw results against the
+  old code: 12 citations go, every one on a heading or a question ("How do I make cold brew coffee at home? [1]");
+  11 are added, every one a line whose words are in the discovery but for joining words ("offer", "while"). Lines
+  between 0.70 and 0.75 added claims of their own ("SQL92"), so the threshold stops there.
+- **The model's recommendation is labelled "My view:" in more of the ways it heads it**: a numbered heading ("#### 4.
+  Recommendation ...", Phi-4 on 1.66), and a list under the heading with the advice in a paragraph after it (Phi-4 on
+  1.67). A paragraph already starting "My view:" under such a heading no longer becomes "My view: My view:" (11 of
+  the saved results would have). On the saved results, 7 more recommendations are labelled, each the advice itself.
+- **"10 mins" in a finding is the same time as "10 minutes" in the result** (also "hrs", "wks", "yrs"). Opus 5.5's
+  cold brew result had its right "10 minutes" cut, from a recipe card's "Prep Time: 10 mins".
+- **A number given with another unit than its discovery's is checked like an invented one** (temperature, length,
+  weight): Gemma 3 4B gave a page's "173.8 °F" as "173.8 °C". No saved suite result or SimpleQA answer (968 in all)
+  is flagged by it.
+- **The checks' own "Left out, because ..." notes no longer count as numbers missing from the discoveries.** On the
+  saved suite runs, 9 of 400 results had the numbers their note named as cut flagged a second time.
+- **Control characters are taken out of findings and the final result** (tabs and line breaks stay): a reply's
+  JSON "\b" is read as a backspace.
+- **A byte-order mark before a piped objective is dropped** (PowerShell and Notepad can add one).
+- **The regression suite's explanation task accepts "O2" and "O₂" for oxygen**, but not the "O2" inside "CO2".
 
 ## [1.67.2] - 2026-11-18
 ### Fixed

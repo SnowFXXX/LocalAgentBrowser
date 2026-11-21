@@ -1,8 +1,14 @@
 @echo off
 rem LocalAgentBrowser launcher for Windows: checks that the model server is ready, then runs the agent in this window.
 rem Each run gets its own folder under Documents\LocalAgentBrowser runs, so nothing in the program's folder is touched.
-rem Used by the Start menu and desktop shortcuts: from the installer, or from a clone (tools\windows\make_shortcuts.ps1).
-title LocalAgentBrowser
+rem Classic mode: opened by the "(classic console)" Start menu shortcut, and by the Windows UI's "Classic console" button
+rem or its shortcuts when classic mode is the saved choice (localagentbrowser\winui.py, settings.py).
+rem The window's title names the edition: Clean Room's build leaves out the region below, so its title keeps "Clean Room"
+set "LAB_TITLE=LocalAgentBrowser Clean Room"
+rem cloud:start
+set "LAB_TITLE=LocalAgentBrowser"
+rem cloud:end
+title %LAB_TITLE%
 rem The program folder, as a plain full path (no "..\.." in messages)
 for %%i in ("%~dp0..\..") do set "APP=%%~fi"
 rem The model chosen in setup
@@ -36,13 +42,14 @@ if defined LAB_CLOUD (
   goto server_ready
 )
 rem cloud:end
+rem Until LM Studio answers: a dialog says what to do, with Retry (check again) and Cancel (close)
+:check_server
 powershell -NoProfile -Command "try { Invoke-RestMethod -TimeoutSec 5 http://localhost:1234/v1/models | Out-Null; exit 0 } catch { exit 1 }"
 if errorlevel 1 (
   echo LM Studio is not answering at http://localhost:1234.
-  echo Start LM Studio, load a model, and start its local server, then open LocalAgentBrowser again.
-  echo.
-  pause
-  exit /b 1
+  powershell -NoProfile -Command "Add-Type -AssemblyName System.Windows.Forms; $n = [Environment]::NewLine; $r = [System.Windows.Forms.MessageBox]::Show('LM Studio is not answering at http://localhost:1234.' + $n + $n + 'Open LM Studio, load a model, and start its local server (the Developer tab, Status: Running). Then click Retry.', '%LAB_TITLE%', 'RetryCancel', 'Warning'); if ($r -eq 'Retry') { exit 0 } else { exit 1 }"
+  if errorlevel 1 exit /b 1
+  goto check_server
 )
 :server_ready
 rem Windows' own Documents folder (it may be in OneDrive), the same one the installer's "Past reports" shortcut opens
