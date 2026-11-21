@@ -2,6 +2,7 @@
 import asyncio
 import ipaddress
 import json
+import os
 import re
 import socket
 import sys
@@ -23,10 +24,22 @@ from .checklist import after_discovery_advice, check_parts, checklist_lines, lin
 from .coverage import amounts_not_found, coverage_refusal, not_found_items, record_install_line, remember_install_lines
 from .checks import check_decision, escalation_message, numbered_discoveries, numbered_lines, refusal_correction, source_note
 from . import windows
+from .events import emit
 from .report import compact_journal, compose_final_result, visited_summary, write_report, write_research_log
 
 def new_conversation():
     return {"messages": None, "followups": 0, "tokens": 0, "note": None, "note_url": None, "shown_links": set()}
+
+def checklist_snapshot(checklist):
+    """The checklist as plain values, for a view (events.py): each item's text and the discoveries linked to it."""
+    return [{"text": item["text"], "discoveries": list(item.get("discoveries") or [])} for item in checklist or []]
+
+def page_snapshot(url, page_state, search=False):
+    """The page shown to the model, as plain values for a view: where it is, which part, the outline, and the search
+    results when it is a results page."""
+    return {"url": url, "search": search, "part": page_state.get("index", 0) + 1, "parts": len(page_state.get("parts") or []),
+            "outline": list(page_state.get("outline") or []),
+            "results": [list(r) for r in page_state.get("results") or []] if search else []}
 
 def set_note(conversation, note, current_url):
     # A note is only used if the agent is still on the page it describes when the next turn starts
@@ -211,6 +224,7 @@ async def request_decision(client, messages, journal, tried, page_state, current
 
         refused.append({"action": action, "parameter": parameter, "journal_action": refusal[0], "reason": refusal[1]})
         print(f"Cheap retry {len(refused)}/{MAX_CHEAP_RETRIES}: [{action}] refused. {refusal[1]}")
+        emit("retried", action=action, parameter=parameter, reason=refusal[1])
         correction = refusal_correction(action, refusal[1], page_state, current_url)
         if refusal[0].startswith("CONFIRM_"):
             # Not a true refusal: repeating the action is an allowed answer, so no "do not repeat" wording
@@ -311,24 +325,30 @@ TIMER_TICK_SECONDS = 1
 async def ticking(call):
     """The model call, with a timer counting its seconds on one console line while it runs. On a CPU a call can take
     minutes, and a console showing nothing looked frozen. Only in a person's console window: a run whose output goes
-    to a file (the regression suite's console.txt) gets no timer lines."""
-    if not sys.stdout.isatty():
-        return await call
-    task = asyncio.ensure_future(call)
-    started, shown = time.monotonic(), False
+    to a file (the regression suite's console.txt) gets no timer lines. A view (events.py) is told when each call starts
+    and ends, console or not: the Windows UI has no console and draws its own timer."""
+    emit("waiting")
+    started = time.monotonic()
     try:
-        while not (await asyncio.wait({task}, timeout=TIMER_TICK_SECONDS))[0]:
-            waited = int(time.monotonic() - started)
-            if waited >= TIMER_AFTER_SECONDS:
-                print(f"\r   Waiting for the model: {waited} s", end="", flush=True)
-                shown = True
-    except BaseException:
-        task.cancel()
-        raise
+        if not sys.stdout.isatty():
+            return await call
+        task = asyncio.ensure_future(call)
+        shown = False
+        try:
+            while not (await asyncio.wait({task}, timeout=TIMER_TICK_SECONDS))[0]:
+                waited = int(time.monotonic() - started)
+                if waited >= TIMER_AFTER_SECONDS:
+                    print(f"\r   Waiting for the model: {waited} s", end="", flush=True)
+                    shown = True
+        except BaseException:
+            task.cancel()
+            raise
+        finally:
+            if shown:
+                print("\r" + " " * 40 + "\r", end="", flush=True)
+        return task.result()
     finally:
-        if shown:
-            print("\r" + " " * 40 + "\r", end="", flush=True)
-    return task.result()
+        emit("replied", seconds=round(time.monotonic() - started, 1))
 
 def with_retries(client):
     """The client, with each model call tried again when the server fails it (no connection, or a server error).
@@ -482,9 +502,11 @@ async def main():
     tried = {"queries": [], "urls": [], "objective": objective}
     # The first model call reads the whole prompt with nothing cached yet: on a CPU it takes a minute or two, and a
     # silent console looked frozen to a first-time user
+    emit("objective", objective=objective)
     print("Splitting the objective into a checklist... (the first step takes a minute or two on a CPU)")
     tried["checklist"] = await split_objective(client, objective)
     print("Objective checklist:\n" + checklist_lines(tried["checklist"]))
+    emit("checklist", items=checklist_snapshot(tried["checklist"]))
     page_state = {"url": None, "parts": [], "index": 0}
     conversation = new_conversation()
     loop_msg = None
@@ -508,6 +530,7 @@ async def main():
         try:
             while turn_counter <= max_turns:
                 print(f"\n[TURN {turn_counter}/{max_turns}] Active reasoning cycle executing...")
+                emit("turn", number=turn_counter, of=max_turns)
                 tried["finish_confirmed"] = False  # The finish check runs once per turn
                 remember_install_lines(tried, page_state)
 
@@ -536,13 +559,16 @@ async def main():
 
                 print(f"Agent Thoughts: {thought}")
                 print(f"Chosen Action: [{action}] -> Parameter: {parameter}")
+                emit("decision", action=action, parameter=parameter, thought=thought)
 
                 refusal = check_decision(action, parameter, journal, tried, page_state, current_url, thought)
                 if not refusal and action == "FINISH":
+                    emit("checking")
                     refusal = await coverage_refusal(client, objective, tried, journal)
                 if refusal:
                     # Only reached once this turn's cheap retries are used up
                     print(f"Action refused: {refusal[1]}")
+                    emit("refused", action=action, parameter=parameter, reason=refusal[1], check=refusal[0])
                     journal.append({"turn": turn_counter, "thought": thought, "action": refusal[0], "requested": parameter, "reason": refusal[1]})
                     loop_msg = f"Your {action} was refused. {refusal[1]}"
                     set_note(conversation, f"RESULT: Nothing changed. {where_you_are(page_state, current_url)}", current_url)
@@ -566,7 +592,9 @@ async def main():
                     journal.append(finish_entry)
                     try:
                         missing, unproven = await not_found_items(client, objective, tried, journal)
+                        emit("not_found", items=list(missing))
                         no_amounts = amounts_not_found(tried.get("checklist"), journal, skip=missing)
+                        emit("writing")
                         final = await compose_final_result(client, objective, journal, tried.get("checklist"), missing,
                                                            unproven, no_amounts, tried.get("evidence"),
                                                            tried.get("short_counts"))
@@ -575,6 +603,7 @@ async def main():
                     except Exception as err:
                         print(f"Warning: Could not write the final result separately ({err}); keeping the agent's FINISH text.")
                     finish_entry.pop("writing", None)
+                    emit("result", text=finish_entry["finding"])
                     break
 
                 elif action in ["SEARCH", "NAVIGATE"]:
@@ -642,6 +671,10 @@ async def main():
                     environment = await build_environment(page, current_url, page_state, {normalize_url(u) for u in tried["urls"]}, conversation["shown_links"])
                     if "error" in outcome and page_state["url"] == normalize_url(current_url):
                         page_state["leave_confirmed"] = True  # Nothing to record on an error page
+                    if "error" in outcome:
+                        emit("failed", action=action, parameter=parameter, error=outcome["error"])
+                    else:
+                        emit("page", **page_snapshot(current_url, page_state, search=action == "SEARCH"))
                     set_note(conversation, f"{result}\n\n### CURRENT ENVIRONMENT (replaces the earlier one)\n"
                                            f"Active URL: {current_url}\n{environment}", current_url)
 
@@ -650,6 +683,7 @@ async def main():
                     page_state["index"] = target
                     page_state.setdefault("seen_parts", {0}).add(target)
                     print(f"Showing part {target + 1} of {len(page_state['parts'])} of the current page.")
+                    emit("read_more", part=target + 1, parts=len(page_state["parts"]))
                     journal.append({"turn": turn_counter, "thought": thought, "action": "READ_MORE", "part": f"{target + 1} of {len(page_state['parts'])}"})
                     set_note(conversation, f"RESULT: READ_MORE done. {where_you_are(page_state, current_url)} "
                                            f"The CURRENT ENVIRONMENT now shows:\n{render_part(page_state)}\n"
@@ -668,6 +702,8 @@ async def main():
                                     "extracted_data": recorded, "checklist_items": linked})
                     page_state["visit_discoveries"] = page_state.get("visit_discoveries", 0) + 1
                     page_state.setdefault("recorded_parts", set()).add(page_state["index"])
+                    emit("discovery", number=number, text=recorded, source=current_url, items=linked,
+                         checklist=checklist_snapshot(tried["checklist"]))
                     # A discovery is when the objective can become complete; on a one-answer question the model
                     # recorded the full answer, said "the objective has been met", then kept reading for
                     # "interesting" details, so completion is checked right here. On an explanation task it recorded
@@ -735,6 +771,9 @@ async def main():
             # Always saved, however the run ends: FINISH, the turn limit, Ctrl+C or an outside time limit
             write_research_log(objective, journal, tried.get("checklist"))
             write_report(objective, journal, tried.get("checklist"), stop_reason)
+            finished = any(e.get("action") == "FINISH" and not e.get("writing") for e in journal)
+            emit("stopped", reason=None if finished else (stop_reason or "stopped before finishing"),
+                 report=os.path.abspath(REPORT_FILE))
 
         print(f"\nShutting down browser instance. Report: {REPORT_FILE}; full journal: research_log.txt.")
         await browser.close()

@@ -193,3 +193,28 @@ def test_a_site_that_refuses_the_browser_is_not_visited_again(monkeypatch, tmp_p
     assert second not in site.visits, "the second address on the refusing site was never loaded"
     assert any("refused this browser" in e.get("reason", "") for e in journal)
     pages.REFUSING_SITES.clear()
+
+
+def test_a_run_sends_events_a_view_can_draw(monkeypatch, tmp_path):
+    from localagentbrowser import events
+    seen = []
+    listener = events.listen(lambda kind, data: seen.append((kind, data)))
+    try:
+        run_agent(monkeypatch, tmp_path)
+    finally:
+        events.stop_listening(listener)
+    kinds = [kind for kind, _ in seen]
+    first = {kind: data for kind, data in reversed(seen)}  # Each kind's first event
+    json.dumps(seen)  # Plain values only: a view sends them to a page as JSON
+    assert kinds[0] == "objective" and first["objective"]["objective"] == "test objective"
+    assert [i["text"] for i in first["checklist"]["items"]] == ["the setup", "the fact"]
+    assert kinds.count("waiting") == kinds.count("replied") > 0  # Every model call, for the view's own timer
+    assert first["decision"]["action"] == "SEARCH" and first["turn"] == {"number": 1, "of": 100}
+    assert first["page"]["search"] and first["page"]["results"][0][1] == A
+    assert first["discovery"]["number"] == 1 and "Fact from page A" in first["discovery"]["text"]
+    assert first["discovery"]["source"] == A and first["read_more"] == {"part": 2, "parts": 3}
+    assert first["retried"]["action"] == "NAVIGATE" and first["refused"]["check"]
+    assert kinds.index("checking") < kinds.index("writing") < kinds.index("result") < kinds.index("stopped")
+    assert first["result"]["text"].startswith("Composed final result")
+    assert kinds[-1] == "stopped" and seen[-1][1]["reason"] is None
+    assert seen[-1][1]["report"].endswith("research_report.md")
