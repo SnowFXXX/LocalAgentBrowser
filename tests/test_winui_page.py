@@ -101,3 +101,56 @@ def test_the_page_draws_the_start_screen_and_a_whole_run():
     assert not state["steps_open"]
     assert state["link"] == {"type": "open", "url": A}  # The first link: the search result
     assert state["url"] == "about:blank"  # Still the UI page
+
+
+async def follow_on_a_page():
+    from playwright.async_api import async_playwright
+    from localagentbrowser import follow
+    async with async_playwright() as p:
+        try:
+            browser = await p.chromium.launch()
+        except Exception as err:
+            pytest.skip(f"no Chromium for Playwright ({str(err)[:80]})")
+        page = await browser.new_page(viewport={"width": 800, "height": 600})
+        filler = "<p>" + "Unrelated filler text. " * 400 + "</p>"
+        await page.set_content(f"<html><body>{filler}<h2>Geology</h2><p>Kilimanjaro rises to <b>5,895 m</b> "
+                               f"(19,341 ft).</p><p>Its summit is Uhuru Peak.</p>{filler}</body></html>")
+        before = await page.evaluate("document.body.innerText")
+        found = await follow.show_discovery(page, '(Under the heading "Geology") Kilimanjaro rises to 5,895 m '
+                                                  '(19,341 ft). Its summit is Uhuru Peak.')
+        await page.wait_for_timeout(600)  # The smooth scroll
+        state = {"found": found, "scrolled": await page.evaluate("window.scrollY"),
+                 "ranges": await page.evaluate("CSS.highlights.get('lab-found').size"),
+                 "same_text": await page.evaluate("document.body.innerText") == before,
+                 "missing": await follow.show_discovery(page, "Words that are nowhere on this page at all.")}
+        await browser.close()
+        return state
+
+
+def test_the_browser_highlights_a_discovery_across_elements_and_keeps_the_page_text():
+    state = asyncio.run(follow_on_a_page())
+    assert state["found"] and state["scrolled"] > 500  # Scrolled down to it, past the filler
+    assert state["ranges"] == 1  # The whole quote at once, across the bold text and the paragraph break
+    assert state["same_text"]  # What the agent reads is unchanged
+    assert state["missing"] is False
+
+
+async def follow_by_sentence():
+    from playwright.async_api import async_playwright
+    from localagentbrowser import follow
+    async with async_playwright() as p:
+        try:
+            browser = await p.chromium.launch()
+        except Exception as err:
+            pytest.skip(f"no Chromium for Playwright ({str(err)[:80]})")
+        page = await browser.new_page()
+        await page.set_content("<p>Kibo is the highest cone.</p><p>Shira is the lowest.</p><p>It rises to 5,895 m.</p>")
+        # Two sentences the page has apart, joined in one discovery: each is highlighted where it is
+        found = await follow.show_discovery(page, "Kibo is the highest cone. It rises to 5,895 m.")
+        ranges = await page.evaluate("CSS.highlights.get('lab-found').size")
+        await browser.close()
+        return found, ranges
+
+
+def test_a_discovery_joining_sentences_is_highlighted_sentence_by_sentence():
+    assert asyncio.run(follow_by_sentence()) == (True, 2)

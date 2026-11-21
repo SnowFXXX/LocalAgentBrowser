@@ -218,3 +218,29 @@ def test_a_run_sends_events_a_view_can_draw(monkeypatch, tmp_path):
     assert first["result"]["text"].startswith("Composed final result")
     assert kinds[-1] == "stopped" and seen[-1][1]["reason"] is None
     assert seen[-1][1]["report"].endswith("research_report.md")
+
+
+def test_the_browser_follows_the_agent_without_changing_what_it_reads(monkeypatch, tmp_path):
+    SITE.followed.clear()
+    calls, journal = run_agent(monkeypatch, tmp_path)
+    followed = list(SITE.followed)
+    SITE.followed.clear()
+    # The discovery highlighted in mint, and kept; READ_MORE scrolled to part 2 and tinted its first words
+    assert (A, ["Fact from page A"], "lab-found", True, 0) in followed
+    part_two = [f for f in followed if f[2] == "lab-reading"]
+    assert len(part_two) == 1 and part_two[0][0] == A and part_two[0][3] is True
+    assert part_two[0][1][0].split()[0] == "Long"  # The first words of part 2, as the agent reads it
+    # The same run as without it: every model call and the journal unchanged
+    monkeypatch.setenv("LAB_FOLLOW", "0")
+    calls_without, journal_without = run_agent(monkeypatch, tmp_path)
+    assert SITE.followed == [] and calls_without == calls
+    assert [e["action"] for e in journal_without] == [e["action"] for e in journal]
+
+
+def test_a_discovery_is_looked_for_whole_and_by_sentence():
+    from localagentbrowser import follow
+    text = '(Under the heading "Geology") Kibo is the highest cone. It rises to 5,895 m. Ok.'
+    assert follow.quote_pieces(text) == ["Kibo is the highest cone. It rises to 5,895 m. Ok.",
+                                         "Kibo is the highest cone.", "It rises to 5,895 m."]
+    assert follow.first_words("  one two\nthree four five six seven eight nine ten") == \
+        "one two three four five six seven eight"

@@ -93,6 +93,7 @@ class FakeSite:
     def __init__(self, pages, results, statuses=None):
         self.pages, self.results = pages, results
         self.statuses = statuses or {}  # {url: HTTP status} for pages that answer with an error
+        self.followed = []  # The browser following the agent (follow.py): (url, texts, highlight, scroll, tint)
         self.visits = []
 
     def playwright(self):
@@ -127,6 +128,9 @@ class FakeSite:
 
             async def evaluate(self, js, *args):
                 text, links = site.pages.get(self.url.split("#")[0].rstrip("/"), ("", []))
+                if "labFollow" in js:  # The browser following the agent: recorded, changes nothing
+                    site.followed.append((self.url, *args[0]))
+                    return True
                 if "result__a" in js:
                     return site.results if "duckduckgo" in self.url else []
                 if "blockStart" in js:

@@ -23,7 +23,7 @@ from .pages import build_environment, count_search_results, determine_url, is_se
 from .checklist import after_discovery_advice, check_parts, checklist_lines, link_discovery, split_objective
 from .coverage import amounts_not_found, coverage_refusal, not_found_items, record_install_line, remember_install_lines
 from .checks import check_decision, escalation_message, numbered_discoveries, numbered_lines, refusal_correction, source_note
-from . import windows
+from . import follow, windows
 from .events import LISTENERS as EVENT_LISTENERS, Stopped, emit, listen, print_line, stop_requested
 from . import settings
 from .report import compact_journal, compose_final_result, visited_summary, write_report, write_research_log
@@ -704,6 +704,8 @@ async def main():
                     page_state.setdefault("seen_parts", {0}).add(target)
                     print(f"Showing part {target + 1} of {len(page_state['parts'])} of the current page.")
                     emit("read_more", part=target + 1, parts=len(page_state["parts"]))
+                    if 0 <= target < len(page_state["parts"]):
+                        await follow.show_part(page, page_state["parts"][target])
                     journal.append({"turn": turn_counter, "thought": thought, "action": "READ_MORE", "part": f"{target + 1} of {len(page_state['parts'])}"})
                     set_note(conversation, f"RESULT: READ_MORE done. {where_you_are(page_state, current_url)} "
                                            f"The CURRENT ENVIRONMENT now shows:\n{render_part(page_state)}\n"
@@ -724,6 +726,7 @@ async def main():
                     page_state.setdefault("recorded_parts", set()).add(page_state["index"])
                     emit("discovery", number=number, text=recorded, source=current_url, items=linked,
                          checklist=checklist_snapshot(tried["checklist"]))
+                    await follow.show_discovery(page, parameter)
                     # A discovery is when the objective can become complete; on a one-answer question the model
                     # recorded the full answer, said "the objective has been met", then kept reading for
                     # "interesting" details, so completion is checked right here. On an explanation task it recorded
