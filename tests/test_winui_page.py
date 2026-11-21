@@ -236,6 +236,51 @@ def test_the_second_kind_of_model_is_picked_from_our_list_or_typed_in():
     assert state["hidden_unticked"]
 
 
+LONG_REASON = ("Your only discovery comes from https://en.wikipedia.org/wiki/Eiffel_Tower. Consider whether the "
+               "objective needs more. The current page still has 23 unread parts: use its outline. " * 3)
+
+
+async def long_run():
+    from playwright.async_api import async_playwright
+    async with async_playwright() as p:
+        try:
+            browser = await p.chromium.launch()
+        except Exception as err:
+            pytest.skip(f"no Chromium for Playwright ({str(err)[:80]})")
+        page = await browser.new_page(viewport={"width": 720, "height": 800})
+        await page.expose_binding("labSend", lambda source, message: None)
+        with open(winui.PAGE_FILE, encoding="utf-8") as f:
+            await page.set_content(f.read())
+
+        async def receive(kind, data):
+            await page.evaluate("e => lab.receive(e)", {"kind": kind, **data})
+        await receive("started", {"objective": "How often is the Eiffel Tower repainted?", "folder": "C:\\Runs\\x",
+                                  "model": "microsoft/phi-4"})
+        for n in range(30):  # A timeline several windows long
+            await receive("decision", {"action": "READ_MORE", "parameter": str(n + 2), "thought": "Reading on. " * 20})
+        await receive("retried", {"action": "FINISH", "parameter": "x", "reason": LONG_REASON})
+        await page.evaluate("() => window.scrollTo(0, document.documentElement.scrollHeight)")
+        await asyncio.sleep(0.3)
+        state = {"bar_top": await page.evaluate("() => document.querySelector('.bar').getBoundingClientRect().top"),
+                 "scrolled": await page.evaluate("() => window.scrollY"),
+                 "card": await page.inner_text("#timeline .card:last-child .main"),
+                 "whole_shown": await page.is_visible("#timeline .card:last-child details.whole > div")}
+        await page.click("#timeline .card:last-child details.whole > summary")
+        state["whole"] = await page.inner_text("#timeline .card:last-child details.whole > div")
+        await browser.close()
+        return state
+
+
+def test_a_long_run_keeps_the_bar_and_a_check_s_card_shows_its_reason_first():
+    """Seen live (Nov 21): past a window's length the bar scrolled away (the body was the window's height), and a
+    refusal's card showed the checks' whole message to the model, a page long."""
+    state = asyncio.run(long_run())
+    assert state["scrolled"] > 2000 and state["bar_top"] == 0
+    assert state["card"].startswith("ASKED AGAIN") and state["card"].endswith(
+        "FINISH refused by the code: Your only discovery comes from https://en.wikipedia.org/wiki/Eiffel_Tower.")
+    assert not state["whole_shown"] and state["whole"].strip() == LONG_REASON.strip()
+
+
 async def opened_window(tmp_path, monkeypatch):
     import os
     from playwright.async_api import async_playwright

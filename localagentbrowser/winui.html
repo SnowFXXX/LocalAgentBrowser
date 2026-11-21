@@ -11,9 +11,12 @@
   --amber: #f0a860; --amber-bg: #2b2112; --amber-line: #8a6232;
   --mono: Consolas, "Cascadia Mono", monospace; --sans: "Segoe UI", system-ui, sans-serif; }
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; }
-body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans); overflow-y: auto;
-  background-image: radial-gradient(900px 420px at 85% 0%, rgba(30,58,90,.75), transparent 70%); }
+/* The body grows with the page (a body of the window's height let the sticky bar scroll away once the live view
+   was longer than the window) */
+html, body { margin: 0; min-height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--sans);
+  background-image: radial-gradient(900px 420px at 85% 0%, rgba(30,58,90,.75), transparent 70%);
+  background-repeat: no-repeat; background-attachment: fixed; }
 button, select, input, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 .bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 10px 18px;
@@ -90,6 +93,9 @@ textarea:focus, select:focus { border-color: var(--mint-line); box-shadow: 0 0 0
 .card.amber .label { color: var(--amber); }
 .card .main { word-break: break-word; }
 .card .more { margin-top: 6px; font-size: 13px; color: var(--sub); }
+.card details.whole { margin-top: 6px; font-size: 13px; color: var(--sub); }
+.card details.whole > summary { cursor: pointer; color: var(--muted); }
+.card details.whole > div { margin-top: 4px; white-space: pre-wrap; }
 .card .thought { margin-top: 6px; font-size: 13px; color: var(--muted); font-style: italic; }
 .card ol, .card ul { margin: 6px 0 0; padding-left: 20px; }
 .card .site { font-family: var(--mono); font-size: 12px; color: var(--muted); }
@@ -200,6 +206,21 @@ function card(tone, label, main) {
   $("steps-summary").textContent = "Steps (" + $("timeline").children.length + ")";
   if (!run || !run.ended) c.scrollIntoView({ block: "nearest", behavior: "smooth" });
   return c;
+}
+
+// A check's message to the model can run to a page: its card shows the first sentence (the reason), and the whole
+// message is one click away
+function firstSentence(text) {
+  const m = String(text || "").match(/^[\s\S]{20,300}?[.!?](?=\s|$)/);
+  return m ? m[0] : String(text || "");
+}
+
+function checked(c, whole) {
+  const first = firstSentence(whole);
+  if (String(whole || "").trim().length <= first.length + 1) return;
+  const box = el("details", "whole");
+  box.append(el("summary", null, "The whole message to the model"), el("div", null, whole));
+  c.append(box);
 }
 
 function chips(items, missing) {
@@ -388,8 +409,8 @@ const handlers = {
     current = c;
   },
   // Within a turn, before its decision: a reply the code refused, and the model asked again
-  retried(e) { card("amber", "ASKED AGAIN", e.action + " refused by the code: " + e.reason); },
-  refused(e) { card("amber", "REFUSED", e.action + ": " + e.reason); setState("Checked", "amber"); },
+  retried(e) { checked(card("amber", "ASKED AGAIN", e.action + " refused by the code: " + firstSentence(e.reason)), e.reason); },
+  refused(e) { checked(card("amber", "REFUSED", e.action + ": " + firstSentence(e.reason)), e.reason); setState("Checked", "amber"); },
   failed(e) { card("amber", "FAILED", e.action + " " + e.parameter + ": " + e.error); },
   page(e) {
     if (!current) return;
