@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="google-site-verification" content="Ro0o4mqjvdOCVnwGtTao8F__S7BkFmtEytfMc-7gSuM">
+<title>LocalAgentBrowser: answers with their sources, on your own PC</title>
+<link rel="canonical" href="https://localagentbrowser.com/">
+<meta name="description" content="An autonomous web research agent on your own computer, with a local AI model or, if you choose, a cloud one. Code checks every finding against the page it came from; what wasn't found is reported as not found.">
+<meta property="og:title" content="LocalAgentBrowser">
+<meta property="og:description" content="An AI that can't cover up: a web research agent where code, not the model, decides what counts.">
+<meta property="og:image" content="https://localagentbrowser.com/social-preview.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b111b'/%3E%3Cpath d='M9 22V10h3v9.5h6V22z' fill='%23e8eef5'/%3E%3Ccircle cx='22' cy='20' r='3' fill='%235fd3a6'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #0b111b; --bg-2: #0e1624; --ink: #e8eef5; --sub: #b9c7d6; --muted: #8191a5;
+    --mint: #5fd3a6; --mint-hi: #8ff0c8; --mint-bg: #12312b; --mint-line: #3fae86;
+    --blue: #7fb3e6; --chip: #122438; --chip-line: #2f5577; --amber: #f0a860;
+    --mono: Consolas, "Cascadia Mono", "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--ink); font: 17px/1.6 "Segoe UI", system-ui, -apple-system, sans-serif; }
+  a { color: var(--blue); }
+  header { position: sticky; top: 0; z-index: 10; background: rgba(11,17,27,.92); backdrop-filter: blur(6px);
+           border-bottom: 1px solid #1a2638; }
+  header .in { max-width: 1180px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 24px; }
+  .mark { font-weight: 800; font-size: 19px; color: var(--ink); text-decoration: none; margin-right: auto; }
+  .mark b { color: var(--mint); }
+  header nav a { color: var(--sub); text-decoration: none; font-size: 15px; margin-left: 18px; }
+  header nav a:hover { color: var(--mint-hi); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+
+  /* The top: everything to get started */
+  .top { padding: 56px 0 64px; background: radial-gradient(1200px 500px at 70% -10%, #16324e 0%, transparent 60%); }
+  .title { font-size: clamp(44px, 7vw, 84px); font-weight: 800; line-height: 1.02; letter-spacing: -.03em;
+           color: var(--ink); margin-bottom: 26px; padding-bottom: 22px; border-bottom: 1px solid var(--chip-line); }
+  .title b { color: var(--mint); }
+  h1 { font-size: clamp(36px, 5.4vw, 64px); line-height: 1.08; letter-spacing: -.02em; max-width: 900px; }
+  h1 b { color: var(--mint); }
+  .lead { font-size: clamp(18px, 2.2vw, 22px); color: var(--sub); max-width: 760px; margin-top: 18px; }
+  .get { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 30px; align-items: center; }
+  .btn { display: inline-block; padding: 14px 24px; border-radius: 12px; font-weight: 700; text-decoration: none;
+         border: 1.5px solid var(--chip-line); color: var(--ink); background: var(--chip); }
+  .btn.primary { background: var(--mint); border-color: var(--mint); color: #08241a; font-size: 18px; }
+  .btn:hover { border-color: var(--mint-line); }
+  .get .or { color: var(--muted); font-size: 16px; font-weight: 600; }
+  .btn.clean { color: var(--mint); }
+  .cleanpick { position: relative; }
+  .crlinux { position: absolute; top: 100%; left: 0; right: 0; margin-top: 8px; text-align: center; white-space: nowrap;
+             color: var(--mint); font-size: 15px; font-weight: 600; }
+  .get:has(.cleanpick) { padding-bottom: 30px; }
+  .cr, .btn.clean .cr { color: var(--amber); }  /* The app's color for a call the code sends back ("Asked again") */
+  .need { color: var(--muted); font-size: 15px; margin-top: 12px; }
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 40px; }
+  .step { background: rgba(18,36,56,.6); border: 1.5px solid var(--chip-line); border-radius: 14px; padding: 20px; }
+  .step .n { font-family: var(--mono); color: var(--mint); font-weight: 700; font-size: 14px; letter-spacing: .1em; }
+  .step h3 { font-size: 18px; margin: 6px 0 4px; }
+  .step p { color: var(--sub); font-size: 15px; }
+  .models { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .models .box { background: rgba(18,36,56,.6); border: 1.5px solid var(--chip-line); border-radius: 14px; padding: 20px; }
+  .models .box.best { border-color: var(--mint-line); background: rgba(18,49,43,.45); }
+  .tag { font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--blue); }
+  .box.best .tag { color: var(--mint); }
+  .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .badge { font-size: 14px; padding: 5px 12px; border-radius: 999px; background: var(--chip); border: 1px solid var(--chip-line); }
+  .badge.rec { background: var(--mint-bg); border-color: var(--mint-line); color: var(--mint-hi); }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; color: var(--blue); font-weight: 600; font-size: 15px; }
+  details .badges { margin-top: 10px; }
+  details .badge { font-size: 13px; }
+
+  /* The slideshow: full screen, one example or highlight per slide */
+  .show { position: relative; height: 100vh; min-height: 560px; background: var(--bg-2); overflow: hidden; }
+  .track { display: flex; height: 100%; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .track::-webkit-scrollbar { display: none; }
+  .slide { flex: 0 0 100%; height: 100%; scroll-snap-align: start; display: grid; grid-template-columns: 5fr 7fr;
+           gap: 48px; align-items: center; padding: 80px max(24px, calc((100% - 1180px) / 2 + 24px)) 90px; }
+  .slide .kind { font-size: 14px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--blue); }
+  .slide.hl .kind { color: var(--mint); }
+  .slide h2 { font-size: clamp(30px, 3.8vw, 46px); line-height: 1.12; margin: 10px 0 14px; }
+  .slide p { color: var(--sub); font-size: 19px; }
+  .slide .q { margin-top: 18px; padding: 14px 18px; border-left: 4px solid var(--mint); background: rgba(18,49,43,.35);
+              border-radius: 0 10px 10px 0; color: var(--ink); font-size: 18px; }
+  .slide .soon { display: inline-block; margin-top: 14px; font-size: 13px; color: var(--sub); }
+  .slide img { width: 100%; max-height: 72vh; object-fit: contain; border-radius: 14px; border: 1px solid var(--chip-line);
+               box-shadow: 0 30px 80px rgba(0,0,0,.45); background: #070b12; }
+  .arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border-radius: 50%;
+           border: 1.5px solid var(--chip-line); background: rgba(14,22,36,.85); color: var(--ink); font-size: 22px;
+           cursor: pointer; z-index: 2; }
+  .arrow:hover { border-color: var(--mint-line); color: var(--mint-hi); }
+  .arrow.prev { left: 16px; } .arrow.next { right: 16px; }
+  .dots { position: absolute; bottom: 28px; left: 0; right: 0; display: flex; justify-content: center; gap: 8px; z-index: 2; }
+  .dots button { width: 10px; height: 10px; border-radius: 50%; border: none; background: #2f4a66; cursor: pointer; }
+  .dots button.on { background: var(--mint); width: 26px; border-radius: 6px; }
+
+  /* The video, the research, the footer */
+  section.pad { padding: 72px 0; }
+  .kicker { font-size: 14px; letter-spacing: .2em; font-weight: 600; color: var(--blue); text-transform: uppercase; }
+  h2.big { font-size: clamp(28px, 3.6vw, 42px); margin: 8px 0 12px; }
+  .video { position: relative; margin-top: 24px; border-radius: 16px; overflow: hidden; border: 1px solid var(--chip-line); }
+  .video video { width: 100%; display: block; background: #0d1117; }
+  .video + .note { margin-top: 10px; font-size: 14px; color: var(--sub); }
+  .video .over { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+  .video .over b { display: block; font-size: 24px; }
+  .video .over span { color: var(--sub); }
+  .research { border-top: 1px solid #1a2638; }
+  .research p { color: var(--sub); max-width: 760px; margin-top: 10px; }
+  footer { padding: 28px 0 48px; color: var(--muted); font-size: 14px; }
+
+  @media (max-width: 900px) {
+    header nav { display: none; }
+    .steps { grid-template-columns: 1fr 1fr; }
+    .models { grid-template-columns: 1fr; }
+    .slide { grid-template-columns: 1fr; gap: 20px; padding: 56px 20px 80px; align-content: center; }
+    .slide img { max-height: 40vh; }
+    .slide p { font-size: 17px; }
+    .arrow { display: none; }
+  }
+  @media (max-width: 560px) { .steps { grid-template-columns: 1fr; } .wrap { padding: 0 16px; } }
+</style>
+</head>
+<body>
+<header><div class="in">
+  <a class="mark" href="#">LocalAgent<b>Browser</b></a>
+  <nav><a href="#download">Download</a><a href="#show">Good for</a><a href="#watch">Watch it work</a><a href="#research">Research</a></nav>
+</div></header>
+
+<section class="top" id="download"><div class="wrap">
+  <div class="title">Local Agent <b>Browser</b></div>
+  <h1>Ask a question. Get an answer <b>with its sources.</b></h1>
+  <p class="lead">LocalAgentBrowser searches the web, reads the pages and writes you an answer that shows where every part
+    came from. It runs on your own PC, free and private.</p>
+  <div class="get">
+    <a class="btn primary" href="#">Download for Windows</a>
+    <a class="btn primary" href="#">Download for Linux</a>
+    <span class="or">or</span>
+    <div class="cleanpick">
+      <a class="btn clean" href="#">Download <span class="cr">Clean Room</span>, a Private Edition, for Windows</a>
+      <a class="crlinux" href="#">Download Clean Room For Linux</a>
+    </div>
+  </div>
+  <p class="need">Windows 10 or 11 · 8 GB of memory · no graphics card needed · Android and Apple/Mac: coming soon.</p>
+
+  <div class="steps">
+    <div class="step"><div class="n">STEP 1</div><h3>Get LM Studio</h3><p>The free app that runs the AI model on your PC: <a href="https://lmstudio.ai">lmstudio.ai</a>.</p></div>
+    <div class="step"><div class="n">STEP 2</div><h3>Run setup</h3><p>It picks a tested model and downloads it for you.</p></div>
+    <div class="step"><div class="n">STEP 3</div><h3>Open LocalAgentBrowser</h3><p>From your desktop or the Start menu.</p></div>
+    <div class="step"><div class="n">STEP 4</div><h3>Ask</h3><p>Type your question, click Start research, and watch it work.</p></div>
+  </div>
+
+  <div class="models">
+    <div class="box best">
+      <div class="tag">On your PC, with LM Studio</div>
+      <div class="badges">
+        <span class="badge rec">Qwen2.5 7B (recommended)</span><span class="badge">Qwen2.5 14B</span>
+        <span class="badge">Qwen2.5 3B</span><span class="badge">Llama 3.1 8B</span><span class="badge">Gemma 3 4B</span>
+        <span class="badge">Qwen3-VL 8B</span>
+      </div>
+    </div>
+    <div class="box">
+      <div class="tag">Or in the cloud, with your own OpenRouter key</div>
+      <div class="badges">
+        <span class="badge rec">Phi-4</span><span class="badge rec">GPT-4o-mini</span>
+        <span class="badge rec">Gemini 3.8 Flash</span><span class="badge rec">GPT-5.6 Terra</span>
+      </div>
+      <details><summary>59 more cloud models that work</summary>
+        <div class="badges">
+          <span class="badge">claude-fable-5.2</span><span class="badge">claude-haiku-5.5</span><span class="badge">claude-opus-5.5</span>
+          <span class="badge">claude-sonnet-5.5</span><span class="badge">command-a-plus</span><span class="badge">deepseek-chat-v3.1</span>
+          <span class="badge">deepseek-r1-0528</span><span class="badge">deepseek-v4-flash</span><span class="badge">deepseek-v4-pro</span>
+          <span class="badge">gemini-3.5-flash-lite</span><span class="badge">gemini-4-hydrogen</span><span class="badge">gemini-4-neon</span>
+          <span class="badge">gemma-3-12b-it</span><span class="badge">gemma-3-27b-it</span><span class="badge">gemma-4-26b-a4b-it</span>
+          <span class="badge">gemma-4-31b-it</span><span class="badge">llama-3.3-70b-instruct</span><span class="badge">llama-4-maverick</span>
+          <span class="badge">llama-4-scout</span><span class="badge">muse-spark-1.3</span><span class="badge">minimax-m3</span>
+          <span class="badge">minimax-m3.1-flash</span><span class="badge">codestral-2508</span><span class="badge">ministral-3b-2512</span>
+          <span class="badge">ministral-8b-2512</span><span class="badge">mistral-large-4-0</span><span class="badge">kimi-k3.1-pro</span>
+          <span class="badge">hermes-4-405b</span><span class="badge">nemotron-3-super-120b-a12b</span><span class="badge">nemotron-3.5-lightning</span>
+          <span class="badge">gpt-4.1-mini</span><span class="badge">gpt-5.4-mini</span><span class="badge">gpt-5.4-nano</span>
+          <span class="badge">gpt-6-luna</span><span class="badge">gpt-6.1-terra</span><span class="badge">gpt-6.2-sol</span>
+          <span class="badge">gpt-oss-120b</span><span class="badge">gpt-oss-20b</span><span class="badge">qwen-2.5-72b-instruct</span>
+          <span class="badge">qwen3-235b-a22b-2507</span><span class="badge">qwen3-30b-a3b-instruct-2507</span><span class="badge">qwen3-32b</span>
+          <span class="badge">qwen3-coder</span><span class="badge">qwen3.5-9b</span><span class="badge">qwen3.6-35b-a3b</span>
+          <span class="badge">qwen3.7-plus</span><span class="badge">qwen3.8-flash</span><span class="badge">qwen4-max</span>
+          <span class="badge">step-3.7-flash</span><span class="badge">inkling-2-small</span><span class="badge">solar-pro4</span>
+          <span class="badge">grok-4.3</span><span class="badge">grok-4.7</span><span class="badge">mimo-v2.6-flash</span>
+          <span class="badge">glm-4.7</span><span class="badge">glm-4.7-flash</span><span class="badge">glm-5.2</span>
+          <span class="badge">glm-5.3</span><span class="badge">glm-5.3-flash</span>
+        </div>
+      </details>
+    </div>
+  </div>
+</div></section>
+
+<section class="show" id="show">
+  <div class="track">
+    <div class="slide"><div><div class="kind">Good for</div><h2>Checking a fact, with its sources</h2>
+      <p>It finds the answer on real pages and shows you exactly where each part came from.</p>
+      <div class="q">"When did the James Webb Space Telescope launch, and how far from Earth is it?"</div>
+      <span class="soon">A real run, on Phi-4 through OpenRouter</span></div>
+      <img src="assets/examples/example-1-james-webb.png" alt="LocalAgentBrowser's report on when the James Webb Space Telescope launched and how far from Earth it is"></div>
+    <div class="slide"><div><div class="kind">Good for</div><h2>Comparing before you choose</h2>
+      <p>It reads both sides and lays out the differences that matter, with sources for each.</p>
+      <div class="q">"Which is better for a first e-reader, a Kindle or a Kobo?"</div>
+      <span class="soon">A real run, on Phi-4 through OpenRouter</span></div>
+      <img src="assets/examples/example-2-kindle-or-kobo.png" alt="LocalAgentBrowser's report comparing the Kindle and the Kobo as a first e-reader"></div>
+    <div class="slide"><div><div class="kind">Good for</div><h2>Step-by-step how-tos</h2>
+      <p>Clear steps gathered from the pages that explain them, in order.</p>
+      <div class="q">"How do I descale a Keurig coffee maker?"</div>
+      <span class="soon">A real run, on Phi-4 through OpenRouter</span></div>
+      <img src="assets/examples/example-3-descale-a-keurig.png" alt="LocalAgentBrowser's report with the steps to descale a Keurig coffee maker"></div>
+    <div class="slide"><div><div class="kind">Good for</div><h2>Hearing what people say</h2>
+      <p>Views from several sources, side by side, so you can make up your own mind.</p>
+      <div class="q">"What do reviewers say about the Framework Laptop 13?"</div>
+      <span class="soon">A real run, on GPT-4o mini through OpenRouter</span></div>
+      <img src="assets/examples/example-4-framework-laptop.png" alt="LocalAgentBrowser's report on what reviewers say about the Framework Laptop 13"></div>
+    <div class="slide"><div><div class="kind">Good for</div><h2>Finding it in the official docs</h2>
+      <p>It goes to the official documentation and brings back the exact steps.</p>
+      <div class="q">"How do I set an environment variable in Windows 11?"</div>
+      <span class="soon">A real run, on Phi-4 through OpenRouter</span></div>
+      <img src="assets/examples/example-5-windows-variable.png" alt="LocalAgentBrowser's report on setting an environment variable in Windows 11"></div>
+    <div class="slide"><div><div class="kind">Good for</div><h2>Planning everyday things</h2>
+      <p>The checklist you need, pulled together from the pages that have it.</p>
+      <div class="q">"What do I need to bring to renew a US passport in person?"</div>
+      <span class="soon">A real run, on Phi-4 through OpenRouter</span></div>
+      <img src="assets/examples/example-6-us-passport.png" alt="LocalAgentBrowser's report on what to bring to renew a US passport in person"></div>
+    <div class="slide hl"><div><div class="kind">Highlight</div><h2>Watch it work</h2>
+      <p>Its window shows every step while its browser opens the pages beside it, scrolls to what it reads and marks
+        what it finds.</p></div>
+      <img src="assets/ui/run-beside-browser.png" alt=""></div>
+    <div class="slide hl"><div><div class="kind">Highlight</div><h2>Every answer shows its sources</h2>
+      <p>Each part of the answer carries a number that points to the page it came from, so you can check it yourself.</p></div>
+      <img src="assets/ui/report-in-window.png" alt=""></div>
+    <div class="slide hl"><div><div class="kind">Highlight</div><h2>It checks its own answer</h2>
+      <p>Before it finishes, it checks what it wrote against the pages it read, and says plainly when something wasn't found.</p></div>
+      <img src="assets/ui/reading-on.png" alt=""></div>
+    <div class="slide hl"><div><div class="kind">Highlight</div><h2>On your own PC, private and free</h2>
+      <p>With a model in LM Studio, your questions never leave your computer, and there's nothing to pay.</p></div>
+      <img src="assets/examples/local-start-screen.png" alt="LocalAgentBrowser's start screen with a model in LM Studio"></div>
+    <div class="slide hl"><div><div class="kind">Highlight</div><h2>Dozens of models, local or cloud</h2>
+      <p>Six tested models run on an ordinary PC. Or tick the cloud box and pick from 63 tested cloud models, with your
+        own key.</p></div>
+      <img src="assets/ui/cloud-model-menu.png" alt=""></div>
+    <div class="slide hl"><div><div class="kind">Highlight</div><h2><span class="cr">Clean Room</span> edition</h2>
+      <p>The same app with no cloud code in it at all, for anyone who wants to be certain nothing can leave the PC.</p></div>
+      <img src="assets/examples/cleanroom-start-screen.png" alt="The Clean Room edition's start screen: a model in LM Studio, and no cloud option"></div>
+  </div>
+  <button class="arrow prev" aria-label="Previous">&#8249;</button>
+  <button class="arrow next" aria-label="Next">&#8250;</button>
+  <div class="dots"></div>
+</section>
+
+<section class="pad" id="watch"><div class="wrap">
+  <div class="kicker">Watch it work</div>
+  <h2 class="big">A real run, start to finish</h2>
+  <p class="lead">It searches, opens a page, scrolls to what it needs, records what it finds and writes the answer.</p>
+  <div class="video"><video src="assets/examples/watch-it-work.webm" autoplay muted loop playsinline controls
+    aria-label="A real run on Phi-4: LocalAgentBrowser searches, reads Wikipedia, records two findings and writes the answer, sped up twice"></video></div>
+  <p class="note">A real run on Phi-4 through OpenRouter, sped up twice.</p>
+</div></section>
+
+<section class="pad research" id="research"><div class="wrap">
+  <div class="kicker">The research behind it</div>
+  <h2 class="big">Curious how it works?</h2>
+  <p>LocalAgentBrowser is also a research project into how far small models can go when code checks their work.</p>
+  <p style="margin-top:16px; display:flex; flex-wrap:wrap; gap:12px"><a class="btn" href="#">Read the article: We Can Do Better</a></p>
+</div></section>
+
+<footer><div class="wrap">LocalAgentBrowser · open source</div></footer>
+
+<script>
+  const track = document.querySelector(".track");
+  const slides = [...track.children];
+  const dots = document.querySelector(".dots");
+  slides.forEach((_, i) => {
+    const b = document.createElement("button");
+    b.setAttribute("aria-label", "Slide " + (i + 1));
+    b.onclick = () => go(i);
+    dots.append(b);
+  });
+  const current = () => Math.round(track.scrollLeft / track.clientWidth);
+  const go = i => track.scrollTo({ left: Math.max(0, Math.min(slides.length - 1, i)) * track.clientWidth, behavior: "smooth" });
+  const mark = () => [...dots.children].forEach((d, i) => d.classList.toggle("on", i === current()));
+  document.querySelector(".prev").onclick = () => go(current() - 1);
+  document.querySelector(".next").onclick = () => go(current() + 1);
+  track.addEventListener("scroll", () => requestAnimationFrame(mark));
+  document.addEventListener("keydown", e => {
+    const r = track.getBoundingClientRect();
+    if (r.top > innerHeight * 0.5 || r.bottom < innerHeight * 0.5) return;
+    if (e.key === "ArrowRight") go(current() + 1);
+    if (e.key === "ArrowLeft") go(current() - 1);
+  });
+  mark();
+  // Moves on by itself every 5 seconds, and after the last slide starts again from the first
+  setInterval(() => go(current() >= slides.length - 1 ? 0 : current() + 1), 5000);
+</script>
+</body>
+</html>
